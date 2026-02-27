@@ -1,0 +1,133 @@
+﻿from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from supabase import create_client, Client
+
+app = Flask(__name__)
+# Secret key is required for Flask flash messages to work securely
+app.secret_key = "yene_safe_ride_super_secret" 
+
+# --- SUPABASE CREDENTIALS ---
+SUPABASE_URL = "https://kcxphxihykonzuagtgke.supabase.co"
+SUPABASE_KEY = "sb_publishable_g7evtigGLrMyHUSOZisn-g_XHwIVwrF"
+
+# 🔥 The Service Role Key allows the backend to act as a Super Admin to create users silently
+SUPABASE_SERVICE_KEY = "PUT_YOUR_SERVICE_ROLE_KEY_HERE" 
+
+# Initialize Clients
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+# --- FRONTEND ROUTES ---
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/register')
+def register():
+    return render_template('register_agent.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username').strip().lower()
+        password = request.form.get('password')
+
+        try:
+            # 1. Look up the Agent by username
+            agent_check = supabase.table('agent_profiles').select('email, status').eq('username', username).execute()
+            
+            if agent_check.data:
+                agent_email = agent_check.data[0]['email']
+                agent_status = agent_check.data[0]['status']
+                
+                # Check approval status before logging in
+                if agent_status == 'pending_approval':
+                    flash("Your account is still pending admin approval.")
+                    return redirect(url_for('login'))
+                elif agent_status == 'blocked':
+                    flash("Your account has been blocked. Contact Support.")
+                    return redirect(url_for('login'))
+                
+                # Authenticate with the retrieved email
+                supabase.auth.sign_in_with_password({"email": agent_email, "password": password})
+                return redirect(url_for('agent_dashboard'))
+            
+            # 2. Look up Admin by username
+            admin_check = supabase.table('admin_profiles').select('email').eq('username', username).execute()
+            
+            if admin_check.data:
+                admin_email = admin_check.data[0]['email']
+                supabase.auth.sign_in_with_password({"email": admin_email, "password": password})
+                return redirect(url_for('admin_dashboard'))
+
+            # If username is not in agent_profiles or admin_profiles
+            flash("Username not found.")
+            return redirect(url_for('login'))
+
+        except Exception as e:
+            # If the password/PIN is wrong, Supabase throws an error here
+            flash("Invalid PIN or Password.")
+            return redirect(url_for('login'))
+
+    return render_template('login.html')
+
+@app.route('/dashboard/agent')
+def agent_dashboard():
+    return render_template('agent_dashboard.html')
+
+@app.route('/dashboard/admin')
+def admin_dashboard():
+    return render_template('admin_dashboard.html')
+
+@app.route('/invoice')
+def invoice():
+    return render_template('invoice.html')
+
+
+# --- SECURE BACKEND API ROUTES ---
+
+@app.route('/api/create_user', methods=['POST'])
+def create_user():
+    """
+    Called by the Admin Dashboard to create a new Agent or Admin
+    without logging the current Admin out of their session.
+    """
+    data = request.get_json()
+    role = data.get('role')
+    username = data.get('username').strip().lower()
+    email = data.get('email').strip()
+    password = data.get('password')
+
+    try:
+        # 1. Create the user silently using the Admin API
+        new_user = supabase_admin.auth.admin.create_user({
+            "email": email,
+            "password": password,
+            "email_confirm": True
+        })
+        user_id = new_user.user.id
+
+        # 2. Add them to the correct database table
+        if role == 'admin':
+            supabase_admin.table('admin_profiles').insert({
+                "user_id": user_id,
+                "username": username,
+                "email": email
+            }).execute()
+        else:
+            supabase_admin.table('agent_profiles').insert({
+                "user_id": user_id,
+                "username": username,
+                "email": email,
+                "status": "active" # Auto-activated because the Admin created them
+            }).execute()
+
+        return jsonify({"success": True, "message": f"{role.capitalize()} account '@{username}' created successfully!"})
+
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+
+if __name__ == '__main__':
+    print("🚀 Starting Yene Safe Ride Portal...")
+    app.run(debug=True, port=5000)

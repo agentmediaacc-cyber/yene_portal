@@ -1,0 +1,510 @@
+﻿import os
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, Response
+from flask_cors import CORS
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+# Load .env variables
+load_dotenv()
+
+app = Flask(__name__)
+# --- ENV / SUPABASE VARS (for templates) ---
+SUPABASE_URL_ENV = os.getenv("SUPABASE_URL", "https://kcxphxihykonzuagtgke.supabase.co")
+SUPABASE_ANON_ENV = os.getenv("SUPABASE_ANON_KEY", "")
+
+app.secret_key = os.getenv("FLASK_SECRET", "yene_safe_ride_super_secret")
+CORS(app)
+
+# --- SUPABASE CREDENTIALS (from .env) ---
+URL = (os.getenv("SUPABASE_URL") or "").strip()
+ANON_KEY = (os.getenv("SUPABASE_ANON_KEY") or "").strip()
+SERVICE_KEY = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+
+if not URL or not ANON_KEY or not SERVICE_KEY:
+    raise RuntimeError("Missing SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY in .env")
+
+# Clients
+supabase: Client = create_client(URL, ANON_KEY)        # normal client (RLS applies)
+sb_admin: Client = create_client(URL, SERVICE_KEY)     # admin client (bypasses RLS)
+
+# ----------------------------
+# Helpers
+# ----------------------------
+def require_login(role=None):
+    def decorator(fn):
+        from functools import wraps
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not session.get("role"):
+                flash("Please login first.")
+                return redirect(url_for("login"))
+            if role and session.get("role") != role:
+                flash("Access denied.")
+                return redirect(url_for("login"))
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def log_system_event(event_type, description, user_id=None):
+    try:
+        ip_addr = request.headers.get("X-Forwarded-For", request.remote_addr)
+        sb_admin.table("system_logs").insert({
+            "event_type": event_type,
+            "description": description,
+            "user_id": user_id,
+            "ip_address": ip_addr
+        }).execute()
+    except Exception as e:
+        print(f"Logging Error: {e}")
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route('/agent/dashboard')
+@require_login('AGENT')
+def agent_dashboard():
+    return render_template('agent_dashboard.html', SUPABASE_URL=os.getenv('SUPABASE_URL',''), SUPABASE_ANON_KEY=os.getenv('SUPABASE_ANON_KEY',''))
+
+
+@app.route('/dashboard/agent')
+def agent_dashboard_alias():
+    return redirect(url_for('agent_dashboard'))
+
+@app.route("/register")
+def register():
+    return render_template("register.html")
+
+@app.route("/dashboard/admin")
+@require_login("ADMIN")
+def admin_dashboard():
+    return render_template("admin_dashboard.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Logged out.")
+    return redirect(url_for("login"))
+
+
+@app.route("/admin/login", methods=["GET"])
+def admin_login():
+    # Admin-only login entry
+    return render_template("login.html", login_mode="admin")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = (request.form.get("username") or "").strip().lower()   # from login.html email field
+        password = request.form.get("password") or ""
+        login_mode = (request.form.get("login_mode") or "agent").strip().lower()
+
+        try:
+            if login_mode == "admin":
+                # Admin must exist in admin_profiles
+                admin_check = supabase.table("admin_profiles").select("email").eq("email", email).execute()
+                if not admin_check.data:
+                    flash("Admin not found.")
+                    return redirect(url_for("admin_login"))
+
+                supabase.auth.sign_in_with_password({"email": email, "password": password})
+
+                session.clear()
+                session["role"] = "ADMIN"
+                session["email"] = email
+
+                flash("Access granted.")
+                return redirect(url_for("admin_dashboard"))
+
+            # Agent login
+            agent_check = supabase.table("agent_profiles").select("email, status").eq("email", email).execute()
+            if not agent_check.data:
+                flash("Agent account not found.")
+                return redirect(url_for("login"))
+
+            status = (agent_check.data[0].get("status") or "").lower()
+            if status in ("pending", "pending_approval"):
+                flash("Your account is still pending admin approval.")
+                return redirect(url_for("login"))
+
+            supabase.auth.sign_in_with_password({"email": email, "password": password})
+
+            session.clear()
+            session["role"] = "AGENT"
+            session["email"] = email
+
+            flash("Access granted.")
+            return redirect(url_for("agent_dashboard"))
+
+        except Exception as e:
+            flash(f"Login error: {str(e)}")
+
+    return render_template("login.html", login_mode="agent")
+
+
+@app.route("/api/admin/create_user_v2", methods=["POST"])
+@require_login("ADMIN")
+def admin_create_user_final():
+    try:
+        data = request.json or {}
+
+        email = (data.get("email") or "").strip().lower()
+        password = data.get("password") or ""
+        full_name = (data.get("full_name") or "").strip()
+        username = (data.get("username") or "").strip().lower()
+        phone = (data.get("phone") or "").strip()
+        role = (data.get("role") or "AGENT").strip().upper()
+
+        if not email or len(password) < 6:
+            return jsonify({"success": False, "error": "Email required and password must be at least 6 characters."}), 400
+        if not username:
+            return jsonify({"success": False, "error": "Username is required."}), 400
+
+        # 1) Create Supabase Auth user (service role)
+        res = sb_admin.auth.admin.create_user({
+            "email": email,
+            "password": password,
+            "email_confirm": True,
+            "user_metadata": {"full_name": full_name}
+        })
+
+        user_id = res.user.id
+
+        # 2) Insert profile row (agent_profiles)
+        # NOTE: Your table earlier did NOT have auth_id, so we store the auth user id in "id".
+        sb_admin.table("agent_profiles").insert({
+            "id": user_id,
+            "username": username,
+            "full_name": full_name,
+            "email": email,
+            "phone": phone,
+            "role": role,
+            "status": "pending_approval"
+        }).execute()
+
+        log_system_event("USER_CREATION", f"Admin created agent: {email}", user_id=user_id)
+        return jsonify({"success": True, "message": "Account Created (Pending Approval)!"})
+
+    except Exception as e:
+        msg = str(e)
+        low = msg.lower()
+        if "already registered" in low or "user already exists" in low:
+            msg = "This email is already registered."
+        return jsonify({"success": False, "error": msg}), 400
+
+
+@app.route("/test-env")
+def test_env():
+    return jsonify({
+        "url": URL,
+        "anon_loaded": bool(ANON_KEY),
+        "service_loaded": bool(SERVICE_KEY)
+    })
+
+
+
+# === YENE ADMIN API BLOCK ===
+# NOTE: These endpoints use sb_admin (service role) so the browser never sees service keys.
+
+def _require_admin():
+    # If you already have require_login("ADMIN"), this is extra safety.
+    role = session.get("role") or session.get("user_role")
+    if role and str(role).upper() == "ADMIN":
+        return True
+    return False
+
+@app.route("/api/admin/overview")
+def api_admin_overview():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+
+    # Agents
+    agents = sb_admin.table("agents").select("id,status").execute().data or []
+    active = len([a for a in agents if (a.get("status") or "").upper() == "ACTIVE"])
+    pending = len([a for a in agents if (a.get("status") or "").upper() == "PENDING"])
+    blocked = len([a for a in agents if (a.get("status") or "").upper() == "BLOCKED"])
+
+    # Drivers + clients
+    drivers = sb_admin.table("drivers").select("id,created_at,full_name,phone,town,recruiter_name,recruiter_agent_id").order("created_at", desc=True).limit(15).execute().data or []
+    clients = sb_admin.table("clients").select("id,created_at,full_name,phone,recruiter_name,recruiter_agent_id").order("created_at", desc=True).limit(15).execute().data or []
+
+    # Finance totals
+    ledger = sb_admin.table("finance_ledger").select("amount").execute().data or []
+    total_paid = sum(float(x.get("amount") or 0) for x in ledger)
+
+    recent = []
+    for d in drivers:
+        recent.append({
+            "created_at": d.get("created_at"),
+            "type": "DRIVER",
+            "name": d.get("full_name"),
+            "phone": d.get("phone"),
+            "town": d.get("town"),
+            "recruiter_name": d.get("recruiter_name"),
+            "recruiter_id": d.get("recruiter_agent_id"),
+        })
+    for c in clients:
+        recent.append({
+            "created_at": c.get("created_at"),
+            "type": "CLIENT",
+            "name": c.get("full_name"),
+            "phone": c.get("phone"),
+            "town": "",
+            "recruiter_name": c.get("recruiter_name"),
+            "recruiter_id": c.get("recruiter_agent_id"),
+        })
+    recent = sorted(recent, key=lambda x: x.get("created_at") or "", reverse=True)[:25]
+
+    return jsonify({"success": True, "data": {
+        "agents_total": len(agents),
+        "agents_active": active,
+        "agents_pending": pending,
+        "agents_blocked": blocked,
+        "drivers_total": sb_admin.table("drivers").select("id").execute().data and len(sb_admin.table("drivers").select("id").execute().data) or 0,
+        "clients_total": sb_admin.table("clients").select("id").execute().data and len(sb_admin.table("clients").select("id").execute().data) or 0,
+        "total_paid": total_paid,
+        "recent_activity": recent
+    }})
+
+@app.route("/api/admin/agents")
+def api_admin_agents():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+
+    agents = sb_admin.table("agents").select("*").order("created_at", desc=True).limit(2000).execute().data or []
+
+    # counts per agent for drivers/clients
+    drivers = sb_admin.table("drivers").select("recruiter_agent_id").execute().data or []
+    clients = sb_admin.table("clients").select("recruiter_agent_id").execute().data or []
+
+    counts = {}
+    for d in drivers:
+        aid = d.get("recruiter_agent_id")
+        if not aid: continue
+        counts.setdefault(aid, {"drivers":0, "clients":0})
+        counts[aid]["drivers"] += 1
+    for c in clients:
+        aid = c.get("recruiter_agent_id")
+        if not aid: continue
+        counts.setdefault(aid, {"drivers":0, "clients":0})
+        counts[aid]["clients"] += 1
+
+    return jsonify({"success": True, "data": {"agents": agents, "counts": counts}})
+
+@app.route("/api/admin/agents/<agent_id>/status", methods=["POST"])
+def api_admin_agent_status(agent_id):
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+
+    data = request.json or {}
+    status = (data.get("status") or "").upper().strip()
+    if status not in ("ACTIVE","PENDING","SUSPENDED","BLOCKED"):
+        return jsonify({"success": False, "error": "Invalid status"}), 400
+
+    sb_admin.table("agents").update({"status": status}).eq("id", agent_id).execute()
+    try:
+        sb_admin.table("system_logs").insert({
+            "event_type": "AGENT_STATUS",
+            "description": f"Admin set agent {agent_id} -> {status}",
+            "user_id": session.get("user_id"),
+            "ip_address": request.remote_addr
+        }).execute()
+    except Exception:
+        pass
+
+    return jsonify({"success": True})
+
+@app.route("/api/admin/drivers")
+def api_admin_drivers():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+    data = sb_admin.table("drivers").select("*").order("created_at", desc=True).limit(5000).execute().data or []
+    return jsonify({"success": True, "data": data})
+
+@app.route("/api/admin/clients")
+def api_admin_clients():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+    data = sb_admin.table("clients").select("*").order("created_at", desc=True).limit(5000).execute().data or []
+    return jsonify({"success": True, "data": data})
+
+@app.route("/api/admin/finance")
+def api_admin_finance():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+    data = sb_admin.table("finance_ledger").select("*").order("created_at", desc=True).limit(5000).execute().data or []
+    return jsonify({"success": True, "data": data})
+
+@app.route("/api/admin/payment_rules", methods=["GET","POST"])
+def api_admin_payment_rules():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+
+    if request.method == "GET":
+        data = sb_admin.table("payment_rules").select("*").order("region").order("town").limit(3000).execute().data or []
+        return jsonify({"success": True, "data": data})
+
+    payload = request.json or {}
+    region = (payload.get("region") or "").strip()
+    town = (payload.get("town") or "").strip()
+    if not region or not town:
+        return jsonify({"success": False, "error": "Region and town required"}), 400
+
+    row = {
+        "region": region,
+        "town": town,
+        "driver_reg": payload.get("driver_reg") or 0,
+        "client_reg": payload.get("client_reg") or 0,
+        "first_trip_bonus": payload.get("first_trip_bonus") or 0,
+        "referral_pct": payload.get("referral_pct") or 0,
+        "is_active": bool(payload.get("is_active", True)),
+    }
+
+    # Upsert by (region,town) — requires unique constraint in Supabase to be perfect.
+    # If no unique constraint exists, this will insert duplicates (still works but not ideal).
+    sb_admin.table("payment_rules").insert(row).execute()
+    return jsonify({"success": True})
+
+@app.route("/api/admin/broadcast", methods=["POST"])
+def api_admin_broadcast():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+    data = request.json or {}
+    msg = (data.get("message") or "").strip()
+    if not msg:
+        return jsonify({"success": False, "error": "Message required"}), 400
+    sb_admin.table("broadcasts").insert({"message": msg}).execute()
+    return jsonify({"success": True})
+
+@app.route("/api/admin/broadcasts")
+def api_admin_broadcasts():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+    data = sb_admin.table("broadcasts").select("*").order("created_at", desc=True).limit(50).execute().data or []
+    return jsonify({"success": True, "data": data})
+
+@app.route("/api/admin/create_user", methods=["POST"])
+def api_admin_create_user():
+    if not _require_admin():
+        return jsonify({"success": False, "error": "Not authorized"}), 401
+
+    data = request.json or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    full_name = (data.get("full_name") or "").strip()
+    username = (data.get("username") or "").strip().lower()
+    phone = (data.get("phone") or "").strip()
+    role = (data.get("role") or "AGENT").strip().upper()
+
+    if not email or len(password) < 6:
+        return jsonify({"success": False, "error": "Email required + password min 6"}), 400
+    if role not in ("AGENT","ADMIN"):
+        return jsonify({"success": False, "error": "Role must be AGENT or ADMIN"}), 400
+
+    # Create Auth user
+    res = sb_admin.auth.admin.create_user({
+        "email": email,
+        "password": password,
+        "email_confirm": True,
+        "user_metadata": {"full_name": full_name, "role": role}
+    })
+
+    auth_id = res.user.id
+
+    # Create DB profile row
+    # IMPORTANT: your agent_dashboard currently reads from table "agents" using auth_id
+    sb_admin.table("agents").insert({
+        "auth_id": auth_id,
+        "full_name": full_name,
+        "email": email,
+        "username": username,
+        "phone": phone,
+        "role": role,
+        "status": "PENDING" if role == "AGENT" else "ACTIVE"
+    }).execute()
+
+    try:
+        sb_admin.table("system_logs").insert({
+            "event_type": "USER_CREATE",
+            "description": f"Admin created {role}: {email}",
+            "user_id": session.get("user_id"),
+            "ip_address": request.remote_addr
+        }).execute()
+    except Exception:
+        pass
+
+    return jsonify({"success": True})
+
+@app.route("/api/admin/export/<kind>")
+def api_admin_export(kind):
+    if not _require_admin():
+        return "Not authorized", 401
+
+    if kind == "agents":
+        rows = sb_admin.table("agents").select("*").order("created_at", desc=True).limit(10000).execute().data or []
+    elif kind == "drivers":
+        rows = sb_admin.table("drivers").select("*").order("created_at", desc=True).limit(20000).execute().data or []
+    elif kind == "clients":
+        rows = sb_admin.table("clients").select("*").order("created_at", desc=True).limit(20000).execute().data or []
+    elif kind == "finance":
+        rows = sb_admin.table("finance_ledger").select("*").order("created_at", desc=True).limit(50000).execute().data or []
+    else:
+        return "Bad export type", 400
+
+    # Build CSV
+    import csv, io
+    out = io.StringIO()
+    if not rows:
+        out.write("")
+    else:
+        fieldnames = sorted({k for r in rows for k in r.keys()})
+        w = csv.DictWriter(out, fieldnames=fieldnames)
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: r.get(k, "") for k in fieldnames})
+
+    resp = Response(out.getvalue(), mimetype="text/csv; charset=utf-8")
+    resp.headers["Content-Disposition"] = f'attachment; filename="{kind}.csv"'
+    return resp
+
+# === END YENE ADMIN API BLOCK ===
+
+
+if __name__ == "__main__":
+    print("🚀 YENE Portal is Live on http://127.0.0.1:5000")
+    app.run(debug=True, port=5000)
+@app.route("/api/admin/approve_agent", methods=["POST"])
+@require_login("ADMIN")
+def approve_agent():
+    """
+    Approve / block / suspend an agent profile.
+    Expects JSON:
+      { "agent_id": "<uuid>", "status": "ACTIVE" | "PENDING" | "BLOCKED" | "SUSPENDED" }
+    """
+    try:
+        data = request.json or {}
+        agent_id = (data.get("agent_id") or "").strip()
+        status = (data.get("status") or "ACTIVE").strip().upper()
+
+        if not agent_id:
+            return jsonify({"success": False, "error": "agent_id is required"}), 400
+
+        allowed = {"ACTIVE", "PENDING", "BLOCKED", "SUSPENDED"}
+        if status not in allowed:
+            return jsonify({"success": False, "error": f"Invalid status. Use: {', '.join(sorted(allowed))}"}), 400
+
+        sb_admin.table("agent_profiles").update({"status": status}).eq("id", agent_id).execute()
+
+        log_system_event("AGENT_STATUS", f"Admin set agent {agent_id} status -> {status}", user_id=agent_id)
+        return jsonify({"success": True, "message": f"Agent status updated to {status}"}), 200
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route("/admin")
+def admin_entry():
+    # Admin channel entry point
+    return redirect(url_for("admin_dashboard"))

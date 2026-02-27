@@ -1,0 +1,84 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>YENE Admin Setup</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: #121212; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #1e1e1e; padding: 3rem; border-radius: 8px; border-top: 4px solid #ff4757; text-align: center; }
+        button { background: #ff4757; color: white; border: none; padding: 1rem 2rem; font-size: 1.2rem; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 1rem; }
+        button:hover { background: #e84118; }
+        #log { margin-top: 1.5rem; color: #a4b0be; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1 style="margin-top:0;">👑 Forge Master Key</h1>
+        <p>Username: <strong style="color:#00a8ff;">yenekasera</strong></p>
+        <p>PIN: <strong style="color:#00a8ff;">000001</strong></p>
+        <button id="btn" onclick="forgeAdmin()">Create Admin Account</button>
+        <div id="log">Waiting...</div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://kcxphxihykonzuagtgke.supabase.co';
+        const supabaseKey = 'sb_publishable_g7evtigGLrMyHUSOZisn-g_XHwIVwrF';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function forgeAdmin() {
+            const btn = document.getElementById('btn');
+            const log = document.getElementById('log');
+            btn.disabled = true;
+            
+            const email = "admin@yene.com"; // System needs an email anchor
+            const pin = "000001";
+            const username = "yenekasera";
+
+            log.innerHTML = "<span style='color:#f39c12'>Step 1: Creating secure Auth Vault entry...</span>";
+            
+            // 1. Create the Auth User
+            const { data: authData, error: authErr } = await supabase.auth.signUp({
+                email: email,
+                password: pin
+            });
+
+            if (authErr) {
+                log.innerHTML = `<span style='color:#ff4757'>Auth Error: ${authErr.message}</span>`;
+                btn.disabled = false;
+                return;
+            }
+
+            log.innerHTML += "<br><span style='color:#f39c12'>Step 2: Injecting Admin privileges into Database...</span>";
+
+            // 2. Inject directly into the Agent Profiles table as Active Admin
+            const { error: dbErr } = await supabase.from('agent_profiles').insert({
+                user_id: authData.user.id,
+                username: username,
+                auth_method: 'pin',
+                email: email,
+                full_name: 'Yene Founder',
+                phone_number: '+264810000000',
+                gender: 'Male',
+                national_id: 'MASTER_ADMIN',
+                address: 'Yene Headquarters',
+                town: 'Windhoek',
+                region: 'Khomas',
+                profile_pic_path: 'admin',
+                id_document_path: 'admin',
+                status: 'active',
+                role: 'admin'
+            });
+
+            if (dbErr) {
+                log.innerHTML += `<br><span style='color:#ff4757'>Database Error: ${dbErr.message}</span>`;
+                btn.disabled = false;
+                return;
+            }
+
+            log.innerHTML += "<br><span style='color:#2ed573; font-size:1.2rem; font-weight:bold;'>✅ MASTER ADMIN CREATED SUCCESSFULLY!</span>";
+            log.innerHTML += "<br><br>You can now go to the login page and use your credentials.";
+        }
+    </script>
+</body>
+</html>

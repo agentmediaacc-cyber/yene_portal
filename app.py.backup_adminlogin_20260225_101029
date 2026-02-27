@@ -1,0 +1,233 @@
+﻿import os
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask_cors import CORS
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+# Load .env variables
+load_dotenv()
+
+app = Flask(__name__)
+# --- ENV / SUPABASE VARS (for templates) ---
+SUPABASE_URL_ENV = os.getenv("SUPABASE_URL", "https://kcxphxihykonzuagtgke.supabase.co")
+SUPABASE_ANON_ENV = os.getenv("SUPABASE_ANON_KEY", "")
+
+app.secret_key = os.getenv("FLASK_SECRET", "yene_safe_ride_super_secret")
+CORS(app)
+
+# --- SUPABASE CREDENTIALS (from .env) ---
+URL = (os.getenv("SUPABASE_URL") or "").strip()
+ANON_KEY = (os.getenv("SUPABASE_ANON_KEY") or "").strip()
+SERVICE_KEY = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+
+if not URL or not ANON_KEY or not SERVICE_KEY:
+    raise RuntimeError("Missing SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY in .env")
+
+# Clients
+supabase: Client = create_client(URL, ANON_KEY)        # normal client (RLS applies)
+sb_admin: Client = create_client(URL, SERVICE_KEY)     # admin client (bypasses RLS)
+
+# ----------------------------
+# Helpers
+# ----------------------------
+def require_login(role=None):
+    def decorator(fn):
+        from functools import wraps
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not session.get("role"):
+                flash("Please login first.")
+                return redirect(url_for("login"))
+            if role and session.get("role") != role:
+                flash("Access denied.")
+                return redirect(url_for("login"))
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def log_system_event(event_type, description, user_id=None):
+    try:
+        ip_addr = request.headers.get("X-Forwarded-For", request.remote_addr)
+        sb_admin.table("system_logs").insert({
+            "event_type": event_type,
+            "description": description,
+            "user_id": user_id,
+            "ip_address": ip_addr,
+            "created_at": datetime.utcnow().isoformat()
+        }).execute()
+    except Exception as e:
+        print(f"Logging Error: {e}")
+
+# ----------------------------
+# FRONTEND ROUTES
+# ----------------------------
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route('/agent/dashboard')
+def agent_dashboard():
+    return render_template('agent_dashboard.html', SUPABASE_URL=SUPABASE_URL_ENV, SUPABASE_ANON_KEY=SUPABASE_ANON_ENV)
+
+
+@app.route('/dashboard/agent')
+def agent_dashboard_alias():
+    return redirect(url_for('agent_dashboard'))
+
+@app.route("/register")
+def register():
+    return render_template("register.html")
+
+@app.route("/dashboard/admin")
+@require_login("ADMIN")
+def admin_dashboard():
+    return render_template("admin_dashboard.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Logged out.")
+    return redirect(url_for("login"))
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip().lower()
+        password = request.form.get("password") or ""
+
+        if not username or not password:
+            flash("Enter username and password.")
+            return redirect(url_for("login"))
+
+        try:
+            # ---- Check Agents ----
+            agent_check = supabase.table("agent_profiles") \
+                .select("id, email, status, username, full_name, role") \
+                .eq("username", username) \
+                .limit(1).execute()
+
+            if agent_check.data:
+                agent = agent_check.data[0]
+                status = (agent.get("status") or "").lower()
+
+                if status in ["pending_approval", "pending"]:
+                    flash("Your account is still pending admin approval.")
+                    return redirect(url_for("login"))
+
+                if status in ["blocked", "suspended"]:
+                    flash("Your account is blocked. Contact admin.")
+                    return redirect(url_for("login"))
+
+                # Verify password via Supabase Auth
+                supabase.auth.sign_in_with_password({"email": agent["email"], "password": password})
+
+                # Create session
+                session["role"] = "AGENT"
+                session["user_id"] = agent["id"]
+                session["username"] = agent.get("username")
+                session["full_name"] = agent.get("full_name")
+                session["email"] = agent.get("email")
+
+                log_system_event("LOGIN", f"Agent login: {agent.get('email')}", user_id=agent["id"])
+                return redirect(url_for("agent_dashboard"))
+
+            # ---- Check Admins ----
+            admin_check = supabase.table("admin_profiles") \
+                .select("id, email, username, full_name") \
+                .eq("username", username) \
+                .limit(1).execute()
+
+            if admin_check.data:
+                admin = admin_check.data[0]
+
+                supabase.auth.sign_in_with_password({"email": admin["email"], "password": password})
+
+                session["role"] = "ADMIN"
+                session["user_id"] = admin["id"]
+                session["username"] = admin.get("username")
+                session["full_name"] = admin.get("full_name")
+                session["email"] = admin.get("email")
+
+                log_system_event("LOGIN", f"Admin login: {admin.get('email')}", user_id=admin["id"])
+                return redirect(url_for("admin_dashboard"))
+
+            flash("Username not found.")
+            return redirect(url_for("login"))
+
+        except Exception as e:
+            flash(f"Login error: {str(e)}")
+            return redirect(url_for("login"))
+
+    return render_template("login.html")
+
+# ----------------------------
+# ADMIN API ROUTES
+# ----------------------------
+@app.route("/api/admin/create_user_v2", methods=["POST"])
+@require_login("ADMIN")
+def admin_create_user_final():
+    try:
+        data = request.json or {}
+
+        email = (data.get("email") or "").strip().lower()
+        password = data.get("password") or ""
+        full_name = (data.get("full_name") or "").strip()
+        username = (data.get("username") or "").strip().lower()
+        phone = (data.get("phone") or "").strip()
+        role = (data.get("role") or "AGENT").strip().upper()
+
+        if not email or len(password) < 6:
+            return jsonify({"success": False, "error": "Email required and password must be at least 6 characters."}), 400
+        if not username:
+            return jsonify({"success": False, "error": "Username is required."}), 400
+
+        # Create Supabase Auth user
+        res = sb_admin.auth.admin.create_user({
+            "email": email,
+            "password": password,
+            "email_confirm": True,
+            "user_metadata": {"full_name": full_name}
+        })
+
+        user_id = res.user.id
+
+        # Create agent profile in DB
+        sb_admin.table("agent_profiles").insert({
+            "id": user_id,                  # best practice: keep same id as auth user
+            "auth_id": user_id,
+            "full_name": full_name,
+            "username": username,
+            "email": email,
+            "phone": phone,
+            "role": role,
+            "status": "pending_approval",
+            "created_at": datetime.utcnow().isoformat()
+        }).execute()
+
+        log_system_event("USER_CREATION", f"Admin created user: {email}", user_id=user_id)
+
+        return jsonify({"success": True, "message": "Account Created! Pending approval.", "user_id": user_id})
+
+    except Exception as e:
+        err_msg = str(e)
+        if "already registered" in err_msg.lower():
+            err_msg = "This email is already registered."
+        if "duplicate key" in err_msg.lower() or "unique constraint" in err_msg.lower():
+            err_msg = "Username/email/phone already exists."
+        return jsonify({"success": False, "error": err_msg}), 400
+
+# ----------------------------
+# QUICK ENV TEST (optional)
+# ----------------------------
+@app.route("/test-env")
+def test_env():
+    return jsonify({
+        "url": URL,
+        "anon_loaded": bool(ANON_KEY),
+        "service_loaded": bool(SERVICE_KEY)
+    })
+
+if __name__ == "__main__":
+    print("🚀 YENE Portal is Live on http://127.0.0.1:5000")
+    app.run(debug=True, port=5000)

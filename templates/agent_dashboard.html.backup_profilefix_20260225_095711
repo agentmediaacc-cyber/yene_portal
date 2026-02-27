@@ -1,0 +1,607 @@
+﻿{% extends 'base.html' %}
+{% block content %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+  :root {
+    --yene: #4aa8ff;
+    --bg: #0b1220;
+    --panel: #0f1a2f;
+    --card: #111b2e;
+    --card2: #0b1427;
+    --text: #eaf2ff;
+    --muted: #a9b7d6;
+    --line: rgba(255,255,255,.10);
+    --danger: #ff5c5c;
+    --ok: #2ed573;
+    --warn: #ffa502;
+    --gold: #f1c40f;
+    --purple: #9c88ff;
+  }
+
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+  body { margin: 0; background: var(--bg); color: var(--text); overflow: hidden; }
+
+  .dash { display: flex; height: 100vh; }
+
+  .topbar { display: none; background: var(--panel); padding: 15px 20px; border-bottom: 1px solid var(--line); align-items: center; justify-content: space-between; }
+  .hamburger { cursor: pointer; font-size: 1.5rem; color: var(--yene); border: none; background: transparent; }
+
+  .sidebar { width: 280px; background: linear-gradient(180deg,#070d18 0%, #091027 100%); border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 1000; transition: 0.3s; }
+
+  .profile-card { padding: 24px 16px; border-bottom: 1px solid var(--line); text-align: center; position: relative; }
+  .badge-icon { position: absolute; top: 16px; right: 16px; font-size: 1.2rem; display: none; color: var(--gold); }
+  .profile-card .avatar { width: 64px; height: 64px; background: rgba(74,168,255,.14); border: 2px solid var(--yene); border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 900; color: var(--yene); text-transform: uppercase; }
+  .profile-card h4 { margin: 0; color: var(--text); font-size: 18px; }
+  .profile-card p { margin: 4px 0 0; color: var(--ok); font-size: 12px; font-weight: bold; }
+  .tier-label { display: inline-block; background: rgba(241, 196, 15, 0.1); color: var(--gold); border: 1px solid rgba(241, 196, 15, 0.3); padding: 4px 10px; border-radius: 999px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; font-weight: 900; }
+
+  .nav { padding: 10px; flex-grow: 1; overflow-y: auto; }
+  .nav .item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; color: var(--muted); cursor: pointer; border: 1px solid transparent; transition: 0.15s; margin-bottom: 4px; }
+  .nav .item:hover { background: rgba(74,168,255,.10); color: var(--text); border-color: rgba(74,168,255,.18); }
+  .nav .item.active { background: rgba(74,168,255,.14); color: var(--text); border-color: rgba(74,168,255,.28); font-weight: bold; }
+  .nav .item i { width: 20px; text-align: center; }
+
+  .sidebar-footer { padding: 12px 10px 16px; border-top: 1px solid var(--line); }
+
+  .main { flex: 1; overflow-y: auto; padding: 24px; position: relative; }
+  .view { display: none; animation: fadeIn 0.2s ease-in; }
+  .view.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+  h2 { margin-top: 0; margin-bottom: 20px; color: var(--text); font-size: 20px; }
+  h3 { margin-top: 0; color: var(--text); font-size: 16px; margin-bottom: 12px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media(max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+
+  .card { background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); background-color: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; position: relative; }
+  .card-top-blue { border-top: 3px solid var(--yene); }
+  .card-top-green { border-top: 3px solid var(--ok); }
+  .card-top-purple { border-top: 3px solid var(--purple); }
+  .card-top-gold { border-top: 3px solid var(--gold); }
+  .card-top-warn { border-top: 3px solid var(--warn); } /* FIX */
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field label { color: var(--muted); font-size: 13px; }
+  .field input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: var(--text); outline: none; }
+  .field input:focus { border-color: var(--yene); }
+
+  .btn { border: 1px solid var(--line); background: var(--card2); color: var(--text); padding: 12px 16px; border-radius: 12px; cursor: pointer; transition: 0.15s; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn:hover { border-color: rgba(74,168,255,.35); }
+  .btn.primary { background: var(--yene); color: #041021; border-color: transparent; }
+  .btn.ok { background: var(--ok); color: #02110a; border-color: transparent; }
+  .btn.warn { background: var(--warn); color: #1b1100; border-color: transparent; }
+  .btn.purple { background: var(--purple); color: #fff; border-color: transparent; }
+
+  .table-wrap { overflow: auto; border-radius: 14px; border: 1px solid var(--line); background: rgba(0,0,0,.05); }
+  table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; }
+  th { color: var(--yene); font-weight: 900; background: rgba(74,168,255,.06); }
+
+  progress { width: 100%; height: 8px; border-radius: 4px; margin-top: 5px; appearance: none; }
+  progress::-webkit-progress-bar { background-color: var(--card2); border-radius: 4px; border: 1px solid var(--line); }
+  progress::-webkit-progress-value { background-color: var(--yene); border-radius: 4px; }
+
+  .locked-overlay { position: absolute; inset: 0; background: rgba(11, 18, 32, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 16px; text-align: center; padding: 24px; z-index: 10; backdrop-filter: blur(4px); }
+
+  #security-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--yene); }
+
+  @media (max-width: 768px) {
+    .topbar { display: flex; }
+    .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+  }
+</style>
+
+<div id="security-overlay">
+  <i class="fa-solid fa-shield-halved fa-3x fa-beat-fade" style="margin-bottom: 20px;"></i>
+  <h2>Authenticating Agent...</h2>
+</div>
+
+<div class="dash">
+  <div class="topbar">
+    <div style="font-weight: 900; color: var(--yene); letter-spacing: 1px;"><i class="fa-solid fa-car-side"></i> YENE PROMOTER</div>
+    <button class="hamburger" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+  </div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="profile-card">
+      <i class="fa-solid fa-star badge-icon" id="elite-badge" title="Elite Agent"></i>
+      <div class="avatar" id="user-initial"><i class="fa-solid fa-user"></i></div>
+      <h4 id="display-name">Loading...</h4>
+      <p id="display-status">Connecting to network...</p>
+      <div class="tier-label" id="tier-display">Standard Agent</div>
+    </div>
+
+    <div class="nav">
+      <div class="item active" onclick="showView('v-home', this)"><i class="fa-solid fa-gauge-high"></i> Dashboard</div>
+      <div class="item" onclick="showView('v-register', this)"><i class="fa-solid fa-user-plus"></i> Register Network</div>
+      <div class="item" onclick="showView('v-wallet', this)"><i class="fa-solid fa-wallet"></i> Wallet & Payouts</div>
+      <div class="item" onclick="showView('v-team', this)"><i class="fa-solid fa-users-rays"></i> My Team</div>
+      <div class="item" onclick="showView('v-statements', this)"><i class="fa-solid fa-file-invoice"></i> Statements</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn" style="width: 100%;" onclick="handleLogout()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <div id="v-home" class="view active">
+      <h2><i class="fa-solid fa-gauge-high"></i> Agent Dashboard</h2>
+
+      <div class="grid">
+        <div class="card card-top-blue">
+          <h3>Road to Team Leader</h3>
+          <div class="sub">Target: 10 Drivers Registered</div>
+          <progress id="kpi-drivers" value="0" max="10"></progress>
+          <div style="text-align: right; font-size: 12px; color: var(--muted); margin-top: 8px;" id="kpi-text">0 / 10</div>
+        </div>
+
+        <div class="card card-top-warn">
+          <h3><i class="fa-solid fa-bullhorn" style="color: var(--warn);"></i> Official Announcements</h3>
+          <div class="sub">Direct messages from YENE Admin</div>
+          <div id="broadcast-feed" style="margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height: 120px; overflow-y:auto;">
+            <div class="sub">Loading messages...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="v-register" class="view">
+      <h2><i class="fa-solid fa-user-plus"></i> Grow Your Network</h2>
+
+      <div class="grid">
+        <div class="card card-top-blue">
+          <h3><i class="fa-solid fa-car"></i> Register a Driver</h3>
+          <form id="driver-form" onsubmit="submitDriver(event)">
+            <div class="field"><label>Driver Full Name</label><input type="text" id="d-name" required></div>
+            <div class="field"><label>WhatsApp Number</label><input type="tel" id="d-phone" placeholder="+264..." required></div>
+            <div class="field"><label>Town / Operating Area</label><input type="text" id="d-town" required></div>
+            <button type="submit" class="btn primary" style="width: 100%; margin-top: 10px;">Submit Driver</button>
+          </form>
+        </div>
+
+        <div class="card card-top-green">
+          <h3><i class="fa-solid fa-mobile-screen"></i> Register a Client</h3>
+          <div class="sub">Help riders download the app and enter your code to earn referrals.</div>
+          <form id="client-form" onsubmit="submitClient(event)">
+            <div class="field"><label>Client Full Name</label><input type="text" id="c-name" required></div>
+            <div class="field"><label>Phone Number</label><input type="text" id="c-phone" required></div>
+            <button type="submit" class="btn ok" style="width: 100%; margin-top: 10px;">Submit Client</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="v-wallet" class="view">
+      <h2><i class="fa-solid fa-wallet"></i> Earnings & Wallet</h2>
+
+      <div class="card card-top-green" style="text-align: center; padding: 40px 20px;">
+        <h1 id="wallet-balance" style="color: var(--ok); font-size: 48px; margin: 0 0 10px 0; font-weight: 900;">N$ 0.00</h1>
+        <div class="sub" style="font-size: 16px;">Available Balance</div>
+
+        <div style="background: rgba(255, 92, 92, 0.1); color: var(--danger); padding: 10px; border-radius: 8px; font-size: 12px; margin: 20px auto; max-width: 300px;">
+          * Standard network fee deducted upon withdrawal
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
+          <input type="number" id="withdraw-amount" placeholder="Amount (N$)" style="padding: 12px; width: 150px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: white; outline:none;">
+          <button class="btn ok" onclick="requestWithdrawal()"><i class="fa-solid fa-money-bill-transfer"></i> Request Payout</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="v-team" class="view">
+      <h2><i class="fa-solid fa-users-rays"></i> Team Management</h2>
+
+      <div class="card card-top-purple" style="position: relative; min-height: 300px;">
+
+        <div id="team-lock" class="locked-overlay">
+          <i class="fa-solid fa-lock fa-3x" style="color: var(--danger); margin-bottom: 16px;"></i>
+          <h3 style="color: var(--text);">Locked: Team Leader Feature</h3>
+          <div class="sub" style="color: #fff; max-width: 400px; margin-bottom: 20px;">
+            Register 10 drivers to unlock your unique referral link and start earning a percentage of your team's activations!
+          </div>
+          <button class="btn primary" onclick="showView('v-home', document.querySelector('.nav .item'))">Check KPI Progress</button>
+        </div>
+
+        <h3><i class="fa-solid fa-link"></i> Your Team Referral Link</h3>
+        <div class="sub">Send this to new agents to recruit them under your downline.</div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 30px;">
+          <input type="text" id="ref-link" readonly style="flex-grow: 1; padding: 12px; border-radius: 12px; background: var(--card2); border: 1px solid var(--purple); color: var(--text); font-weight: bold;">
+          <button class="btn purple" onclick="copyRefLink()"><i class="fa-regular fa-copy"></i> Copy Link</button>
+        </div>
+
+        <h3><i class="fa-solid fa-sitemap"></i> Network Downline</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Agent Name</th><th>Status</th><th>Joined</th></tr></thead>
+            <tbody id="team-table-body">
+              <tr><td colspan="3" style="text-align: center; color: var(--muted);">Loading network...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="v-statements" class="view">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0;"><i class="fa-solid fa-file-invoice"></i> Financial Ledger</h2>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn" onclick="downloadCSV()"><i class="fa-solid fa-download"></i> CSV</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table id="statement-table">
+            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount (N$)</th></tr></thead>
+            <tbody id="wallet-history">
+              <tr><td colspan="4" style="text-align: center; color: var(--muted);">Loading ledger...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  // Supabase public config from Flask (safe + avoids hardcoding)
+  const SUPABASE_URL = {{ (SUPABASE_URL or '') | tojson }};
+  const SUPABASE_ANON = {{ (SUPABASE_ANON_KEY or '') | tojson }};
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  let myAuthUser = null;
+  let myAgentProfile = null; // from agent_profiles
+  let driverCount = 0;
+
+  window.onload = async function() {
+    const { data: { session }, error } = await sb.auth.getSession();
+
+    if (error || !session) {
+      window.location.href = "/login";
+      return;
+    }
+
+    myAuthUser = session.user;
+
+    // ✅ Pull profile from agent_profiles (matches your Flask login system)
+    const { data: profile, error: pErr } = await sb
+      .from('agent_profiles')
+      .select('*')
+      .eq('auth_id', myAuthUser.id)
+      .maybeSingle();
+
+    if (pErr) {
+      alert("Profile load error: " + pErr.message);
+      return;
+    }
+
+    if (!profile) {
+      alert("Your agent profile was not found in agent_profiles. Ask admin to create/approve your profile.");
+      return;
+    }
+
+    myAgentProfile = profile;
+
+    // Status gate
+    const st = String(profile.status || '').toLowerCase();
+    if (st === 'pending_approval' || st === 'pending') {
+      document.getElementById('display-name').innerText = profile.full_name || "Agent";
+      document.getElementById('display-status').innerText = "PENDING APPROVAL";
+      document.getElementById('display-status').style.color = "var(--warn)";
+      // Keep dashboard usable but you can lock actions if you want.
+    } else if (st === 'blocked' || st === 'suspended') {
+      alert("Your account is blocked. Contact admin.");
+      await sb.auth.signOut();
+      window.location.href = "/login";
+      return;
+    }
+
+    // Update UI
+    document.getElementById('display-name').innerText = profile.full_name || "Agent";
+    document.getElementById('user-initial').innerText = (profile.full_name || "A").trim().charAt(0).toUpperCase();
+    document.getElementById('display-status').innerText = "Status: " + (profile.status || "UNKNOWN");
+
+    // Referral link uses agent_profiles.id if present, else auth_id fallback
+    const agentKey = profile.id || profile.auth_id;
+    document.getElementById('ref-link').value = window.location.origin + "/register?ref_agent_id=" + encodeURIComponent(agentKey);
+
+    await loadKPIs();
+    await loadBroadcasts();
+
+    document.getElementById('security-overlay').style.display = 'none';
+  }
+
+  function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+  function showView(viewId, el) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav .item').forEach(i => i.classList.remove('active'));
+
+    document.getElementById(viewId).classList.add('active');
+    if (el) el.classList.add('active');
+
+    if (window.innerWidth <= 768) toggleSidebar();
+
+    if (viewId === 'v-wallet' || viewId === 'v-statements') loadLedger();
+    if (viewId === 'v-team') loadTeamData();
+  }
+
+  async function handleLogout() {
+    await sb.auth.signOut();
+    window.location.href = "/login";
+  }
+
+  async function loadKPIs() {
+    if(!myAgentProfile) return;
+
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+
+    // ✅ drivers linked by recruiter_agent_id = agent_profiles.id (or auth_id fallback)
+    const { count, error } = await sb
+      .from('drivers')
+      .select('id', { count: 'exact', head: true })
+      .eq('recruiter_agent_id', agentKey);
+
+    if (error) console.warn(error);
+
+    driverCount = count || 0;
+
+    document.getElementById('kpi-drivers').value = driverCount;
+    document.getElementById('kpi-text').innerText = `${driverCount} / 10`;
+
+    if (driverCount >= 10) {
+      document.getElementById('team-lock').style.display = 'none';
+      document.getElementById('tier-display').innerText = "👑 Team Leader";
+      document.getElementById('elite-badge').style.display = 'block';
+    }
+  }
+
+  async function loadBroadcasts() {
+    const { data: messages, error } = await sb
+      .from('broadcasts')
+      .select('message, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    const feed = document.getElementById('broadcast-feed');
+
+    if (error) {
+      feed.innerHTML = '<div class="sub" style="color: var(--danger);">Error loading announcements.</div>';
+      return;
+    }
+
+    if (!messages || messages.length === 0) {
+      feed.innerHTML = '<div class="sub">No announcements at this time.</div>';
+      return;
+    }
+
+    feed.innerHTML = messages.map(msg => `
+      <div style="background: rgba(255,165,2,0.1); border-left: 3px solid var(--warn); padding: 10px; border-radius: 8px;">
+        <div style="color: var(--text); font-size: 13px; font-weight: 700;">${escapeHtml(msg.message)}</div>
+        <div style="color: var(--warn); font-size: 11px; margin-top: 4px;">${new Date(msg.created_at).toLocaleString()}</div>
+      </div>
+    `).join('');
+  }
+
+  async function submitDriver(e) {
+    e.preventDefault();
+    if(!myAgentProfile) return alert("Profile error.");
+
+    const st = String(myAgentProfile.status || '').toLowerCase();
+    if (st === 'pending_approval' || st === 'pending') {
+      alert("Your account is still pending approval. You cannot register drivers yet.");
+      return;
+    }
+
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+
+    const payload = {
+      recruiter_agent_id: agentKey,
+      recruiter_auth_id: myAuthUser.id,
+      recruiter_name: myAgentProfile.full_name || null,
+      full_name: document.getElementById('d-name').value,
+      phone: document.getElementById('d-phone').value,
+      town: document.getElementById('d-town').value
+    };
+
+    const { error } = await sb.from('drivers').insert(payload);
+
+    if(error) {
+      alert("Error: " + error.message);
+    } else {
+      alert('Driver successfully registered!');
+      e.target.reset();
+      await loadKPIs();
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = 'Submit Driver';
+  }
+
+  async function submitClient(e) {
+    e.preventDefault();
+    if(!myAgentProfile) return alert("Profile error.");
+
+    const st = String(myAgentProfile.status || '').toLowerCase();
+    if (st === 'pending_approval' || st === 'pending') {
+      alert("Your account is still pending approval. You cannot register clients yet.");
+      return;
+    }
+
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+
+    const payload = {
+      recruiter_agent_id: agentKey,
+      recruiter_auth_id: myAuthUser.id,
+      recruiter_name: myAgentProfile.full_name || null,
+      full_name: document.getElementById('c-name').value,
+      phone: document.getElementById('c-phone').value
+    };
+
+    const { error } = await sb.from('clients').insert(payload);
+
+    if(error) {
+      alert("Error: " + error.message);
+    } else {
+      alert('Client successfully registered!');
+      e.target.reset();
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = 'Submit Client';
+  }
+
+  async function loadTeamData() {
+    // Lock if not leader
+    if(driverCount < 10) return;
+
+    const tbody = document.getElementById('team-table-body');
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+
+    // This assumes you have referred_by_id in agent_profiles
+    const { data: team, error } = await sb
+      .from('agent_profiles')
+      .select('full_name, status, created_at')
+      .eq('referred_by_id', agentKey)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--danger);">Error loading team.</td></tr>';
+      return;
+    }
+
+    if (!team || team.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--muted);">No agents recruited yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = team.map(member => `
+      <tr>
+        <td><b>${escapeHtml(member.full_name || 'Agent')}</b></td>
+        <td style="font-weight:800; color: ${String(member.status).toLowerCase()==='approved' || String(member.status).toLowerCase()==='active' ? 'var(--ok)' : 'var(--warn)'}">
+          ${escapeHtml(member.status || 'PENDING')}
+        </td>
+        <td class="muted">${member.created_at ? new Date(member.created_at).toLocaleDateString() : ''}</td>
+      </tr>
+    `).join('');
+  }
+
+  // -------- Wallet / Ledger (safe defaults) --------
+  async function loadLedger() {
+    // If you don’t have wallet_ledger table yet, this won’t crash
+    const tbody = document.getElementById('wallet-history');
+    const balEl = document.getElementById('wallet-balance');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Loading ledger...</td></tr>';
+
+    const agentKey = myAgentProfile?.id || myAgentProfile?.auth_id;
+    if (!agentKey) return;
+
+    // Try ledger table
+    const { data, error } = await sb
+      .from('wallet_ledger')
+      .select('created_at, description, type, amount')
+      .eq('agent_id', agentKey)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">No ledger table yet.</td></tr>';
+      balEl.innerText = "N$ 0.00";
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">No transactions yet.</td></tr>';
+      balEl.innerText = "N$ 0.00";
+      return;
+    }
+
+    let total = 0;
+    data.forEach(x => total += Number(x.amount || 0));
+    balEl.innerText = "N$ " + total.toFixed(2);
+
+    tbody.innerHTML = data.map(x => `
+      <tr>
+        <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ''}</td>
+        <td>${escapeHtml(x.description || '')}</td>
+        <td>${escapeHtml(x.type || '')}</td>
+        <td><b>${Number(x.amount || 0).toFixed(2)}</b></td>
+      </tr>
+    `).join('');
+  }
+
+  async function requestWithdrawal() {
+    const amount = Number(document.getElementById('withdraw-amount').value || 0);
+    if (!amount || amount <= 0) return alert("Enter a valid amount.");
+
+    const agentKey = myAgentProfile?.id || myAgentProfile?.auth_id;
+    if (!agentKey) return alert("Profile error.");
+
+    // Optional withdrawals table
+    const { error } = await sb.from('withdrawals').insert({
+      agent_id: agentKey,
+      amount: amount,
+      status: 'REQUESTED'
+    });
+
+    if (error) {
+      alert("Withdrawal request failed: " + error.message);
+      return;
+    }
+
+    alert("Withdrawal requested. Admin will review.");
+    document.getElementById('withdraw-amount').value = "";
+  }
+
+  function downloadCSV() {
+    const table = document.getElementById('statement-table');
+    if (!table) return;
+
+    let csv = [];
+    for (const row of table.querySelectorAll('tr')) {
+      const cols = Array.from(row.querySelectorAll('th,td')).map(c => `"${String(c.innerText).replaceAll('"','""')}"`);
+      csv.push(cols.join(','));
+    }
+
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'yene_statement.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyRefLink() {
+    const el = document.getElementById('ref-link');
+    el.select();
+    el.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+    alert("Referral link copied!");
+  }
+
+  function escapeHtml(s){
+    return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  }
+</script>
+
+{% endblock %}

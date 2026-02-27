@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>YENE Portal | Create Account</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root{--yene:#4aa8ff;--bg:#0b1220;--card:#111b2e;--text:#eaf2ff;--muted:#a9b7d6;--line:rgba(255,255,255,.12);--danger:#ff5c5c;}
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);padding:18px}
+    .card{width:100%;max-width:520px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px}
+    h1{margin:0 0 6px;font-size:20px}
+    p{margin:0 0 14px;color:var(--muted);line-height:1.4}
+    label{display:block;margin:10px 0 6px;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
+    input, select{width:100%;padding:12px 12px;border-radius:12px;border:1px solid var(--line);background:#0b1427;color:var(--text);outline:none}
+    input:focus, select:focus{border-color:var(--yene)}
+    .btn{width:100%;margin-top:14px;padding:12px;border-radius:12px;border:none;background:var(--yene);color:#041021;font-weight:1000;cursor:pointer}
+    .msg{margin-top:12px;padding:10px;border-radius:12px;border:1px solid var(--line);background:rgba(255,92,92,.12);color:#ffd7d7;border-color:rgba(255,92,92,.5);text-align:center;}
+    .top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .logo{width:40px;height:40px;border-radius:14px;background:rgba(74,168,255,.18);display:flex;align-items:center;justify-content:center;color:var(--yene);font-size:18px;border:1px solid rgba(74,168,255,.28)}
+    .small{font-size:12px;color:var(--muted);margin-top:8px}
+    a{color:var(--yene);text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="top">
+      <div class="logo"><i class="fa-solid fa-bolt"></i></div>
+      <div>
+        <h1>Create your YENE Agent Account</h1>
+        <p>Enter your details to create the account. You will complete the full profile in the dashboard.</p>
+      </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="msg" style="display:block;">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/register">
+        <label>Full Name</label>
+        <input name="full_name" placeholder="E.g. John Doe" required />
+
+        <label>Choose Username</label>
+        <input name="username" placeholder="johndoe99" required />
+
+        <label>Cellphone Number</label>
+        <input name="phone" placeholder="+264..." required />
+
+        <label>Email</label>
+        <input name="email" type="email" placeholder="you@email.com" required />
+
+        <label>Gender</label>
+        <select name="gender" required>
+            <option value="" disabled selected>Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <label>Password</label>
+        <input name="password" type="password" placeholder="Minimum 6 characters" required minlength="6"/>
+
+        <button class="btn" type="submit">
+          <i class="fa-solid fa-user-plus"></i> Create Account
+        </button>
+    </form>
+
+    <div class="small">Already have an account? <a href="/login">Login</a></div>
+  </div>
+</body>
+</html>

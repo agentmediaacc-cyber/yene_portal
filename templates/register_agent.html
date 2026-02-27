@@ -1,0 +1,278 @@
+﻿{% extends 'base_public.html' %}
+{% block title %}YENE Portal • Apply as Promoter{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  :root {
+    --yene: #4aa8ff;          
+    --bg: #0b1220;
+    --panel: #0f1a2f;
+    --card: #111b2e;
+    --card2: #0b1427;
+    --text: #eaf2ff;
+    --muted: #a9b7d6;
+    --line: rgba(255,255,255,.10);
+    --danger: #ff5c5c;
+    --ok: #2ed573;
+  }
+
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; margin: 0; }
+  
+  .reg-container { 
+    background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    background-color: var(--card); 
+    padding: 32px; 
+    border-radius: 16px; 
+    border-top: 4px solid var(--yene); 
+    max-width: 800px; 
+    margin: 40px auto; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+
+  .reg-header { text-align: center; margin-bottom: 30px; }
+  .reg-header i { color: var(--yene); font-size: 32px; margin-bottom: 10px; }
+  .reg-header h2 { margin: 0; color: var(--text); font-size: 24px; }
+  
+  #ref-banner {
+    display: none;
+    background: rgba(46, 213, 115, 0.1);
+    color: var(--ok);
+    border: 1px solid rgba(46, 213, 115, 0.3);
+    padding: 12px;
+    text-align: center;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .full-width { grid-column: span 2; }
+  @media(max-width: 600px) { .form-grid { grid-template-columns: 1fr; } .full-width { grid-column: span 1; } }
+
+  .section-title { 
+    grid-column: 1 / -1; 
+    color: var(--text); 
+    margin-top: 16px; 
+    border-bottom: 1px solid var(--line); 
+    padding-bottom: 8px; 
+    font-size: 16px; 
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { color: var(--muted); font-size: 13px; }
+  .field input, .field select, .field textarea { 
+    width: 100%; padding: 12px; background: var(--card2); 
+    border: 1px solid var(--line); color: var(--text); 
+    border-radius: 12px; outline: none; box-sizing: border-box; transition: 0.2s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--yene); }
+
+  .radio-group { display: flex; gap: 20px; background: var(--card2); padding: 12px; border-radius: 12px; border: 1px solid var(--line); }
+  .radio-group label { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; color: var(--text); font-size: 13px;}
+  
+  .file-upload-label { 
+    display: block; padding: 12px; background: rgba(255,255,255,.02); 
+    border: 1px dashed var(--muted); border-radius: 12px; text-align: center; 
+    cursor: pointer; color: var(--muted); transition: 0.2s; font-size: 13px;
+  }
+  .file-upload-label:hover { border-color: var(--yene); color: var(--yene); background: rgba(74,168,255,.05); }
+  input[type="file"] { display: none; }
+
+  .btn { 
+    background: var(--yene); color: #041021; border: none; padding: 14px; 
+    border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; 
+    font-size: 15px; margin-top: 20px; transition: 0.2s; 
+  }
+  .btn:hover { opacity: 0.9; }
+
+  .alert-msg { margin-top: 20px; text-align: center; font-size: 14px; padding: 10px; border-radius: 12px; display: none; }
+  .hidden { display: none !important; }
+</style>
+
+<div class="reg-container" id="registration-form-container">
+  <div class="reg-header">
+    <i class="fa-solid fa-address-card"></i>
+    <h2>New Agent Registration</h2>
+  </div>
+
+  <div id="ref-banner">
+    <i class="fa-solid fa-handshake"></i> You were invited to the network by: <b id="ref-name-display"></b>
+  </div>
+
+  <form id="reg-form" onsubmit="handleRegistration(event)">
+    <div class="form-grid">
+      <h3 class="section-title"><i class="fa-solid fa-user"></i> 1. Personal Identity</h3>
+      <div class="field"><label>Full Legal Name</label><input type="text" id="reg-name" required></div>
+      <div class="field"><label>Gender</label><select id="reg-gender" required><option value="Male">Male</option><option value="Female">Female</option></select></div>
+      <div class="field full-width"><label>National ID Number</label><input type="text" id="reg-id-num" required></div>
+
+      <h3 class="section-title"><i class="fa-solid fa-lock"></i> 2. Account Credentials</h3>
+      <div class="field"><label>Choose Username (No spaces)</label><input type="text" id="reg-username" required pattern="^\S+$"></div>
+      <div class="field"><label>Email Address</label><input type="email" id="reg-email" required></div>
+      <div class="field full-width"><label>Cellphone Number</label><input type="tel" id="reg-phone" required placeholder="+264..."></div>
+
+      <div class="field full-width">
+        <label>Authentication Method</label>
+        <div class="radio-group">
+          <label><input type="radio" name="auth_type" value="pin" checked onchange="toggleAuthType()"> 6-Digit PIN</label>
+          <label><input type="radio" name="auth_type" value="password" onchange="toggleAuthType()"> Custom Password</label>
+        </div>
+      </div>
+      <div class="field"><label id="lbl-pass">Create 6-Digit PIN</label><input type="password" id="reg-pass" required minlength="6" maxlength="6"></div>
+      <div class="field"><label id="lbl-pass-confirm">Confirm PIN</label><input type="password" id="reg-pass-confirm" required minlength="6" maxlength="6"></div>
+
+      <h3 class="section-title"><i class="fa-solid fa-map-location-dot"></i> 3. Location</h3>
+      <div class="field full-width"><label>Residential Address</label><textarea id="reg-address" rows="2" required></textarea></div>
+      <div class="field"><label>Town / City</label><input type="text" id="reg-town" required></div>
+      <div class="field">
+        <label>Operating Region</label>
+        <select id="reg-region" required>
+          <option value="Windhoek">Windhoek</option>
+          <option value="Oshakati">Oshakati</option>
+          <option value="Swakopmund">Swakopmund</option>
+          </select>
+      </div>
+
+      <h3 class="section-title"><i class="fa-solid fa-folder-open"></i> 4. KYC Documents</h3>
+      <div class="field">
+        <label>Profile Picture</label>
+        <label for="file-profile" class="file-upload-label" id="label-profile"><i class="fa-solid fa-camera"></i> Select Photo</label>
+        <input type="file" id="file-profile" required accept="image/*" onchange="updateFileName('file-profile', 'label-profile')">
+      </div>
+      <div class="field">
+        <label>ID / Passport</label>
+        <label for="file-id-doc" class="file-upload-label" id="label-id-doc"><i class="fa-solid fa-id-badge"></i> Select ID</label>
+        <input type="file" id="file-id-doc" required accept="image/*,.pdf" onchange="updateFileName('file-id-doc', 'label-id-doc')">
+      </div>
+
+      <div class="full-width"><button type="submit" class="btn" id="submit-btn"><i class="fa-solid fa-paper-plane"></i> Submit Application</button></div>
+    </div>
+  </form>
+  
+  <div id="status-message" class="alert-msg"></div>
+</div>
+
+<div class="reg-container hidden" id="success-container" style="text-align: center; padding: 60px 20px;">
+  <i class="fa-solid fa-shield-check fa-4x" style="color: var(--ok); margin-bottom: 20px;"></i>
+  <h2 style="color: var(--text);">Application Submitted!</h2>
+  <p style="color: var(--muted); margin: 20px 0;">Your account is now under verification by the YENE Admin team. You will be notified once approved.</p>
+  <a href="/login" class="btn" style="display: inline-block; width: auto; text-decoration: none;">Proceed to Login</a>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://kcxphxihykonzuagtgke.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjeHBoeGloeWtvbnp1YWd0Z2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODQ3NTYsImV4cCI6MjA4NzE2MDc1Nn0.apk8My6XuGnv1374_q-r45QMYO2FYveWIlXuj12VCR0";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  // Catch Referral UUID from URL (e.g., ?ref_agent_id=123-abc)
+  const urlParams = new URLSearchParams(window.location.search);
+  const refAgentId = urlParams.get('ref_agent_id') || null;
+
+  window.onload = async function() {
+    if (refAgentId) {
+      // Look up the referring agent's name to show on the banner
+      const { data } = await sb.from('agents').select('full_name').eq('id', refAgentId).single();
+      if (data) {
+        document.getElementById('ref-banner').style.display = 'block';
+        document.getElementById('ref-name-display').innerText = data.full_name;
+      }
+    }
+  }
+
+  function toggleAuthType() {
+    const type = document.querySelector('input[name="auth_type"]:checked').value;
+    const p1 = document.getElementById('reg-pass'); 
+    const p2 = document.getElementById('reg-pass-confirm');
+    
+    if(type === 'pin'){ 
+      p1.type = 'password'; p1.maxLength = 6; p1.minLength = 6; 
+      p2.type = 'password'; p2.maxLength = 6; p2.minLength = 6; 
+      document.getElementById('lbl-pass').innerText = "Create 6-Digit PIN"; 
+    } else { 
+      p1.type = 'password'; p1.maxLength = 50; p1.minLength = 8; 
+      p2.type = 'password'; p2.maxLength = 50; p2.minLength = 8; 
+      document.getElementById('lbl-pass').innerText = "Create Password"; 
+    }
+  }
+
+  function updateFileName(inputId, labelId) { 
+    document.getElementById(labelId).innerHTML = '<i class="fa-solid fa-check"></i> Selected'; 
+    document.getElementById(labelId).style.color = "var(--ok)";
+    document.getElementById(labelId).style.borderColor = "var(--ok)";
+  }
+
+  async function handleRegistration(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn'); 
+    const msg = document.getElementById('status-message');
+    
+    const pass = document.getElementById('reg-pass').value; 
+    const conf = document.getElementById('reg-pass-confirm').value;
+    const username = document.getElementById('reg-username').value.toLowerCase();
+    const email = document.getElementById('reg-email').value;
+    
+    if (pass !== conf) { 
+      msg.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Passwords do not match.'; 
+      msg.style.display = 'block'; msg.style.color = "var(--danger)"; msg.style.background = "rgba(255,92,92,0.1)";
+      return; 
+    }
+    
+    btn.disabled = true; 
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processing...'; 
+    msg.style.display = "none";
+    
+    try {
+      // 1. Create Auth Account
+      const { data: auth, error: authErr } = await sb.auth.signUp({ email: email, password: pass });
+      if (authErr) throw authErr;
+
+      // 2. Upload Files to Storage (Wrap in try/catch so registration doesn't completely fail if bucket is missing)
+      let pPath = null; let iPath = null;
+      try {
+        const profileFile = document.getElementById('file-profile').files[0]; 
+        const idFile = document.getElementById('file-id-doc').files[0];
+        pPath = `${username}/p_${Date.now()}`; 
+        iPath = `${username}/i_${Date.now()}`;
+        await sb.storage.from('agent-photos').upload(pPath, profileFile);
+        await sb.storage.from('agent-ids').upload(iPath, idFile);
+      } catch(uploadErr) {
+        console.warn("Storage upload failed (Check if buckets exist). Skipping file attachment.", uploadErr);
+      }
+
+      // 3. Insert into the main 'agents' table!
+      const { error: dbErr } = await sb.from('agents').insert({
+        auth_id: auth.user.id, 
+        role: 'AGENT',
+        status: 'PENDING',
+        referred_by_id: refAgentId, 
+        username: username, 
+        email: email, 
+        full_name: document.getElementById('reg-name').value, 
+        phone: document.getElementById('reg-phone').value,
+        gender: document.getElementById('reg-gender').value, 
+        national_id: document.getElementById('reg-id-num').value, 
+        address: document.getElementById('reg-address').value,
+        town: document.getElementById('reg-town').value, 
+        region: document.getElementById('reg-region').value, 
+        profile_pic_path: pPath, 
+        id_document_path: iPath
+      });
+      
+      if (dbErr) throw dbErr;
+
+      // 4. Show Success Screen
+      document.getElementById('registration-form-container').classList.add('hidden');
+      document.getElementById('success-container').classList.remove('hidden'); 
+      window.scrollTo(0,0);
+      
+    } catch (err) { 
+      msg.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ${err.message}`; 
+      msg.style.display = "block"; msg.style.color = "var(--danger)"; msg.style.background = "rgba(255,92,92,0.1)";
+      btn.disabled = false; 
+      btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Application'; 
+    }
+  }
+</script>
+{% endblock %}

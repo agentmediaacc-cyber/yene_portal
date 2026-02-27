@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>YENE ADMIN • Command Center</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#081225;
+      --panel:#0c1b36;
+      --panel2:#0b1730;
+      --border:#163464;
+      --text:#e9f2ff;
+      --muted:#a6c4ff;
+      --brand:#67c3ff;
+      --ok:#25d366;
+      --warn:#ffb020;
+      --bad:#ff4d4d;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#071126,#081225);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    a{color:var(--brand);text-decoration:none}
+    header{
+      position:sticky;top:0;z-index:9;
+      display:flex;align-items:center;justify-content:space-between;
+      padding:14px 16px;background:rgba(12,27,54,.92);backdrop-filter:blur(10px);
+      border-bottom:1px solid var(--border);
+    }
+    header .left{display:flex;gap:12px;align-items:center}
+    .logo{
+      width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#67c3ff,#1f57ff);
+      display:grid;place-items:center;font-weight:900;color:white;
+      box-shadow:0 10px 22px rgba(0,0,0,.25);
+    }
+    .title h1{font-size:14px;margin:0}
+    .title p{margin:0;font-size:12px;color:var(--muted)}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .nav{
+      display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 16px;
+    }
+    .tab{
+      padding:10px 12px;border-radius:999px;border:1px solid var(--border);
+      background:rgba(11,23,48,.7);color:var(--text);cursor:pointer;font-weight:700;font-size:12px;
+    }
+    .tab.active{background:rgba(103,195,255,.18);border-color:rgba(103,195,255,.6)}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    @media(max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:560px){.grid{grid-template-columns:1fr}}
+    .card{
+      background:linear-gradient(180deg,rgba(12,27,54,.92),rgba(11,23,48,.92));
+      border:1px solid var(--border);border-radius:16px;padding:14px;
+      box-shadow:0 18px 40px rgba(0,0,0,.25);
+    }
+    .card h3{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:800}
+    .big{font-size:26px;font-weight:900}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(8,18,37,.6);font-size:12px;color:var(--muted)}
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--ok)}
+    .dot.warn{background:var(--warn)}
+    .dot.bad{background:var(--bad)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .btn{
+      border:1px solid rgba(103,195,255,.55);
+      background:rgba(103,195,255,.18);
+      color:var(--text);
+      padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:800;font-size:12px;
+    }
+    .btn:hover{filter:brightness(1.1)}
+    .btn.ok{border-color:rgba(37,211,102,.55);background:rgba(37,211,102,.14)}
+    .btn.bad{border-color:rgba(255,77,77,.55);background:rgba(255,77,77,.14)}
+    .btn.ghost{border-color:var(--border);background:rgba(8,18,37,.4)}
+    .section{display:none}
+    .section.active{display:block}
+    .table{
+      width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border-radius:14px;
+      border:1px solid var(--border);
+      background:rgba(11,23,48,.75);
+    }
+    .table th,.table td{padding:10px;border-bottom:1px solid rgba(22,52,100,.55);text-align:left;font-size:12px}
+    .table th{font-size:12px;color:var(--muted);background:rgba(12,27,54,.75);position:sticky;top:0}
+    .table tr:last-child td{border-bottom:none}
+    .muted{color:var(--muted)}
+    .status{font-weight:900}
+    .status.ACTIVE{color:var(--ok)}
+    .status.PENDING,.status.PENDING_APPROVAL{color:var(--warn)}
+    .status.BLOCKED{color:var(--bad)}
+    .kpi{display:flex;justify-content:space-between;align-items:end;gap:10px}
+    .kpi .small{font-size:12px;color:var(--muted)}
+    .hr{height:1px;background:rgba(22,52,100,.6);margin:12px 0}
+    .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    @media(max-width:900px){.formgrid{grid-template-columns:1fr}}
+    input,select,textarea{
+      width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--border);
+      background:rgba(8,18,37,.65);color:var(--text);outline:none
+    }
+    textarea{min-height:120px;resize:vertical}
+    .toast{
+      position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+      background:rgba(8,18,37,.92);border:1px solid var(--border);
+      padding:10px 12px;border-radius:14px;display:none;max-width:92vw
+    }
+    .right{display:flex;gap:10px;align-items:center}
+  </style>
+</head>
+<body>
+<header>
+  <div class="left">
+    <div class="logo">Y</div>
+    <div class="title">
+      <h1>YENE ADMIN</h1>
+      <p>Command Center • approvals • pricing • finance • audit</p>
+    </div>
+    <span class="pill"><span class="dot" id="liveDot"></span><span id="liveText">Live</span></span>
+  </div>
+
+  <div class="right">
+    <a class="btn ghost" href="/">Home</a>
+    <button class="btn ghost" onclick="refreshAll()">Refresh</button>
+    <a class="btn bad" href="/logout">Logout</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="nav" id="tabs">
+    <button class="tab active" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="approvals">Approvals</button>
+    <button class="tab" data-tab="agents">Agents</button>
+    <button class="tab" data-tab="drivers">Drivers</button>
+    <button class="tab" data-tab="clients">Clients</button>
+    <button class="tab" data-tab="finance">Finance Ledger</button>
+    <button class="tab" data-tab="pricing">Pricing Rules</button>
+    <button class="tab" data-tab="broadcasts">Broadcasts</button>
+    <button class="tab" data-tab="audit">Audit Logs</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="section active" id="overview">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="big">Admin Command Center</div>
+          <div class="muted">Approve agents • monitor registrations • control pricing • broadcast messages</div>
+        </div>
+        <div class="row">
+          <button class="btn" onclick="exportCSV('agents')">Export Agents CSV</button>
+          <button class="btn" onclick="exportCSV('drivers')">Export Drivers CSV</button>
+          <button class="btn" onclick="exportCSV('clients')">Export Clients CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+      <div class="card">
+        <h3>Agents</h3>
+        <div class="kpi">
+          <div class="big" id="k_agents_total">—</div>
+          <div class="small muted" id="k_agents_meta">—</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Drivers Registered</h3>
+        <div class="kpi">
+          <div class="big" id="k_drivers_total">—</div>
+          <div class="small muted">With timestamps + recruiter</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Clients Registered</h3>
+        <div class="kpi">
+          <div class="big" id="k_clients_total">—</div>
+          <div class="small muted">With timestamps + recruiter</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Total Paid (N$)</h3>
+        <div class="kpi">
+          <div class="big" id="k_total_paid">—</div>
+          <div class="small muted">Ledger totals</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">Recent Activity</h3>
+          <div class="muted">Last 25 registrations across the network • Audit-ready timestamps</div>
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div style="overflow:auto; max-height:360px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Town</th>
+              <th>Agent</th>
+            </tr>
+          </thead>
+          <tbody id="recentActivity">
+            <tr><td colspan="6" class="muted">No activity yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="muted" style="margin-top:10px">Tip: your overview endpoint currently returns empty activity. If you want, I can show you how to populate it using your existing tables.</div>
+    </div>
+  </section>
+
+  <!-- APPROVALS -->
+  <section class="section" id="approvals">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="big">Approvals</div>
+          <div class="muted">Approve, block, or re-activate agents</div>
+        </div>
+        <div class="row">
+          <span class="pill"><span class="dot warn"></span>Pending</span>
+          <span class="pill"><span class="dot"></span>Active</span>
+          <span class="pill"><span class="dot bad"></span>Blocked</span>
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div style="overflow:auto; max-height:520px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Town</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="approvalsTable">
+            <tr><td colspan="7" class="muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENTS -->
+  <section class="section" id="agents">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="big">Agents</div>
+          <div class="muted">Full list + recruiter performance counts</div>
+        </div>
+        <div class="row">
+          <input id="agentSearch" placeholder="Search by name / email / phone…" oninput="renderAgents()" style="max-width:360px">
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div style="overflow:auto; max-height:560px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Drivers</th>
+              <th>Clients</th>
+              <th>Created</th>
+              <th>Quick Actions</th>
+            </tr>
+          </thead>
+          <tbody id="agentsTable">
+            <tr><td colspan="8" class="muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- DRIVERS -->
+  <section class="section" id="drivers">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="big">Drivers</div>
+          <div class="muted">Registered drivers with recruiter details</div>
+        </div>
+        <div class="row">
+          <input id="driverSearch" placeholder="Search drivers…" oninput="renderDrivers()" style="max-width:360px">
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div style="overflow:auto; max-height:600px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Town</th>
+              <th>Recruiter</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="driversTable">
+            <tr><td colspan="6" class="muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLIENTS -->
+  <section class="section" id="clients">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="big">Clients</div>
+          <div class="muted">Registered clients with recruiter details</div>
+        </div>
+        <div class="row">
+          <input id="clientSearch" placeholder="Search clients…" oninput="renderClients()" style="max-width:360px">
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div style="overflow:auto; max-height:600px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Recruiter</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="clientsTable">
+            <tr><td colspan="5" class="muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINANCE -->
+  <section class="section" id="finance">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="big">Finance Ledger</div>
+          <div class="muted">All entries from finance_ledger</div>
+        </div>
+        <div class="row">
+          <input id="financeSearch" placeholder="Search ledger…" oninput="renderFinance()" style="max-width:360px">
+        </div>
+      </div>
+      <div class="hr"></div>
+      <div style="overflow:auto; max-height:600px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>User</th>
+              <th>Amount</th>
+              <th>Meta</th>
+            </tr>
+          </thead>
+          <tbody id="financeTable">
+            <tr><td colspan="5" class="muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING RULES -->
+  <section class="section" id="pricing">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="big">Pricing Rules</div>
+          <div class="muted">Edit / create rules in payment_rules</div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="formgrid">
+        <div class="card" style="background:rgba(11,23,48,.55)">
+          <h3>Create / Update Rule</h3>
+          <div class="muted" style="margin-bottom:10px">
+            Your backend POST endpoint updates existing rule by region+town automatically.
+          </div>
+
+          <label class="muted">Region</label>
+          <input id="pr_region" placeholder="e.g. Kavango East">
+
+          <label class="muted" style="margin-top:10px">Town</label>
+          <input id="pr_town" placeholder="e.g. Rundu">
+
+          <label class="muted" style="margin-top:10px">Rule JSON (any fields your table expects)</label>
+          <textarea id="pr_json" placeholder='Example:
+{
+  "base_fare": 10,
+  "per_km": 6,
+  "night_multiplier": 1.2
+}'></textarea>
+
+          <div class="row" style="margin-top:10px">
+            <button class="btn ok" onclick="savePricingRule()">Save Rule</button>
+            <button class="btn ghost" onclick="loadPricingRules()">Reload List</button>
+          </div>
+        </div>
+
+        <div class="card" style="background:rgba(11,23,48,.55)">
+          <h3>Existing Rules</h3>
+          <div style="overflow:auto; max-height:520px">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Region</th>
+                  <th>Town</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="pricingTable">
+                <tr><td colspan="3" class="muted">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="muted" style="margin-top:10px">Click a row to load it into the editor.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BROADCASTS -->
+  <section class="section" id="broadcasts">
+    <div class="card">
+      <div class="row" style="justify-content:space-between; align-items:flex-start">
+        <div>
+          <div class="big">Broadcasts</div>
+          <div class="muted">Create, edit, and delete broadcast messages</div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="formgrid">
+        <div class="card" style="background:rgba(11,23,48,.55)">
+          <h3>Create New Broadcast</h3>
+          <div class="muted" style="margin-bottom:10px">
+            Uses your endpoint: <code class="muted">POST /api/admin/broadcast</code> (message + target_region="ALL")
+          </div>
+          <label class="muted">Message</label>
+          <textarea id="bc_new_message" placeholder="Type broadcast message…"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn ok" onclick="createBroadcast()">Send Broadcast</button>
+            <button class="btn ghost" onclick="loadBroadcasts()">Reload List</button>
+          </div>
+        </div>
+
+        <div class="card" style="background:rgba(11,23,48,.55)">
+          <h3>Edit Broadcast</h3>
+          <div class="muted" style="margin-bottom:10px">
+            Select a broadcast on the right to edit.
+          </div>
+          <input id="bc_edit_id" placeholder="Broadcast ID" readonly>
+          <label class="muted" style="margin-top:10px">Message</label>
+          <textarea id="bc_edit_message" placeholder="Edit message…"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn ok" onclick="updateBroadcast()">Update</button>
+            <button class="btn bad" onclick="deleteBroadcast()">Delete</button>
+            <button class="btn ghost" onclick="clearBroadcastEditor()">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>All Broadcasts</h3>
+        <div style="overflow:auto; max-height:520px">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Created</th>
+                <th>Message</th>
+                <th>Target</th>
+                <th>ID</th>
+              </tr>
+            </thead>
+            <tbody id="broadcastsTable">
+              <tr><td colspan="4" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="muted" style="margin-top:10px">Click a row to load it into the editor.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUDIT -->
+  <section class="section" id="audit">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <div class="big">Audit Logs</div>
+          <div class="muted">system_logs (last 50)</div>
+        </div>
+        <button class="btn ghost" onclick="loadAudit()">Reload</button>
+      </div>
+      <div class="hr"></div>
+      <div style="overflow:auto; max-height:620px">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Event</th>
+              <th>Description</th>
+              <th>User</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody id="auditTable">
+            <tr><td colspan="5" class="muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ---------- State ----------
+  let agents = [];
+  let agentCounts = {}; // { agent_id: {drivers, clients} }
+  let drivers = [];
+  let clients = [];
+  let finance = [];
+  let pricingRules = [];
+  let broadcasts = [];
+
+  // ---------- Helpers ----------
+  function toast(msg){
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.style.display = "block";
+    setTimeout(()=> el.style.display="none", 2600);
+  }
+  function safe(v, fallback="—"){ return (v===null || v===undefined || v==="") ? fallback : v; }
+  function fmtDate(x){
+    if(!x) return "—";
+    try { return new Date(x).toLocaleString(); } catch(e){ return String(x); }
+  }
+  function fmtMoney(n){
+    let num = Number(n || 0);
+    if (Number.isNaN(num)) num = 0;
+    return "N$ " + num.toFixed(2);
+  }
+  function esc(s){
+    return String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+  }
+
+  async function apiGET(url){
+    const r = await fetch(url, {credentials:"same-origin"});
+    const j = await r.json().catch(()=> ({}));
+    if(!r.ok || j.success === false){
+      throw new Error(j.error || ("Request failed: " + r.status));
+    }
+    return j;
+  }
+  async function apiJSON(url, method, body){
+    const r = await fetch(url, {
+      method,
+      credentials:"same-origin",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(body || {})
+    });
+    const j = await r.json().catch(()=> ({}));
+    if(!r.ok || j.success === false){
+      throw new Error(j.error || ("Request failed: " + r.status));
+    }
+    return j;
+  }
+
+  // ---------- Tabs ----------
+  document.getElementById("tabs").addEventListener("click", (e)=>{
+    const btn = e.target.closest(".tab");
+    if(!btn) return;
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    btn.classList.add("active");
+    const tab = btn.dataset.tab;
+    document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+    document.getElementById(tab).classList.add("active");
+  });
+
+  // ---------- Loaders ----------
+  async function loadOverview(){
+    const j = await apiGET("/api/admin/overview");
+    const d = j.data;
+
+    document.getElementById("k_agents_total").textContent = safe(d.agents_total, "0");
+    document.getElementById("k_agents_meta").textContent =
+      `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Blocked ${safe(d.agents_blocked,0)}`;
+
+    document.getElementById("k_drivers_total").textContent = safe(d.drivers_total, "0");
+    document.getElementById("k_clients_total").textContent = safe(d.clients_total, "0");
+    document.getElementById("k_total_paid").textContent = fmtMoney(d.total_paid);
+  }
+
+  async function loadAgents(){
+    const j = await apiGET("/api/admin/agents");
+    agents = (j.data && j.data.agents) ? j.data.agents : [];
+    agentCounts = (j.data && j.data.counts) ? j.data.counts : {};
+    renderApprovals();
+    renderAgents();
+  }
+
+  async function loadDrivers(){
+    const j = await apiGET("/api/admin/drivers");
+    drivers = j.data || [];
+    renderDrivers();
+  }
+
+  async function loadClients(){
+    const j = await apiGET("/api/admin/clients");
+    clients = j.data || [];
+    renderClients();
+  }
+
+  async function loadFinance(){
+    const j = await apiGET("/api/admin/finance");
+    finance = j.data || [];
+    renderFinance();
+  }
+
+  async function loadPricingRules(){
+    const j = await apiGET("/api/admin/payment_rules");
+    pricingRules = j.data || [];
+    renderPricing();
+  }
+
+  async function loadBroadcasts(){
+    const j = await apiGET("/api/admin/broadcasts");
+    broadcasts = j.data || [];
+    renderBroadcasts();
+  }
+
+  async function loadAudit(){
+    const j = await apiGET("/api/admin/audit_logs");
+    const logs = j.data || [];
+    const tb = document.getElementById("auditTable");
+    tb.innerHTML = logs.length ? logs.map(x => `
+      <tr>
+        <td>${esc(fmtDate(x.created_at))}</td>
+        <td>${esc(safe(x.event_type))}</td>
+        <td>${esc(safe(x.description))}</td>
+        <td>${esc(safe(x.user_id))}</td>
+        <td>${esc(safe(x.ip_address))}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="5" class="muted">No logs</td></tr>`;
+  }
+
+  // ---------- Renderers ----------
+  function statusClass(s){
+    const u = String(s||"").toUpperCase();
+    return "status " + u;
+  }
+
+  function renderApprovals(){
+    const tb = document.getElementById("approvalsTable");
+    const sorted = [...agents].sort((a,b)=>{
+      const as = String(a.status||"").toUpperCase();
+      const bs = String(b.status||"").toUpperCase();
+      const ap = (as==="PENDING" || as==="PENDING_APPROVAL") ? 0 : 1;
+      const bp = (bs==="PENDING" || bs==="PENDING_APPROVAL") ? 0 : 1;
+      if(ap!==bp) return ap-bp;
+      return String(b.created_at||"").localeCompare(String(a.created_at||""));
+    });
+
+    tb.innerHTML = sorted.length ? sorted.map(a => `
+      <tr>
+        <td class="${statusClass(a.status)}">${esc(safe(a.status,"—"))}</td>
+        <td>${esc(safe(a.full_name))}</td>
+        <td>${esc(safe(a.email))}</td>
+        <td>${esc(safe(a.phone || a.phone_number))}</td>
+        <td>${esc(safe(a.town))}</td>
+        <td class="muted">${esc(fmtDate(a.created_at))}</td>
+        <td>
+          <div class="row">
+            <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')">Approve</button>
+            <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button>
+            <button class="btn ghost" onclick="setAgentStatus('${a.id}','PENDING_APPROVAL')">Set Pending</button>
+          </div>
+        </td>
+      </tr>
+    `).join("") : `<tr><td colspan="7" class="muted">No agents found</td></tr>`;
+  }
+
+  function renderAgents(){
+    const q = (document.getElementById("agentSearch").value || "").toLowerCase().trim();
+    const list = agents.filter(a=>{
+      if(!q) return true;
+      const hay = `${a.full_name||""} ${a.email||""} ${a.phone||a.phone_number||""}`.toLowerCase();
+      return hay.includes(q);
+    });
+
+    const tb = document.getElementById("agentsTable");
+    tb.innerHTML = list.length ? list.map(a=>{
+      const c = agentCounts[a.id] || {drivers:0, clients:0};
+      return `
+        <tr>
+          <td class="${statusClass(a.status)}">${esc(safe(a.status,"—"))}</td>
+          <td>${esc(safe(a.full_name))}</td>
+          <td>${esc(safe(a.email))}</td>
+          <td>${esc(safe(a.phone || a.phone_number))}</td>
+          <td>${esc(c.drivers || 0)}</td>
+          <td>${esc(c.clients || 0)}</td>
+          <td class="muted">${esc(fmtDate(a.created_at))}</td>
+          <td>
+            <div class="row">
+              <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')">Active</button>
+              <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("") : `<tr><td colspan="8" class="muted">No results</td></tr>`;
+  }
+
+  function renderDrivers(){
+    const q = (document.getElementById("driverSearch").value || "").toLowerCase().trim();
+    const list = drivers.filter(d=>{
+      if(!q) return true;
+      const hay = `${d.full_name||""} ${d.phone||d.phone_number||""} ${d.town||""} ${d.recruiter_name||""}`.toLowerCase();
+      return hay.includes(q);
+    });
+    const tb = document.getElementById("driversTable");
+    tb.innerHTML = list.length ? list.map(d=>`
+      <tr>
+        <td class="${statusClass(d.status)}">${esc(safe(d.status))}</td>
+        <td>${esc(safe(d.full_name))}</td>
+        <td>${esc(safe(d.phone || d.phone_number))}</td>
+        <td>${esc(safe(d.town))}</td>
+        <td>${esc(safe(d.recruiter_name))}</td>
+        <td class="muted">${esc(fmtDate(d.created_at))}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="6" class="muted">No drivers</td></tr>`;
+  }
+
+  function renderClients(){
+    const q = (document.getElementById("clientSearch").value || "").toLowerCase().trim();
+    const list = clients.filter(c=>{
+      if(!q) return true;
+      const hay = `${c.full_name||""} ${c.phone||c.phone_number||""} ${c.recruiter_name||""}`.toLowerCase();
+      return hay.includes(q);
+    });
+    const tb = document.getElementById("clientsTable");
+    tb.innerHTML = list.length ? list.map(c=>`
+      <tr>
+        <td class="${statusClass(c.status)}">${esc(safe(c.status))}</td>
+        <td>${esc(safe(c.full_name))}</td>
+        <td>${esc(safe(c.phone || c.phone_number))}</td>
+        <td>${esc(safe(c.recruiter_name))}</td>
+        <td class="muted">${esc(fmtDate(c.created_at))}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="5" class="muted">No clients</td></tr>`;
+  }
+
+  function renderFinance(){
+    const q = (document.getElementById("financeSearch").value || "").toLowerCase().trim();
+    const list = finance.filter(x=>{
+      if(!q) return true;
+      const hay = JSON.stringify(x||{}).toLowerCase();
+      return hay.includes(q);
+    });
+    const tb = document.getElementById("financeTable");
+    tb.innerHTML = list.length ? list.map(x=>`
+      <tr>
+        <td class="muted">${esc(fmtDate(x.created_at))}</td>
+        <td>${esc(safe(x.type || x.event_type || x.category))}</td>
+        <td>${esc(safe(x.user_id || x.email || x.actor))}</td>
+        <td>${esc(fmtMoney(x.amount))}</td>
+        <td class="muted">${esc(JSON.stringify(x.meta || x.details || {}, null, 0))}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="5" class="muted">No finance entries</td></tr>`;
+  }
+
+  function renderPricing(){
+    const tb = document.getElementById("pricingTable");
+    tb.innerHTML = pricingRules.length ? pricingRules.map(r=>{
+      const region = r.region || "";
+      const town = r.town || "";
+      return `
+        <tr style="cursor:pointer" onclick='loadRuleToEditor(${JSON.stringify(r)})'>
+          <td>${esc(region)}</td>
+          <td>${esc(town)}</td>
+          <td class="muted">${esc(JSON.stringify(r))}</td>
+        </tr>
+      `;
+    }).join("") : `<tr><td colspan="3" class="muted">No pricing rules</td></tr>`;
+  }
+
+  function renderBroadcasts(){
+    const tb = document.getElementById("broadcastsTable");
+    const list = [...broadcasts].sort((a,b)=> String(b.created_at||"").localeCompare(String(a.created_at||"")));
+    tb.innerHTML = list.length ? list.map(bc=>`
+      <tr style="cursor:pointer" onclick='loadBroadcastToEditor(${JSON.stringify(bc)})'>
+        <td class="muted">${esc(fmtDate(bc.created_at))}</td>
+        <td>${esc(safe(bc.message))}</td>
+        <td>${esc(safe(bc.target_region || bc.audience || "ALL"))}</td>
+        <td class="muted">${esc(safe(bc.id))}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="4" class="muted">No broadcasts</td></tr>`;
+  }
+
+  // ---------- Actions ----------
+  async function setAgentStatus(agentId, status){
+    try{
+      await apiJSON("/api/admin/approve_agent", "POST", {agent_id: agentId, status});
+      toast("Agent updated to " + status);
+      await loadAgents();
+      await loadOverview();
+      await loadAudit().catch(()=>{});
+    }catch(e){
+      toast(e.message);
+    }
+  }
+
+  function exportCSV(type){
+    let rows = [];
+    if(type==="agents") rows = agents;
+    if(type==="drivers") rows = drivers;
+    if(type==="clients") rows = clients;
+    if(!rows.length){ toast("Nothing loaded yet. Click Refresh first."); return; }
+
+    const cols = Object.keys(rows[0] || {});
+    const csv = [
+      cols.join(","),
+      ...rows.map(r => cols.map(c=>{
+        const v = r[c];
+        const s = (v===null || v===undefined) ? "" : (typeof v === "object" ? JSON.stringify(v) : String(v));
+        return `"${s.replaceAll('"','""')}"`;
+      }).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `yene_${type}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  async function savePricingRule(){
+    const region = (document.getElementById("pr_region").value || "").trim();
+    const town = (document.getElementById("pr_town").value || "").trim();
+    const raw = (document.getElementById("pr_json").value || "").trim();
+
+    if(!region || !town){ toast("Region and Town are required"); return; }
+
+    let payload = {};
+    if(raw){
+      try{
+        payload = JSON.parse(raw);
+      }catch(e){
+        toast("Invalid JSON in Rule JSON field");
+        return;
+      }
+    }
+    payload.region = region;
+    payload.town = town;
+
+    try{
+      await apiJSON("/api/admin/payment_rules", "POST", payload);
+      toast("Pricing rule saved");
+      await loadPricingRules();
+    }catch(e){
+      toast(e.message);
+    }
+  }
+
+  function loadRuleToEditor(rule){
+    document.getElementById("pr_region").value = rule.region || "";
+    document.getElementById("pr_town").value = rule.town || "";
+    const clone = {...rule};
+    delete clone.id;
+    document.getElementById("pr_json").value = JSON.stringify(clone, null, 2);
+    toast("Rule loaded to editor");
+  }
+
+  async function createBroadcast(){
+    const message = (document.getElementById("bc_new_message").value || "").trim();
+    if(!message){ toast("Message is required"); return; }
+    try{
+      await apiJSON("/api/admin/broadcast", "POST", {message});
+      document.getElementById("bc_new_message").value = "";
+      toast("Broadcast sent");
+      await loadBroadcasts();
+      await loadAudit().catch(()=>{});
+    }catch(e){
+      toast(e.message);
+    }
+  }
+
+  function loadBroadcastToEditor(bc){
+    document.getElementById("bc_edit_id").value = bc.id || "";
+    document.getElementById("bc_edit_message").value = bc.message || "";
+    toast("Broadcast loaded");
+  }
+
+  function clearBroadcastEditor(){
+    document.getElementById("bc_edit_id").value = "";
+    document.getElementById("bc_edit_message").value = "";
+  }
+
+  async function updateBroadcast(){
+    const id = (document.getElementById("bc_edit_id").value || "").trim();
+    const message = (document.getElementById("bc_edit_message").value || "").trim();
+    if(!id){ toast("Select a broadcast first"); return; }
+    if(!message){ toast("Message required"); return; }
+    try{
+      await apiJSON(`/api/admin/broadcast/${id}`, "PUT", {message});
+      toast("Broadcast updated");
+      await loadBroadcasts();
+    }catch(e){
+      toast(e.message);
+    }
+  }
+
+  async function deleteBroadcast(){
+    const id = (document.getElementById("bc_edit_id").value || "").trim();
+    if(!id){ toast("Select a broadcast first"); return; }
+    if(!confirm("Delete this broadcast?")) return;
+    try{
+      await apiJSON(`/api/admin/broadcast/${id}`, "DELETE", {});
+      toast("Broadcast deleted");
+      clearBroadcastEditor();
+      await loadBroadcasts();
+    }catch(e){
+      toast(e.message);
+    }
+  }
+
+  async function refreshAll(){
+    try{
+      document.getElementById("liveDot").className = "dot";
+      document.getElementById("liveText").textContent = "Live";
+      await Promise.allSettled([
+        loadOverview(),
+        loadAgents(),
+        loadDrivers(),
+        loadClients(),
+        loadFinance(),
+        loadPricingRules(),
+        loadBroadcasts(),
+        loadAudit()
+      ]);
+      toast("Refreshed");
+    }catch(e){
+      document.getElementById("liveDot").className = "dot bad";
+      document.getElementById("liveText").textContent = "Offline";
+      toast(e.message);
+    }
+  }
+
+  // initial load
+  refreshAll();
+</script>
+</body>
+</html>

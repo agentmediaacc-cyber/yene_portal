@@ -1,0 +1,336 @@
+﻿{% extends 'base.html' %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+    :root { --yene: #4aa8ff; --bg: #0b1220; --card: #111b2e; --text: #eaf2ff; --line: rgba(255,255,255,.1); --ok: #2ed573; --warn: #ffa502; --danger: #ff5c5c; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; }
+    
+    /* SIDEBAR & OVERLAY */
+    .sidebar { position: fixed; left: -280px; top: 0; width: 280px; height: 100vh; background: #070d18; border-right: 1px solid var(--line); padding: 20px; transition: 0.3s; z-index: 2000; display: flex; flex-direction: column; }
+    .sidebar.open { left: 0; }
+    .nav-item { padding: 12px; cursor: pointer; color: #a9b7d6; display: flex; align-items: center; gap: 10px; border-radius: 8px; margin-bottom: 5px; text-decoration: none; font-size: 14px; }
+    .nav-item:hover, .nav-item.active { background: rgba(74,168,255,0.1); color: white; }
+    #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1500; }
+
+    /* TOP BAR */
+    .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 15px 30px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 900; }
+    .menu-btn { font-size: 24px; cursor: pointer; color: var(--yene); margin-right: 20px; }
+    
+    .main { padding: 30px; background: #080f1d; min-height: 100vh; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: var(--card); padding: 20px; border-radius: 12px; border-left: 4px solid var(--yene); border-bottom: 1px solid var(--line); }
+    .view { display: none; }
+    .view.active { display: block; }
+    
+    /* TABLES */
+    table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; margin-top: 20px; }
+    th { background: rgba(255,255,255,0.03); color: var(--yene); font-size: 11px; text-transform: uppercase; padding: 15px; text-align: left; }
+    td { padding: 15px; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .clickable-name { color: var(--yene); cursor: pointer; font-weight: bold; text-decoration: underline; }
+
+    /* PROFILE MODAL */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; align-items: center; justify-content: center; padding: 20px; }
+    .modal-content { background: var(--card); width: 100%; max-width: 500px; border-radius: 15px; border: 1px solid var(--yene); padding: 25px; position: relative; }
+</style>
+
+<div id="overlay" onclick="toggleMenu()"></div>
+
+<aside class="sidebar" id="sidebar">
+    <h2 style="color:var(--yene); margin-bottom:25px;"><i class="fa-solid fa-shield-halved"></i> YENE POWER</h2>
+    <div class="nav-item active" onclick="switchView('v-overview', this)"><i class="fa-solid fa-gauge"></i> Overview</div>
+    <div class="nav-item" onclick="switchView('v-create', this)"><i class="fa-solid fa-user-plus"></i> Create Account</div>
+    <div class="nav-item" onclick="switchView('v-broadcast', this)"><i class="fa-solid fa-bullhorn"></i> Regional Broadcast</div>
+    <div class="nav-item" onclick="switchView('v-manage', this)"><i class="fa-solid fa-users-gear"></i> Manage Users</div>
+    <div class="nav-item" onclick="switchView('v-system', this)"><i class="fa-solid fa-cloud-arrow-up"></i> System Update</div>
+    <div class="nav-item" onclick="switchView('v-earnings', this)"><i class="fa-solid fa-coins"></i> Earning Update</div>
+    <div class="nav-item" onclick="switchView('v-support', this)"><i class="fa-solid fa-headset"></i> Support Tickets</div>
+    <a href="/logout" class="nav-item" style="margin-top:auto; color:var(--danger);"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+</aside>
+
+<div id="profileModal" class="modal">
+    <div class="modal-content">
+        <span onclick="closeProfile()" style="position:absolute; top:15px; right:20px; cursor:pointer; color:var(--danger); font-size:24px;">&times;</span>
+        <h2 id="p-name" style="color:var(--yene); margin-top:0;">Profile</h2>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:14px; margin-top:20px;">
+            <div><label style="opacity:0.6; font-size:10px;">ID NUMBER</label><div id="p-id">-</div></div>
+            <div><label style="opacity:0.6; font-size:10px;">CELLPHONE</label><div id="p-phone">-</div></div>
+            <div><label style="opacity:0.6; font-size:10px;">REGION</label><div id="p-region">-</div></div>
+            <div><label style="opacity:0.6; font-size:10px;">EMAIL</label><div id="p-email">-</div></div>
+        </div>
+        <div style="margin-top:20px; display:flex; gap:10px;">
+             <button onclick="updateStatus('active')" style="flex:1; background:var(--ok); border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer; color:black;">Approve</button>
+             <button onclick="updateStatus('blocked')" style="flex:1; background:var(--danger); border:none; padding:10px; border-radius:5px; font-weight:bold; cursor:pointer; color:white;">Block</button>
+        </div>
+    </div>
+</div>
+
+<header class="top-bar">
+    <div style="display:flex; align-items:center;">
+        <div class="menu-btn" onclick="toggleMenu()"><i class="fa-solid fa-bars"></i></div>
+        <select id="region-filter" onchange="applyFilters()" style="background:#080f1d; color:white; border:1px solid var(--line); padding:8px; border-radius:5px;">
+            <option value="ALL">🌍 All Regions</option>
+            <option>Khomas</option><option>Erongo</option><option>Otjozondjupa</option><option>Oshana</option>
+            <option>Omusati</option><option>Oshikoto</option><option>Ohangwena</option><option>Kunene</option>
+            <option>Omaheke</option><option>Hardap</option><option>||Karas</option><option>Kavango East</option>
+            <option>Kavango West</option><option>Zambezi</option>
+        </select>
+    </div>
+    <div style="background:#080f1d; border:1px solid var(--line); padding:5px 15px; border-radius:20px; display:flex; align-items:center;">
+        <i class="fa-solid fa-magnifying-glass" style="opacity:0.5;"></i>
+        <input type="text" id="masterSearch" oninput="applyFilters()" placeholder="Search Name, ID, or Phone..." style="background:none; border:none; color:white; margin-left:10px; outline:none; width:200px;">
+        <span id="search-count" style="font-size:10px; color:var(--yene); margin-left:10px; font-weight:bold;"></span>
+    </div>
+</header>
+
+<main class="main">
+    <div id="v-overview" class="view active">
+        <div class="grid">
+            <div class="stat-card"><span>TOTAL AGENTS</span><div id="s-total" style="font-size:24px; font-weight:bold;">0</div></div>
+            <div class="stat-card" style="border-left-color:var(--warn);"><span>PENDING</span><div id="s-pending" style="font-size:24px; font-weight:bold;">0</div></div>
+            <div class="stat-card" style="border-left-color:var(--ok);"><span>ACTIVE</span><div id="s-active" style="font-size:24px; font-weight:bold;">0</div></div>
+        </div>
+        <table>
+            <thead><tr><th>Agent Name (Click)</th><th>Region</th><th>Status</th><th>Joined</th></tr></thead>
+            <tbody id="agent-table-body"></tbody>
+        </table>
+    </div>
+    
+    <div id="v-create" class="view"><h1>Create Account Center</h1></div>
+    <div id="v-broadcast" class="view"><h1>Regional Broadcast Command</h1></div>
+    <div id="v-manage" class="view"><h1>User Database Management</h1></div>
+    <div id="v-system" class="view"><h1>System Update Center</h1></div>
+    <div id="v-earnings" class="view"><h1>Earning & Commission Setup</h1></div>
+    <div id="v-support" class="view"><h1>Support Ticket Desk</h1></div>
+</main>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2">
+    async function handleCreation(e) {
+        e.preventDefault();
+        const btn = document.getElementById('create-btn');
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing & Linking...';
+
+        try {
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-pass').value;
+            const idNum = document.getElementById('reg-id').value;
+            const phone = document.getElementById('reg-phone').value;
+            const region = document.getElementById('reg-region').value;
+
+            // Step 1: Create the secure login in Supabase Auth
+            const { data: authData, error: authError } = await sb.auth.signUp({
+                email: email,
+                password: pass
+            });
+
+            if (authError) {
+                if (authError.message.includes("8 seconds") || authError.message.includes("rate limit")) {
+                    throw new Error("Supabase security cooldown active. Please wait 10 seconds and try again.");
+                }
+                throw authError;
+            }
+
+            if (!authData.user) {
+                throw new Error("Failed to create user. They might already exist in the Auth system.");
+            }
+
+            const userId = authData.user.id;
+
+            // Step 2: Push all details to the agent_profiles table so they show on the dashboard
+            const { error: profileError } = await sb.from('agent_profiles').insert([{
+                id: userId,
+                full_name: name,
+                email: email,
+                id_number: idNum,
+                phone: phone,
+                region: region,
+                status: 'active', // Admin created, so they skip the pending queue
+                role: 'agent'
+            }]);
+
+            if (profileError) throw profileError;
+
+            // Success! Clean up and update UI
+            alert(`✅ SUCCESS: ${name} is now fully registered in Supabase and linked to your dashboard!`);
+            e.target.reset(); 
+            
+            // Switch back to Overview to see the new number instantly
+            switchView('v-overview', document.querySelector('.nav-item')); 
+            syncOverview(); // Force a fresh pull from the database
+
+        } catch (err) {
+            console.error(err);
+            alert("Error: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.innerHTML = 'CREATE & LINK TO DASHBOARD';
+        }
+    }
+</script>
+<script>
+    const SUPABASE_URL = "https://kcxphxihykonzuagtgke.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_g7evtigGLrMyHUSOZisn-g_XHwIVwrF";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let allUsers = [];
+
+    function toggleMenu() {
+        const side = document.getElementById('sidebar');
+        side.classList.toggle('open');
+        document.getElementById('overlay').style.display = side.classList.contains('open') ? 'block' : 'none';
+    }
+
+    function switchView(id, el) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        el.classList.add('active');
+        toggleMenu();
+    }
+
+        async function syncOverview() {
+        console.log("Deep Sync: Pulling all registered agent profiles...");
+        
+        // Fetch everything from agent_profiles
+        const { data, error } = await sb.from('agent_profiles').select('*');
+        
+        if (error) {
+            console.error("Supabase Error:", error.message);
+            return;
+        }
+
+        // Store the data
+        allUsers = data || [];
+        console.log(`Found ${allUsers.length} profiles in the database.`);
+        
+        // If the count is still low, we need to make sure the users have been 
+        // added to the 'agent_profiles' table, not just the Auth list.
+        applyFilters(); 
+    }
+    }
+
+    function applyFilters() {
+        const region = document.getElementById('region-filter').value;
+        const q = document.getElementById('masterSearch').value.toLowerCase().trim();
+        let filtered = allUsers;
+        if(region !== "ALL") filtered = filtered.filter(u => u.region === region);
+        if(q !== "") {
+            filtered = filtered.filter(u => 
+                (u.full_name||"").toLowerCase().includes(q) || 
+                (u.id_number||"").includes(q) || 
+                (u.phone||"").includes(q)
+            );
+            document.getElementById('search-count').innerText = `${filtered.length} found`;
+        } else {
+            document.getElementById('search-count').innerText = "";
+        }
+        
+        document.getElementById('s-total').innerText = filtered.length;
+        document.getElementById('s-pending').innerText = filtered.filter(u => u.status === 'pending_approval').length;
+        document.getElementById('s-active').innerText = filtered.filter(u => u.status === 'active').length;
+        renderTable(filtered);
+    }
+
+    function renderTable(data) {
+        document.getElementById('agent-table-body').innerHTML = data.map(u => `
+            <tr>
+                <td><span class="clickable-name" onclick="openProfile('${u.id}')">${u.full_name || 'No Name'}</span></td>
+                <td>${u.region}</td>
+                <td style="color:${u.status === 'active' ? 'var(--ok)' : 'var(--warn)'}">${u.status}</td>
+                <td>${new Date(u.created_at).toLocaleDateString()}</td>
+            </tr>
+        `).join('');
+    }
+
+    function openProfile(id) {
+        const u = allUsers.find(user => user.id === id);
+        if(!u) return;
+        window.activeProfileId = id;
+        document.getElementById('p-name').innerText = u.full_name;
+        document.getElementById('p-id').innerText = u.id_number || 'N/A';
+        document.getElementById('p-phone').innerText = u.phone || 'N/A';
+        document.getElementById('p-region').innerText = u.region;
+        document.getElementById('p-email').innerText = u.email;
+        document.getElementById('profileModal').style.display = 'flex';
+    }
+
+    function closeProfile() { document.getElementById('profileModal').style.display = 'none'; }
+
+    async function updateStatus(s) {
+        const { error } = await sb.from('agent_profiles').update({ status: s }).eq('id', window.activeProfileId);
+        if(!error) { closeProfile(); syncOverview(); }
+    }
+
+    window.onload = syncOverview;
+
+    async function handleCreation(e) {
+        e.preventDefault();
+        const btn = document.getElementById('create-btn');
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing & Linking...';
+
+        try {
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-pass').value;
+            const idNum = document.getElementById('reg-id').value;
+            const phone = document.getElementById('reg-phone').value;
+            const region = document.getElementById('reg-region').value;
+
+            // Step 1: Create the secure login in Supabase Auth
+            const { data: authData, error: authError } = await sb.auth.signUp({
+                email: email,
+                password: pass
+            });
+
+            if (authError) {
+                if (authError.message.includes("8 seconds") || authError.message.includes("rate limit")) {
+                    throw new Error("Supabase security cooldown active. Please wait 10 seconds and try again.");
+                }
+                throw authError;
+            }
+
+            if (!authData.user) {
+                throw new Error("Failed to create user. They might already exist in the Auth system.");
+            }
+
+            const userId = authData.user.id;
+
+            // Step 2: Push all details to the agent_profiles table so they show on the dashboard
+            const { error: profileError } = await sb.from('agent_profiles').insert([{
+                id: userId,
+                full_name: name,
+                email: email,
+                id_number: idNum,
+                phone: phone,
+                region: region,
+                status: 'active', // Admin created, so they skip the pending queue
+                role: 'agent'
+            }]);
+
+            if (profileError) throw profileError;
+
+            // Success! Clean up and update UI
+            alert(`✅ SUCCESS: ${name} is now fully registered in Supabase and linked to your dashboard!`);
+            e.target.reset(); 
+            
+            // Switch back to Overview to see the new number instantly
+            switchView('v-overview', document.querySelector('.nav-item')); 
+            syncOverview(); // Force a fresh pull from the database
+
+        } catch (err) {
+            console.error(err);
+            alert("Error: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.innerHTML = 'CREATE & LINK TO DASHBOARD';
+        }
+    }
+</script>
+{% endblock %}
+
+

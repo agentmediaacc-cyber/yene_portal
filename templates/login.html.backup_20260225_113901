@@ -1,0 +1,294 @@
+﻿{% extends 'base.html' %} 
+{% block title %}YENE Portal • Secure Login{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+  :root {
+    --yene: #4aa8ff;          
+    --bg: #0b1220;
+    --panel: #0f1a2f;
+    --card: #111b2e;
+    --card2: #0b1427;
+    --text: #eaf2ff;
+    --muted: #a9b7d6;
+    --line: rgba(255,255,255,.10);
+    --danger: #ff5c5c;
+    --ok: #2ed573;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+  .auth-container {
+    width: 100%;
+    max-width: 420px;
+    padding: 20px;
+  }
+
+  .auth-card {
+    background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    background-color: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 32px 24px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+
+  .auth-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  
+  .auth-header .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.03);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  
+  .auth-header .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
+  }
+
+  .auth-header h2 {
+    color: var(--text);
+    margin: 0 0 8px;
+    font-size: 24px;
+    letter-spacing: 0.5px;
+  }
+
+  .auth-header p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 14px;
+  }
+
+  /* Form Fields matching Admin Dashboard */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .field label {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .field input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--card2);
+    color: var(--text);
+    outline: none;
+    transition: 0.2s;
+    box-sizing: border-box;
+  }
+
+  .field input:focus {
+    border-color: rgba(74,168,255,.35);
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    border: 1px solid var(--line);
+    background: var(--card2);
+    color: var(--text);
+    padding: 14px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.15s;
+    font-weight: 700;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .btn.primary {
+    background: var(--yene);
+    color: #041021;
+    border-color: transparent;
+  }
+
+  .btn.primary:hover {
+    opacity: 0.9;
+  }
+
+  /* Messages */
+  .alert-msg {
+    background: rgba(255, 92, 92, 0.1);
+    color: var(--danger);
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 92, 92, 0.2);
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+    text-align: center;
+  }
+
+  .flash-message {
+    background: rgba(255, 165, 2, 0.1);
+    color: var(--warn, #ffa502);
+    border: 1px solid rgba(255, 165, 2, 0.2);
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .register-link {
+    text-align: center;
+    margin-top: 24px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .register-link a {
+    color: var(--yene);
+    text-decoration: none;
+    font-weight: bold;
+    margin-left: 4px;
+  }
+
+  .register-link a:hover {
+    text-decoration: underline;
+  }
+</style>
+
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="pill"><span class="dot"></span> Secure Gateway</div>
+      <h2><i class="fa-solid fa-shield-halved" style="color:var(--yene);"></i> YENE Login</h2>
+      <p>Access the Promoter & Admin Portal</p>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="flash-message"><i class="fa-solid fa-triangle-exclamation"></i> {{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div id="errorBox" class="alert-msg"></div>
+
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <input type="hidden" name="login_mode" value="{{ login_mode or 'agent' }}">
+<div class="field">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" required placeholder="name@domain.com">
+      </div>
+      
+      <div class="field">
+        <label for="password">Password or PIN</label>
+        <input type="password" id="password" required placeholder="••••••••">
+      </div>
+
+      <button type="submit" class="btn primary" id="submitBtn">
+        <i class="fa-solid fa-right-to-bracket"></i> Authenticate
+      </button>
+    </form>
+    
+    <div class="register-link">
+      New to Yene? <a href="{{ url_for('register') }}">Apply as an Agent</a>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  // 1. Initialize Supabase Client
+  const SUPABASE_URL = "https://kcxphxihykonzuagtgke.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjeHBoeGloeWtvbnp1YWd0Z2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODQ3NTYsImV4cCI6MjA4NzE2MDc1Nn0.apk8My6XuGnv1374_q-r45QMYO2FYveWIlXuj12VCR0";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    async function handleLogin(e) {
+    e.preventDefault(); 
+    
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('submitBtn');
+    const errBox = document.getElementById('errorBox');
+    
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying...';
+    btn.disabled = true;
+    errBox.style.display = 'none';
+
+    try {
+        // 1. Authenticate
+        const { data: authData, error: authError } = await sb.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+
+        if (authError) {
+          errBox.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> ` + authError.message;
+          errBox.style.display = 'block';
+          btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Authenticate';
+          btn.disabled = false;
+          return;
+        } 
+
+        // 2. Check Role
+        const user = authData.user;
+        btn.innerHTML = '<i class="fa-solid fa-id-badge"></i> Checking Role...';
+
+        const { data: profile, error: profileErr } = await sb
+          .from('agents')
+          .select('role')
+          .eq('auth_id', user.id)
+          .single();
+
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Access Granted';
+        btn.style.background = "var(--ok)";
+        btn.style.color = "#02110a";
+
+        // 3. IMPORTANT: Check these URLs against your Flask app.py!
+        setTimeout(() => {
+          if (profileErr || !profile) {
+             console.warn("No role found. Defaulting to agent dashboard.");
+             window.location.href = "/dashboard/agent"; // Ensure this matches your Flask route!
+          } else if (profile.role === 'ADMIN') {
+             window.location.href = "/dashboard/admin"; // We saw this route in your logs
+          } else {
+             window.location.href = "/dashboard/agent";
+          }
+        }, 1000);
+
+    } catch (err) {
+        alert("CRITICAL JS ERROR: " + err.message);
+        btn.disabled = false;
+        btn.innerHTML = "Try Again";
+    }
+  }
+</script>
+
+{% endblock %}
+

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>YENE Portal | Login</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root{--yene:#4aa8ff;--bg:#0b1220;--card:#111b2e;--text:#eaf2ff;--muted:#a9b7d6;--line:rgba(255,255,255,.12);}
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);padding:18px}
+    .card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px}
+    
+    .logo-box{text-align:center;margin-bottom:20px;}
+    .logo{width:50px;height:50px;border-radius:14px;background:rgba(74,168,255,.18);display:inline-flex;align-items:center;justify-content:center;color:var(--yene);font-size:24px;border:1px solid rgba(74,168,255,.28);margin-bottom:10px;}
+    h1{margin:0 0 6px;font-size:22px;}
+    p{margin:0;color:var(--muted);font-size:14px;}
+
+    /* The Toggle Switch */
+    .toggle-container{display:flex;background:#0b1427;border-radius:12px;border:1px solid var(--line);margin-bottom:24px;padding:4px;}
+    .toggle-btn{flex:1;text-align:center;padding:10px;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer;color:var(--muted);transition:all 0.2s;}
+    .toggle-btn.active{background:var(--yene);color:#041021;}
+
+    label{display:block;margin:10px 0 6px;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
+    input{width:100%;padding:12px 12px;border-radius:12px;border:1px solid var(--line);background:#0b1427;color:var(--text);outline:none;margin-bottom:12px;}
+    input:focus{border-color:var(--yene)}
+    
+    .btn{width:100%;margin-top:10px;padding:14px;border-radius:12px;border:none;background:var(--yene);color:#041021;font-weight:1000;font-size:15px;cursor:pointer}
+    .btn:hover{opacity:0.9;}
+    
+    .msg{margin-bottom:16px;padding:12px;border-radius:12px;border:1px solid rgba(255,92,92,.5);background:rgba(255,92,92,.12);color:#ffd7d7;text-align:center;font-size:14px;}
+    .small{font-size:13px;color:var(--muted);text-align:center;margin-top:20px;}
+    a{color:var(--yene);text-decoration:none;font-weight:800;}
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="logo-box">
+      <div class="logo"><i class="fa-solid fa-car-side"></i></div>
+      <h1 id="form-title">Agent Login</h1>
+      <p>Welcome back to the Yene Portal</p>
+    </div>
+
+    <div class="toggle-container">
+      <div class="toggle-btn active" id="tab-agent" onclick="setMode('agent')">Agent</div>
+      <div class="toggle-btn" id="tab-admin" onclick="setMode('admin')">Admin</div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="msg">{{ messages[0] }}</div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/login">
+        <input type="hidden" name="login_mode" id="login_mode" value="{{ login_mode | default('agent') }}">
+
+        <label>Email Address</label>
+        <input name="username" type="email" placeholder="you@email.com" required />
+
+        <label>Password</label>
+        <input name="password" type="password" placeholder="••••••••" required />
+
+        <button class="btn" type="submit">
+          <i class="fa-solid fa-right-to-bracket"></i> Sign In
+        </button>
+    </form>
+
+    <div class="small" id="register-link">
+      Don't have an agent account? <a href="/register">Apply Here</a>
+    </div>
+  </div>
+
+  <script>
+    // This script magically changes the form based on what you click
+    function setMode(mode) {
+      document.getElementById('login_mode').value = mode;
+      
+      // Update Button Colors
+      document.getElementById('tab-agent').classList.remove('active');
+      document.getElementById('tab-admin').classList.remove('active');
+      document.getElementById('tab-' + mode).classList.add('active');
+
+      // Update Titles and Links
+      const title = document.getElementById('form-title');
+      const regLink = document.getElementById('register-link');
+      
+      if(mode === 'admin') {
+         title.innerHTML = 'Admin Command Center';
+         regLink.style.display = 'none'; // Admins don't register here
+      } else {
+         title.innerHTML = 'Agent Login';
+         regLink.style.display = 'block';
+      }
+    }
+
+    // If the server tells us it's supposed to be admin, set it on load
+    window.onload = function() {
+      const initialMode = document.getElementById('login_mode').value;
+      if (initialMode === 'admin') {
+        setMode('admin');
+      }
+    };
+  </script>
+</body>
+</html>

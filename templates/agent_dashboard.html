@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+  :root {
+    --yene: #4aa8ff; --bg: #0b1220; --panel: #0f1a2f; --card: #111b2e; --card2: #0b1427;
+    --text: #eaf2ff; --muted: #a9b7d6; --line: rgba(255,255,255,.10);
+    --danger: #ff5c5c; --ok: #2ed573; --warn: #ffa502; --gold: #f1c40f; --purple: #9c88ff;
+  }
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+  body { margin: 0; background: var(--bg); color: var(--text); overflow: hidden; }
+  .dash { display: flex; height: 100vh; }
+  .topbar { display: none; background: var(--panel); padding: 15px 20px; border-bottom: 1px solid var(--line); align-items: center; justify-content: space-between; }
+  .hamburger { cursor: pointer; font-size: 1.5rem; color: var(--yene); border: none; background: transparent; }
+  .sidebar { width: 280px; background: linear-gradient(180deg,#070d18 0%, #091027 100%); border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 1000; transition: 0.3s; }
+  .profile-card { padding: 24px 16px; border-bottom: 1px solid var(--line); text-align: center; position: relative; }
+  .badge-icon { position: absolute; top: 16px; right: 16px; font-size: 1.2rem; display: none; color: var(--gold); }
+  .profile-card .avatar { width: 64px; height: 64px; background: rgba(74,168,255,.14); border: 2px solid var(--yene); border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 900; color: var(--yene); text-transform: uppercase; }
+  .profile-card h4 { margin: 0; color: var(--text); font-size: 18px; }
+  .profile-card p { margin: 4px 0 0; color: var(--ok); font-size: 12px; font-weight: bold; }
+  .tier-label { display: inline-block; background: rgba(241, 196, 15, 0.1); color: var(--gold); border: 1px solid rgba(241, 196, 15, 0.3); padding: 4px 10px; border-radius: 999px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; font-weight: 900; }
+  .nav { padding: 10px; flex-grow: 1; overflow-y: auto; }
+  .nav .item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; color: var(--muted); cursor: pointer; border: 1px solid transparent; transition: 0.15s; margin-bottom: 4px; }
+  .nav .item:hover { background: rgba(74,168,255,.10); color: var(--text); border-color: rgba(74,168,255,.18); }
+  .nav .item.active { background: rgba(74,168,255,.14); color: var(--text); border-color: rgba(74,168,255,.28); font-weight: bold; }
+  .nav .item i { width: 20px; text-align: center; }
+  .sidebar-footer { padding: 12px 10px 16px; border-top: 1px solid var(--line); }
+  .main { flex: 1; overflow-y: auto; padding: 24px; position: relative; }
+  .view { display: none; animation: fadeIn 0.2s ease-in; }
+  .view.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  h2 { margin-top: 0; margin-bottom: 20px; color: var(--text); font-size: 20px; }
+  h3 { margin-top: 0; color: var(--text); font-size: 16px; margin-bottom: 12px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media(max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); background-color: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; position: relative; }
+  .card-top-blue { border-top: 3px solid var(--yene); }
+  .card-top-green { border-top: 3px solid var(--ok); }
+  .card-top-purple { border-top: 3px solid var(--purple); }
+  .card-top-warn { border-top: 3px solid var(--warn); }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field label { color: var(--muted); font-size: 13px; }
+  .field input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: var(--text); outline: none; }
+  .field input:focus { border-color: var(--yene); }
+  .btn { border: 1px solid var(--line); background: var(--card2); color: var(--text); padding: 12px 16px; border-radius: 12px; cursor: pointer; transition: 0.15s; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn:hover { border-color: rgba(74,168,255,.35); }
+  .btn.primary { background: var(--yene); color: #041021; border-color: transparent; }
+  .btn.ok { background: var(--ok); color: #02110a; border-color: transparent; }
+  .btn.purple { background: var(--purple); color: #fff; border-color: transparent; }
+  .table-wrap { overflow: auto; border-radius: 14px; border: 1px solid var(--line); background: rgba(0,0,0,.05); }
+  table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; }
+  th { color: var(--yene); font-weight: 900; background: rgba(74,168,255,.06); }
+  progress { width: 100%; height: 8px; border-radius: 4px; margin-top: 5px; appearance: none; }
+  progress::-webkit-progress-bar { background-color: var(--card2); border-radius: 4px; border: 1px solid var(--line); }
+  progress::-webkit-progress-value { background-color: var(--yene); border-radius: 4px; }
+  .locked-overlay { position: absolute; inset: 0; background: rgba(11, 18, 32, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 16px; text-align: center; padding: 24px; z-index: 10; backdrop-filter: blur(4px); }
+  @media (max-width: 768px) { .topbar { display: flex; } .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); } .sidebar.open { transform: translateX(0); } }
+</style>
+
+<div class="dash">
+  <div class="topbar">
+    <div style="font-weight: 900; color: var(--yene); letter-spacing: 1px;"><i class="fa-solid fa-car-side"></i> YENE PROMOTER</div>
+    <button class="hamburger" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+  </div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="profile-card">
+      <i class="fa-solid fa-star badge-icon" id="elite-badge" title="Elite Agent"></i>
+      <div class="avatar" id="user-initial"><i class="fa-solid fa-user"></i></div>
+      <h4 id="display-name">{{ session.get('email', 'Agent') }}</h4>
+      <p id="display-status">Status: {{ session.get('status', 'ACTIVE') | upper }}</p>
+      <div class="tier-label" id="tier-display">Standard Agent</div>
+    </div>
+
+    <div class="nav">
+      <div class="item active" onclick="showView('v-home', this)"><i class="fa-solid fa-gauge-high"></i> Dashboard</div>
+      <div class="item" onclick="showView('v-register', this)"><i class="fa-solid fa-user-plus"></i> Register Network</div>
+      <div class="item" onclick="showView('v-wallet', this)"><i class="fa-solid fa-wallet"></i> Wallet & Payouts</div>
+      <div class="item" onclick="showView('v-team', this)"><i class="fa-solid fa-users-rays"></i> My Team</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn" style="width: 100%;" onclick="window.location.href='/logout'"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="v-home" class="view active">
+      <h2><i class="fa-solid fa-gauge-high"></i> Agent Dashboard</h2>
+      <div class="grid">
+        <div class="card card-top-blue">
+          <h3>Road to Team Leader</h3>
+          <div class="sub">Target: 10 Drivers Registered</div>
+          <progress id="kpi-drivers" value="0" max="10"></progress>
+          <div style="text-align: right; font-size: 12px; color: var(--muted); margin-top: 8px;" id="kpi-text">0 / 10</div>
+          
+          <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line);">
+            <h3>Your Network Summary</h3>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span>Drivers Registered:</span> <strong style="color:var(--yene);" id="stat-drivers">0</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Clients Registered:</span> <strong style="color:var(--ok);" id="stat-clients">0</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="v-register" class="view">
+      <h2><i class="fa-solid fa-user-plus"></i> Grow Your Network</h2>
+      <div class="grid">
+        <div class="card card-top-blue">
+          <h3><i class="fa-solid fa-car"></i> Register a Driver</h3>
+          <form id="driver-form" onsubmit="submitDriver(event)">
+            <div class="field"><label>Driver Full Name</label><input type="text" id="d-name" required></div>
+            <div class="field"><label>WhatsApp Number</label><input type="tel" id="d-phone" placeholder="+264..." required></div>
+            <div class="field"><label>Town / Operating Area</label><input type="text" id="d-town" required></div>
+            <button type="submit" class="btn primary" id="btn-driver" style="width: 100%; margin-top: 10px;">Submit Driver</button>
+          </form>
+        </div>
+
+        <div class="card card-top-green">
+          <h3><i class="fa-solid fa-mobile-screen"></i> Register a Client</h3>
+          <div class="sub">Help riders download the app and enter your code to earn referrals.</div>
+          <form id="client-form" onsubmit="submitClient(event)">
+            <div class="field"><label>Client Full Name</label><input type="text" id="c-name" required></div>
+            <div class="field"><label>Phone Number</label><input type="tel" id="c-phone" placeholder="+264..." required></div>
+            <button type="submit" class="btn ok" id="btn-client" style="width: 100%; margin-top: 10px;">Submit Client</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="v-wallet" class="view">
+      <h2><i class="fa-solid fa-wallet"></i> Earnings & Wallet</h2>
+      <div class="card card-top-green" style="text-align: center; padding: 40px 20px;">
+        <h1 style="color: var(--ok); font-size: 48px; margin: 0 0 10px 0; font-weight: 900;">N$ 0.00</h1>
+        <div class="sub" style="font-size: 16px;">Available Balance</div>
+        <div style="margin-top: 20px; color: var(--muted);">Payout tracking module loading soon...</div>
+      </div>
+    </div>
+
+    <div id="v-team" class="view">
+      <h2><i class="fa-solid fa-users-rays"></i> Team Management</h2>
+      <div class="card card-top-purple" style="position: relative; min-height: 300px;">
+        <div id="team-lock" class="locked-overlay">
+          <i class="fa-solid fa-lock fa-3x" style="color: var(--danger); margin-bottom: 16px;"></i>
+          <h3 style="color: var(--text);">Locked: Team Leader Feature</h3>
+          <div class="sub" style="color: #fff; max-width: 400px; margin-bottom: 20px;">
+            Register 10 drivers to unlock your unique referral link!
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const userStatus = "{{ session.get('status', 'PENDING') | upper }}";
+  
+  window.onload = function() {
+      // Color code the status
+      const statusText = document.getElementById('display-status');
+      if (userStatus === 'ACTIVE' || userStatus === 'APPROVED') {
+          statusText.style.color = "var(--ok)";
+      } else {
+          statusText.style.color = "var(--warn)";
+          document.getElementById('driver-form').innerHTML = '<div class="sub" style="color: var(--warn); text-align: center;">Your account is pending admin approval. You cannot register drivers yet.</div>';
+          document.getElementById('client-form').innerHTML = '<div class="sub" style="color: var(--warn); text-align: center;">Your account is pending admin approval. You cannot register clients yet.</div>';
+      }
+      
+      // Load their stats from the database
+      loadStats();
+  }
+
+  async function loadStats() {
+      try {
+          const res = await fetch("/api/agent/stats");
+          const data = await res.json();
+          if (data.success !== false) {
+              const dCount = data.drivers || 0;
+              const cCount = data.clients || 0;
+              
+              document.getElementById('stat-drivers').innerText = dCount;
+              document.getElementById('stat-clients').innerText = cCount;
+              document.getElementById('kpi-drivers').value = dCount;
+              document.getElementById('kpi-text').innerText = `${dCount} / 10`;
+              
+              if(dCount >= 10) {
+                  document.getElementById('team-lock').style.display = 'none';
+                  document.getElementById('tier-display').innerText = "👑 Team Leader";
+                  document.getElementById('elite-badge').style.display = 'block';
+              }
+          }
+      } catch (err) {
+          console.error("Failed to load stats", err);
+      }
+  }
+
+  async function submitDriver(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-driver');
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+      btn.disabled = true;
+
+      const payload = {
+          full_name: document.getElementById('d-name').value,
+          phone: document.getElementById('d-phone').value,
+          town: document.getElementById('d-town').value
+      };
+
+      try {
+          const res = await fetch("/api/agent/register_driver", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (data.success) {
+              alert("Driver successfully registered!");
+              e.target.reset();
+              loadStats(); // Automatically refresh the score!
+          } else {
+              alert("Error: " + data.error);
+          }
+      } catch (err) {
+          alert("Network error. Try again.");
+      }
+      btn.innerHTML = 'Submit Driver';
+      btn.disabled = false;
+  }
+
+  async function submitClient(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btn-client');
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+      btn.disabled = true;
+
+      const payload = {
+          full_name: document.getElementById('c-name').value,
+          phone: document.getElementById('c-phone').value
+      };
+
+      try {
+          const res = await fetch("/api/agent/register_client", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (data.success) {
+              alert("Client successfully registered!");
+              e.target.reset();
+              loadStats(); // Automatically refresh the score!
+          } else {
+              alert("Error: " + data.error);
+          }
+      } catch (err) {
+          alert("Network error. Try again.");
+      }
+      btn.innerHTML = 'Submit Client';
+      btn.disabled = false;
+  }
+
+  function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+  function showView(viewId, el) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.nav .item').forEach(i => i.classList.remove('active'));
+    document.getElementById(viewId).classList.add('active');
+    if (el) el.classList.add('active');
+    if (window.innerWidth <= 768) toggleSidebar();
+  }
+</script>
+{% endblock %}

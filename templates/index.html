@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>YENE | Namibia's Nationwide Network</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root{--yene:#4aa8ff;--bg:#0b1220;--card:#111b2e;--text:#eaf2ff;--muted:#a9b7d6;--ok:#2ed573;--warn:#ffa502;}
+        *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+        body{margin:0;background:var(--bg);color:var(--text);padding:20px;line-height:1.6;}
+        .container{max-width:1000px;margin:0 auto;}
+        .card{background:var(--card);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:24px;margin-bottom:20px;}
+        .hero{text-align:center;padding:40px 20px;}
+        .hero h1{font-size:38px;margin:10px 0;font-weight:900;}
+        .pill{display:inline-flex;align-items:center;gap:6px;background:rgba(74,168,255,0.1);color:var(--yene);padding:6px 14px;border-radius:99px;font-size:12px;font-weight:800;text-transform:uppercase;}
+        .dot{width:8px;height:8px;border-radius:50%;}
+        .dot.ok{background:var(--ok);}
+        .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:800;transition:0.2s;}
+        .btn.primary{background:var(--yene);color:#0b1220;}
+        .btn.outline{border:1px solid rgba(255,255,255,0.2);color:var(--text);}
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+        @media (max-width:768px){.grid{grid-template-columns:1fr;}}
+        .section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:10px;}
+        .table-wrap{overflow-x:auto;}
+        table{width:100%;border-collapse:collapse;font-size:14px;}
+        th{text-align:left;color:var(--yene);padding:12px;border-bottom:2px solid rgba(255,255,255,0.1);}
+        td{padding:12px;border-bottom:1px solid rgba(255,255,255,0.05);}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="hero card">
+            <div class="pill"><span class="dot ok"></span> Network Active • Namibia</div>
+            <h1>YENE Promoter & Agent Platform</h1>
+            <p style="color:var(--muted);max-width:700px;margin:15px auto;">
+                Join the nationwide e-hailing revolution. Our secure system allows verified agents to register drivers and clients across all 14 regions of Namibia.
+            </p>
+            <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;">
+                <a href="/register" class="btn primary">Apply to Join</a>
+                <a href="/login" class="btn outline">Agent Login</a>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="section-title">
+                    <h2 style="margin:0;font-size:18px;"><i class="fa-solid fa-bullhorn"></i> Official Updates</h2>
+                </div>
+                <div id="broadcastList">
+                    <p class="muted">Scanning network for updates...</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title">
+                    <h2 style="margin:0;font-size:18px;"><i class="fa-solid fa-shield-check"></i> Network Rules</h2>
+                </div>
+                <ul style="padding-left:18px;font-size:14px;color:var(--muted);">
+                    <li>Only approved agents can earn commissions.</li>
+                    <li>Duplicate phone registrations are blocked.</li>
+                    <li>Verified trip tracking for all rewards.</li>
+                    <li>Transparent ledger for agent payouts.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <h2 style="margin:0;font-size:18px;"><i class="fa-solid fa-coins"></i> Regional Payment Rates</h2>
+            </div>
+            <div class="table-wrap">
+                <table id="paymentTable">
+                    <thead>
+                        <tr>
+                            <th>Region</th>
+                            <th>Town</th>
+                            <th>Driver (N$)</th>
+                            <th>Client (N$)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="5" style="text-align:center;">Loading regional data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+        const SUPABASE_URL = "https://kcxphxihykonzuagtgke.supabase.co";
+        const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjeHBoeGloeWtvbnp1YWd0Z2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODQ3NTYsImV4cCI6MjA4NzE2MDc1Nn0.apk8My6XuGnv1374_q-r45QMYO2FYveWIlXuj12VCR0";
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        async function loadPublicData() {
+            // Load Broadcasts
+            const { data: bData } = await sb.from('broadcasts').select('message,created_at').order('created_at', {ascending:false}).limit(3);
+            const bList = document.getElementById('broadcastList');
+            if(bData && bData.length > 0) {
+                bList.innerHTML = bData.map(msg => `
+                    <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:10px;margin-bottom:10px;border-left:3px solid var(--yene);">
+                        <div style="font-weight:bold;font-size:14px;">${msg.message}</div>
+                        <div style="font-size:11px;color:var(--muted);margin-top:4px;">${new Date(msg.created_at).toLocaleDateString()}</div>
+                    </div>
+                `).join('');
+            } else {
+                bList.innerHTML = "<p style='color:var(--muted)'>No active announcements.</p>";
+            }
+
+            // Load Payment Rules
+            const { data: pData } = await sb.from('payment_rules').select('*').order('region', {ascending:true});
+            const pTable = document.querySelector('#paymentTable tbody');
+            if(pData && pData.length > 0) {
+                pTable.innerHTML = pData.map(r => `
+                    <tr>
+                        <td>${r.region}</td>
+                        <td><b>${r.town}</b></td>
+                        <td>${r.driver_reg || 0}</td>
+                        <td>${r.client_reg || 0}</td>
+                        <td style="color:${r.is_active ? 'var(--ok)' : 'var(--warn)'}">${r.is_active ? 'Active' : 'Inactive'}</td>
+                    </tr>
+                `).join('');
+            } else {
+                pTable.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Regional rates coming soon.</td></tr>";
+            }
+        }
+        loadPublicData();
+    </script>
+</body>
+</html>

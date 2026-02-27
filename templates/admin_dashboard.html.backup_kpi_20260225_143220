@@ -1,0 +1,658 @@
+{% extends 'base.html' %}
+{% block title %}YENE • Admin Command Center{% endblock %}
+{% block content %}
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+  :root{
+    --yene:#4aa8ff; --bg:#0b1220; --panel:#0f1a2f; --card:#111b2e; --card2:#0b1427;
+    --text:#eaf2ff; --muted:#a9b7d6; --line:rgba(255,255,255,.10);
+    --ok:#2ed573; --warn:#ffa502; --danger:#ff5c5c; --purple:#9c88ff;
+  }
+  *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+  body{margin:0;background:var(--bg);color:var(--text);overflow:hidden;}
+  .dash{display:flex;height:100vh;}
+  .sidebar{width:290px;background:linear-gradient(180deg,#070d18 0%,#091027 100%);border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .brand{padding:18px 16px;border-bottom:1px solid var(--line);}
+  .brand h2{margin:0;font-size:16px;letter-spacing:1px;color:var(--yene);font-weight:900;}
+  .brand .sub{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.4;}
+  .nav{padding:10px;overflow:auto;flex:1;}
+  .item{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;color:var(--muted);cursor:pointer;border:1px solid transparent;margin-bottom:4px;}
+  .item:hover{background:rgba(74,168,255,.10);color:var(--text);border-color:rgba(74,168,255,.18);}
+  .item.active{background:rgba(74,168,255,.14);color:var(--text);border-color:rgba(74,168,255,.28);font-weight:900;}
+  .item i{width:20px;text-align:center;}
+  .sidefoot{padding:12px;border-top:1px solid var(--line);}
+  .btn{border:1px solid var(--line);background:var(--card2);color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:800;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+  .btn:hover{border-color:rgba(74,168,255,.35);}
+  .btn.primary{background:var(--yene);color:#041021;border-color:transparent;}
+  .btn.ok{background:var(--ok);color:#02110a;border-color:transparent;}
+  .btn.warn{background:var(--warn);color:#1b1100;border-color:transparent;}
+  .btn.danger{background:var(--danger);color:#1b0000;border-color:transparent;}
+  .btn.purple{background:var(--purple);color:#fff;border-color:transparent;}
+  .main{flex:1;overflow:auto;padding:20px;}
+  .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .title{font-size:18px;font-weight:900;}
+  .muted{color:var(--muted);font-size:13px;}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px;}
+  @media(max-width:1100px){.grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:680px){.grid{grid-template-columns:1fr;}}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01));background-color:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;}
+  .k{font-size:12px;color:var(--muted);font-weight:800;}
+  .v{font-size:26px;font-weight:900;margin-top:4px;}
+  .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:rgba(255,255,255,.03);padding:6px 12px;border-radius:999px;font-size:12px;color:var(--muted);}
+  .dot{width:8px;height:8px;border-radius:50%;}
+  .dot.ok{background:var(--ok);} .dot.warn{background:var(--warn);} .dot.danger{background:var(--danger);}
+  .view{display:none;}
+  .view.active{display:block;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  input,select,textarea{
+    padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--text);outline:none;
+  }
+  textarea{min-height:90px;resize:vertical;}
+  .table-wrap{overflow:auto;border-radius:14px;border:1px solid var(--line);background:rgba(0,0,0,.05);margin-top:10px;}
+  table{width:100%;border-collapse:collapse;min-width:900px;}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;}
+  th{color:var(--yene);font-weight:900;background:rgba(74,168,255,.06);}
+  .tag{font-weight:900;padding:4px 10px;border-radius:999px;font-size:11px;display:inline-block;}
+  .tag.ACTIVE{background:rgba(46,213,115,.12);color:var(--ok);border:1px solid rgba(46,213,115,.25);}
+  .tag.PENDING{background:rgba(255,165,2,.12);color:var(--warn);border:1px solid rgba(255,165,2,.25);}
+  .tag.BLOCKED{background:rgba(255,92,92,.12);color:var(--danger);border:1px solid rgba(255,92,92,.25);}
+  .tag.SUSPENDED{background:rgba(255,165,2,.10);color:var(--warn);border:1px solid rgba(255,165,2,.22);}
+  .right{display:flex;gap:8px;align-items:center;justify-content:flex-end;}
+  .small{font-size:12px;}
+  .hr{height:1px;background:var(--line);margin:12px 0;}
+  .toast{position:fixed;right:16px;bottom:16px;background:var(--panel);border:1px solid var(--line);padding:10px 12px;border-radius:12px;display:none;max-width:360px;}
+</style>
+
+<div class="dash">
+  <aside class="sidebar">
+    <div class="brand">
+      <h2><i class="fa-solid fa-shield-halved"></i> YENE ADMIN</h2>
+      <div class="sub">Command Center • approvals • pricing • security • finance • audit</div>
+      <div class="pill" style="margin-top:10px;"><span class="dot ok"></span> Live</div>
+    </div>
+
+    <div class="nav">
+      <div class="item active" onclick="showView('v-overview', this)"><i class="fa-solid fa-chart-line"></i> Overview</div>
+      <div class="item" onclick="showView('v-approvals', this)"><i class="fa-solid fa-user-check"></i> Approvals</div>
+      <div class="item" onclick="showView('v-agents', this)"><i class="fa-solid fa-users"></i> Agents</div>
+      <div class="item" onclick="showView('v-drivers', this)"><i class="fa-solid fa-car"></i> Drivers</div>
+      <div class="item" onclick="showView('v-clients', this)"><i class="fa-solid fa-mobile-screen"></i> Clients</div>
+      <div class="item" onclick="showView('v-finance', this)"><i class="fa-solid fa-wallet"></i> Finance Ledger</div>
+      <div class="item" onclick="showView('v-rules', this)"><i class="fa-solid fa-sliders"></i> Pricing Rules</div>
+      <div class="item" onclick="showView('v-broadcast', this)"><i class="fa-solid fa-bullhorn"></i> Broadcasts</div>
+      <div class="item" onclick="showView('v-security', this)"><i class="fa-solid fa-lock"></i> Security</div>
+    </div>
+
+    <div class="sidefoot">
+      <a class="btn" style="width:100%;text-decoration:none;" href="/logout">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="title">Admin Command Center</div>
+        <div class="muted">Approve agents • monitor registrations • control payouts • block scammers</div>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="reloadAll()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        <button class="btn primary" onclick="downloadCSV('agents')"><i class="fa-solid fa-download"></i> Export Agents CSV</button>
+        <button class="btn primary" onclick="downloadCSV('drivers')"><i class="fa-solid fa-download"></i> Export Drivers CSV</button>
+      </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section id="v-overview" class="view active">
+      <div class="grid">
+        <div class="card">
+          <div class="k">Agents</div>
+          <div class="v" id="kAgents">—</div>
+          <div class="muted" id="kAgentsSub">Active / Pending / Blocked</div>
+        </div>
+        <div class="card">
+          <div class="k">Drivers Registered</div>
+          <div class="v" id="kDrivers">—</div>
+          <div class="muted">With timestamps + recruiter</div>
+        </div>
+        <div class="card">
+          <div class="k">Clients Registered</div>
+          <div class="v" id="kClients">—</div>
+          <div class="muted">With timestamps + recruiter</div>
+        </div>
+        <div class="card">
+          <div class="k">Total Paid (N$)</div>
+          <div class="v" id="kPaid">—</div>
+          <div class="muted">Ledger totals</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:900;">Recent Activity</div>
+            <div class="muted">Last 25 registrations across the network</div>
+          </div>
+          <div class="pill"><span class="dot warn"></span> Audit-ready timestamps</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>Type</th><th>Name</th><th>Phone</th><th>Town</th><th>Agent</th></tr></thead>
+            <tbody id="recentTable"><tr><td colspan="6" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- APPROVALS -->
+    <section id="v-approvals" class="view">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:900;">Pending Agent Approvals</div>
+            <div class="muted">Approve to activate • block to stop scammers</div>
+          </div>
+          <div class="row">
+            <input id="pendingSearch" placeholder="Search name/email/phone…" oninput="renderPending()">
+            <button class="btn" onclick="loadAgents()"><i class="fa-solid fa-rotate"></i> Reload</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Agent</th><th>Phone</th><th>Town</th><th>Region</th><th>Joined</th><th class="right">Actions</th></tr></thead>
+            <tbody id="pendingTable"><tr><td colspan="6" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- AGENTS -->
+    <section id="v-agents" class="view">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:900;">Agents & Promoters</div>
+            <div class="muted">Status control • team/referrals • overview of earnings</div>
+          </div>
+          <div class="row">
+            <input id="agentSearch" placeholder="Search…" oninput="renderAgents()">
+            <select id="agentStatus" onchange="renderAgents()">
+              <option value="ALL">All Status</option>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="PENDING">PENDING</option>
+              <option value="SUSPENDED">SUSPENDED</option>
+              <option value="BLOCKED">BLOCKED</option>
+            </select>
+            <button class="btn" onclick="openCreateUser()"><i class="fa-solid fa-user-plus"></i> Create User</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Agent</th><th>Status</th><th>Town</th><th>Region</th><th>Joined</th>
+              <th>Drivers</th><th>Clients</th><th class="right">Actions</th>
+            </tr></thead>
+            <tbody id="agentsTable"><tr><td colspan="8" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <div style="font-weight:900;">Create Admin / Agent User</div>
+        <div class="muted">This creates Supabase Auth user + DB profile (admin only).</div>
+        <div class="hr"></div>
+
+        <div class="row">
+          <input id="cu_name" placeholder="Full Name">
+          <input id="cu_email" placeholder="Email" type="email">
+          <input id="cu_phone" placeholder="Phone">
+          <input id="cu_username" placeholder="Username">
+          <input id="cu_password" placeholder="Password (min 6)" type="password">
+          <select id="cu_role">
+            <option value="AGENT">AGENT</option>
+            <option value="ADMIN">ADMIN</option>
+          </select>
+          <button class="btn primary" onclick="createUser()"><i class="fa-solid fa-check"></i> Create</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- DRIVERS -->
+    <section id="v-drivers" class="view">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:900;">Drivers Registered</div>
+            <div class="muted">Includes timestamp + recruiter for fund management</div>
+          </div>
+          <div class="row">
+            <input id="driverSearch" placeholder="Search driver…" oninput="renderDrivers()">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>Driver</th><th>Phone</th><th>Town</th><th>Recruiter</th><th>Recruiter ID</th></tr></thead>
+            <tbody id="driversTable"><tr><td colspan="6" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- CLIENTS -->
+    <section id="v-clients" class="view">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:900;">Clients Registered</div>
+            <div class="muted">Includes timestamp + recruiter for payout validation</div>
+          </div>
+          <div class="row">
+            <input id="clientSearch" placeholder="Search client…" oninput="renderClients()">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>Client</th><th>Phone</th><th>Recruiter</th><th>Recruiter ID</th></tr></thead>
+            <tbody id="clientsTable"><tr><td colspan="5" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- FINANCE -->
+    <section id="v-finance" class="view">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:900;">Finance Ledger</div>
+            <div class="muted">Every payment logged (date • type • amount • agent)</div>
+          </div>
+          <div class="row">
+            <button class="btn primary" onclick="downloadCSV('finance')"><i class="fa-solid fa-download"></i> Export Ledger CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>Type</th><th>Amount (N$)</th><th>Agent</th><th>Agent ID</th><th>Note</th></tr></thead>
+            <tbody id="financeTable"><tr><td colspan="6" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRICING RULES -->
+    <section id="v-rules" class="view">
+      <div class="card">
+        <div style="font-weight:900;">Pricing / Commission Rules (Per Town)</div>
+        <div class="muted">Admin sets values — agent dashboards read them.</div>
+        <div class="hr"></div>
+
+        <div class="row">
+          <input id="pr_region" placeholder="Region (e.g. Kavango East)">
+          <input id="pr_town" placeholder="Town (e.g. Rundu)">
+          <input id="pr_driver" placeholder="Driver Reg N$" type="number">
+          <input id="pr_client" placeholder="Client Reg N$" type="number">
+          <input id="pr_bonus" placeholder="First Trip Bonus N$" type="number">
+          <input id="pr_ref" placeholder="Referral % (e.g. 3)" type="number">
+          <select id="pr_active"><option value="true">Active</option><option value="false">Inactive</option></select>
+          <button class="btn primary" onclick="saveRule()"><i class="fa-solid fa-floppy-disk"></i> Save Rule</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Region</th><th>Town</th><th>Driver Reg</th><th>Client Reg</th><th>First Trip Bonus</th><th>Referral %</th><th>Active</th></tr></thead>
+            <tbody id="rulesTable"><tr><td colspan="7" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- BROADCAST -->
+    <section id="v-broadcast" class="view">
+      <div class="card">
+        <div style="font-weight:900;">System Broadcast</div>
+        <div class="muted">Send message to every agent dashboard.</div>
+        <div class="hr"></div>
+        <textarea id="bc_msg" placeholder="Type announcement…"></textarea>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn warn" onclick="sendBroadcast()"><i class="fa-solid fa-bullhorn"></i> Broadcast</button>
+        </div>
+        <div class="hr"></div>
+        <div class="muted">Recent broadcasts:</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>Message</th></tr></thead>
+            <tbody id="broadcastTable"><tr><td colspan="2" style="text-align:center;color:var(--muted);">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECURITY -->
+    <section id="v-security" class="view">
+      <div class="card">
+        <div style="font-weight:900;">Security Actions</div>
+        <div class="muted">Block/suspend agents • log actions • prevent scammers.</div>
+        <div class="hr"></div>
+        <div class="muted small">
+          ✅ You can block TEMPORARY or PERMANENT by setting status to <b>SUSPENDED</b> or <b>BLOCKED</b> in Agents tab. <br>
+          ✅ Every action is recorded in <b>system_logs</b> for audit.
+        </div>
+      </div>
+    </section>
+
+    <div class="toast" id="toast"></div>
+  </main>
+</div>
+
+<script>
+  // ---------- STATE ----------
+  let AGENTS = [];
+  let DRIVERS = [];
+  let CLIENTS = [];
+  let FIN = [];
+  let RULES = [];
+  let BC = [];
+  let COUNTS = {}; // drivers/clients per agent
+
+  // ---------- UI ----------
+  function showView(id, el){
+    document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+    document.querySelectorAll(".item").forEach(i=>i.classList.remove("active"));
+    if(el) el.classList.add("active");
+  }
+  function toast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.display = "block";
+    setTimeout(()=>t.style.display="none", 2500);
+  }
+  function esc(s){
+    return String(s ?? "")
+      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  }
+  function dt(x){
+    try { return new Date(x).toLocaleString(); } catch(e){ return x || ""; }
+  }
+  function tag(status){
+    const s = (status || "PENDING").toUpperCase();
+    return `<span class="tag ${s}">${esc(s)}</span>`;
+  }
+
+  // ---------- API ----------
+  async function api(path, opts={}){
+    const r = await fetch(path, {
+      headers: { "Content-Type":"application/json" },
+      credentials: "same-origin",
+      ...opts
+    });
+    const j = await r.json().catch(()=>({success:false,error:"Bad JSON response"}));
+    if(!r.ok || j.success===false){
+      throw new Error(j.error || ("HTTP " + r.status));
+    }
+    return j;
+  }
+
+  // ---------- LOAD ----------
+  async function reloadAll(){
+    await Promise.all([
+      loadOverview(),
+      loadAgents(),
+      loadDrivers(),
+      loadClients(),
+      loadFinance(),
+      loadRules(),
+      loadBroadcasts()
+    ]);
+    toast("Refreshed");
+  }
+
+  async function loadOverview(){
+    const j = await api("/api/admin/overview");
+    const o = j.data;
+
+    document.getElementById("kAgents").textContent = String(o.agents_total ?? 0);
+    document.getElementById("kAgentsSub").textContent = `Active ${o.agents_active||0} • Pending ${o.agents_pending||0} • Blocked ${o.agents_blocked||0}`;
+
+    document.getElementById("kDrivers").textContent = String(o.drivers_total ?? 0);
+    document.getElementById("kClients").textContent = String(o.clients_total ?? 0);
+    document.getElementById("kPaid").textContent = "N$ " + Number(o.total_paid||0).toLocaleString();
+
+    const tb = document.getElementById("recentTable");
+    const rows = (o.recent_activity || []);
+    tb.innerHTML = rows.length ? rows.map(x=>`
+      <tr>
+        <td>${dt(x.created_at)}</td>
+        <td><b>${esc(x.type)}</b></td>
+        <td>${esc(x.name)}</td>
+        <td>${esc(x.phone||"")}</td>
+        <td>${esc(x.town||"")}</td>
+        <td>${esc(x.recruiter_name||"")} (${esc(x.recruiter_id||"")})</td>
+      </tr>
+    `).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--muted);">No activity yet</td></tr>`;
+  }
+
+  async function loadAgents(){
+    const j = await api("/api/admin/agents");
+    AGENTS = j.data.agents || [];
+    COUNTS = j.data.counts || {};
+    renderPending();
+    renderAgents();
+  }
+
+  function renderPending(){
+    const q = (document.getElementById("pendingSearch").value || "").toLowerCase();
+    const pend = AGENTS.filter(a => (a.status||"").toUpperCase()==="PENDING");
+    const filtered = pend.filter(a => {
+      const blob = `${a.full_name||""} ${a.email||""} ${a.phone||""} ${a.town||""} ${a.region||""}`.toLowerCase();
+      return blob.includes(q);
+    });
+
+    const tb = document.getElementById("pendingTable");
+    tb.innerHTML = filtered.length ? filtered.map(a=>`
+      <tr>
+        <td><b>${esc(a.full_name||"")}</b><div class="muted small">${esc(a.email||"")}</div></td>
+        <td>${esc(a.phone||"")}</td>
+        <td>${esc(a.town||"")}</td>
+        <td>${esc(a.region||"")}</td>
+        <td>${dt(a.created_at)}</td>
+        <td class="right">
+          <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')"><i class="fa-solid fa-check"></i> Approve</button>
+          <button class="btn warn" onclick="setAgentStatus('${a.id}','SUSPENDED')"><i class="fa-solid fa-pause"></i> Suspend</button>
+          <button class="btn danger" onclick="setAgentStatus('${a.id}','BLOCKED')"><i class="fa-solid fa-ban"></i> Block</button>
+        </td>
+      </tr>
+    `).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--muted);">No pending approvals</td></tr>`;
+  }
+
+  function renderAgents(){
+    const q = (document.getElementById("agentSearch").value || "").toLowerCase();
+    const st = document.getElementById("agentStatus").value;
+
+    const list = AGENTS.filter(a=>{
+      const blob = `${a.full_name||""} ${a.email||""} ${a.phone||""} ${a.town||""} ${a.region||""} ${a.status||""}`.toLowerCase();
+      if(!blob.includes(q)) return false;
+      if(st==="ALL") return true;
+      return (a.status||"").toUpperCase()===st;
+    });
+
+    const tb = document.getElementById("agentsTable");
+    tb.innerHTML = list.length ? list.map(a=>{
+      const c = COUNTS[a.id] || {drivers:0, clients:0};
+      return `
+      <tr>
+        <td><b>${esc(a.full_name||"")}</b><div class="muted small">${esc(a.email||"")} • ${esc(a.phone||"")}</div></td>
+        <td>${tag(a.status)}</td>
+        <td>${esc(a.town||"")}</td>
+        <td>${esc(a.region||"")}</td>
+        <td>${dt(a.created_at)}</td>
+        <td><b>${c.drivers||0}</b></td>
+        <td><b>${c.clients||0}</b></td>
+        <td class="right">
+          <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')">ACTIVE</button>
+          <button class="btn warn" onclick="setAgentStatus('${a.id}','SUSPENDED')">SUSPEND</button>
+          <button class="btn danger" onclick="setAgentStatus('${a.id}','BLOCKED')">BLOCK</button>
+        </td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="8" style="text-align:center;color:var(--muted);">No agents found</td></tr>`;
+  }
+
+  async function setAgentStatus(agent_id, status){
+    await api(`/api/admin/agents/${agent_id}/status`, { method:"POST", body: JSON.stringify({ status }) });
+    toast(`Status updated: ${status}`);
+    await loadAgents();
+    await loadOverview();
+  }
+
+  async function loadDrivers(){
+    const j = await api("/api/admin/drivers");
+    DRIVERS = j.data || [];
+    renderDrivers();
+  }
+  function renderDrivers(){
+    const q = (document.getElementById("driverSearch").value || "").toLowerCase();
+    const tb = document.getElementById("driversTable");
+    const list = DRIVERS.filter(d=>{
+      const blob = `${d.full_name||""} ${d.phone||""} ${d.town||""} ${d.recruiter_name||""}`.toLowerCase();
+      return blob.includes(q);
+    });
+    tb.innerHTML = list.length ? list.map(d=>`
+      <tr>
+        <td>${dt(d.created_at)}</td>
+        <td><b>${esc(d.full_name||"")}</b></td>
+        <td>${esc(d.phone||"")}</td>
+        <td>${esc(d.town||"")}</td>
+        <td>${esc(d.recruiter_name||"")}</td>
+        <td>${esc(d.recruiter_agent_id||"")}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--muted);">No drivers</td></tr>`;
+  }
+
+  async function loadClients(){
+    const j = await api("/api/admin/clients");
+    CLIENTS = j.data || [];
+    renderClients();
+  }
+  function renderClients(){
+    const q = (document.getElementById("clientSearch").value || "").toLowerCase();
+    const tb = document.getElementById("clientsTable");
+    const list = CLIENTS.filter(c=>{
+      const blob = `${c.full_name||""} ${c.phone||""} ${c.recruiter_name||""}`.toLowerCase();
+      return blob.includes(q);
+    });
+    tb.innerHTML = list.length ? list.map(c=>`
+      <tr>
+        <td>${dt(c.created_at)}</td>
+        <td><b>${esc(c.full_name||"")}</b></td>
+        <td>${esc(c.phone||"")}</td>
+        <td>${esc(c.recruiter_name||"")}</td>
+        <td>${esc(c.recruiter_agent_id||"")}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="5" style="text-align:center;color:var(--muted);">No clients</td></tr>`;
+  }
+
+  async function loadFinance(){
+    const j = await api("/api/admin/finance");
+    FIN = j.data || [];
+    const tb = document.getElementById("financeTable");
+    tb.innerHTML = FIN.length ? FIN.map(x=>`
+      <tr>
+        <td>${dt(x.created_at)}</td>
+        <td><b>${esc(x.type||"")}</b></td>
+        <td>${Number(x.amount||0).toLocaleString()}</td>
+        <td>${esc(x.agent_name||"")}</td>
+        <td>${esc(x.agent_id||"")}</td>
+        <td>${esc(x.note||"")}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--muted);">No ledger entries</td></tr>`;
+  }
+
+  async function loadRules(){
+    const j = await api("/api/admin/payment_rules");
+    RULES = j.data || [];
+    const tb = document.getElementById("rulesTable");
+    tb.innerHTML = RULES.length ? RULES.map(r=>`
+      <tr>
+        <td>${esc(r.region||"")}</td>
+        <td><b>${esc(r.town||"")}</b></td>
+        <td>${esc(r.driver_reg||0)}</td>
+        <td>${esc(r.client_reg||0)}</td>
+        <td>${esc(r.first_trip_bonus||0)}</td>
+        <td>${esc(r.referral_pct||0)}%</td>
+        <td>${r.is_active ? "Active" : "Inactive"}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--muted);">No rules</td></tr>`;
+  }
+
+  async function saveRule(){
+    const payload = {
+      region: document.getElementById("pr_region").value.trim(),
+      town: document.getElementById("pr_town").value.trim(),
+      driver_reg: Number(document.getElementById("pr_driver").value || 0),
+      client_reg: Number(document.getElementById("pr_client").value || 0),
+      first_trip_bonus: Number(document.getElementById("pr_bonus").value || 0),
+      referral_pct: Number(document.getElementById("pr_ref").value || 0),
+      is_active: (document.getElementById("pr_active").value === "true"),
+    };
+    await api("/api/admin/payment_rules", { method:"POST", body: JSON.stringify(payload) });
+    toast("Rule saved");
+    await loadRules();
+  }
+
+  async function sendBroadcast(){
+    const message = document.getElementById("bc_msg").value.trim();
+    if(!message) return toast("Type a message first");
+    await api("/api/admin/broadcast", { method:"POST", body: JSON.stringify({ message }) });
+    document.getElementById("bc_msg").value = "";
+    toast("Broadcast sent");
+    await loadBroadcasts();
+  }
+
+  async function loadBroadcasts(){
+    const j = await api("/api/admin/broadcasts");
+    BC = j.data || [];
+    const tb = document.getElementById("broadcastTable");
+    tb.innerHTML = BC.length ? BC.map(x=>`
+      <tr><td>${dt(x.created_at)}</td><td>${esc(x.message||"")}</td></tr>
+    `).join("") : `<tr><td colspan="2" style="text-align:center;color:var(--muted);">No broadcasts</td></tr>`;
+  }
+
+  function openCreateUser(){
+    showView("v-agents", document.querySelectorAll(".item")[2]);
+    toast("Fill Create User form below");
+  }
+
+  async function createUser(){
+    const payload = {
+      full_name: document.getElementById("cu_name").value.trim(),
+      email: document.getElementById("cu_email").value.trim().toLowerCase(),
+      phone: document.getElementById("cu_phone").value.trim(),
+      username: document.getElementById("cu_username").value.trim().toLowerCase(),
+      password: document.getElementById("cu_password").value,
+      role: document.getElementById("cu_role").value
+    };
+    await api("/api/admin/create_user", { method:"POST", body: JSON.stringify(payload) });
+    toast("User created");
+    await loadAgents();
+    await loadOverview();
+  }
+
+  async function downloadCSV(kind){
+    // server returns CSV
+    window.location.href = "/api/admin/export/" + kind;
+  }
+
+  // boot
+  reloadAll().catch(err=>{
+    console.error(err);
+    toast("Error loading admin data. Check tables/policies.")
+  });
+</script>
+
+{% endblock %}

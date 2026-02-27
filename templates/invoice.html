@@ -1,0 +1,180 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YENE Payout Receipt</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #e0e5ec; padding: 2rem; display: flex; justify-content: center; }
+        .invoice-box { max-width: 800px; width: 100%; background: #ffffff; padding: 3rem; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); position: relative; }
+        
+        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #00a8ff; padding-bottom: 1.5rem; margin-bottom: 2rem; }
+        .header-logo { font-size: 2rem; font-weight: bold; color: #00a8ff; margin: 0; }
+        .header-company { color: #555; font-size: 0.9rem; line-height: 1.5; text-align: right; }
+        
+        .invoice-details { display: flex; justify-content: space-between; margin-bottom: 2rem; }
+        .agent-info h3 { margin: 0 0 0.5rem 0; color: #333; }
+        .agent-info p { margin: 0; color: #666; font-size: 0.95rem; line-height: 1.5; }
+        
+        .meta-info text-align: right; }
+        .meta-info h2 { margin: 0; color: #333; font-size: 1.8rem; text-transform: uppercase; letter-spacing: 1px; }
+        .meta-info p { margin: 5px 0 0 0; color: #666; font-size: 0.95rem; }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+        th { background: #f8f9fa; color: #333; padding: 12px; text-align: left; border-bottom: 2px solid #ddd; }
+        td { padding: 12px; border-bottom: 1px solid #eee; color: #555; }
+        .amount-col { text-align: right; font-weight: bold; }
+        
+        .totals { width: 50%; float: right; }
+        .totals table th, .totals table td { border: none; padding: 8px 12px; }
+        .totals .grand-total { font-size: 1.5rem; color: #2ed573; border-top: 2px solid #eee; }
+
+        .footer { clear: both; margin-top: 4rem; text-align: center; color: #888; font-size: 0.85rem; border-top: 1px solid #eee; padding-top: 1rem; }
+        
+        .paid-stamp { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg); font-size: 6rem; font-weight: bold; color: rgba(46, 213, 115, 0.1); border: 8px solid rgba(46, 213, 115, 0.1); border-radius: 10px; padding: 10px 30px; text-transform: uppercase; pointer-events: none; }
+
+        .action-bar { text-align: center; margin-bottom: 2rem; }
+        .btn { background: #00a8ff; color: #fff; border: none; padding: 0.8rem 1.5rem; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        .btn:hover { background: #0097e6; }
+
+        /* Hide buttons when printing/saving as PDF */
+        @media print {
+            body { background: white; padding: 0; }
+            .invoice-box { box-shadow: none; padding: 0; }
+            .action-bar { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div style="width: 100%; max-width: 800px;">
+        <div class="action-bar">
+            <button class="btn" onclick="window.print()">🖨️ Download / Print PDF</button>
+            <button class="btn" style="background: #333; margin-left: 10px;" onclick="window.close()">Close Window</button>
+        </div>
+
+        <div class="invoice-box">
+            <div class="paid-stamp" id="stamp-status">PAID</div>
+            
+            <div class="header">
+                <div>
+                    <h1 class="header-logo">🌐 YENE</h1>
+                    <p style="margin: 5px 0 0 0; color: #777; font-weight: bold;">Safe Ride Operations</p>
+                </div>
+                <div class="header-company">
+                    Yene Safe Ride Namibia<br>
+                    Windhoek, Namibia<br>
+                    support@yene.com
+                </div>
+            </div>
+
+            <div class="invoice-details">
+                <div class="agent-info">
+                    <p style="color: #00a8ff; font-weight: bold; margin-bottom: 5px;">PAYOUT TO:</p>
+                    <h3 id="inv-name">Loading...</h3>
+                    <p id="inv-username">@username</p>
+                    <p id="inv-id">ID: ...</p>
+                    <p id="inv-region">Region: ...</p>
+                </div>
+                <div class="meta-info" style="text-align: right;">
+                    <h2>Receipt</h2>
+                    <p><strong>Ref #:</strong> <span id="inv-ref">...</span></p>
+                    <p><strong>Date:</strong> <span id="inv-date">...</span></p>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th class="amount-col">Amount (N$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="inv-desc">Agent Commission Withdrawal</td>
+                        <td id="inv-status-text" style="color: #2ed573; font-weight: bold;">Cleared</td>
+                        <td class="amount-col" id="inv-amount">0.00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="totals">
+                <table>
+                    <tr>
+                        <th>Subtotal:</th>
+                        <td class="amount-col" id="inv-sub">0.00</td>
+                    </tr>
+                    <tr>
+                        <th>Processing Fee:</th>
+                        <td class="amount-col">0.00</td>
+                    </tr>
+                    <tr class="grand-total">
+                        <th>Total Paid:</th>
+                        <td class="amount-col">N$ <span id="inv-total">0.00</span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="footer">
+                <p>This is a computer-generated document. No signature is required.</p>
+                <p>Thank you for driving the growth of Yene Safe Ride!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://kcxphxihykonzuagtgke.supabase.co';
+        const supabaseKey = 'sb_publishable_g7evtigGLrMyHUSOZisn-g_XHwIVwrF';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function loadInvoice() {
+            // Get the transaction ID from the URL (e.g., /invoice?tx=123)
+            const urlParams = new URLSearchParams(window.location.search);
+            const txId = urlParams.get('tx');
+
+            if (!txId) {
+                document.getElementById('inv-name').innerText = "Demo Receipt (No ID provided)";
+                return;
+            }
+
+            // Fetch Transaction
+            const { data: tx, error: txError } = await supabase.from('wallet_transactions').select('*').eq('id', txId).single();
+            if (txError || !tx) {
+                alert("Transaction not found.");
+                return;
+            }
+
+            // Fetch Agent Profile using the agent_id from the transaction
+            const { data: profile, error: profileError } = await supabase.from('agent_profiles').select('*').eq('user_id', tx.agent_id).single();
+            
+            if (profile) {
+                document.getElementById('inv-name').innerText = profile.full_name;
+                document.getElementById('inv-username').innerText = "@" + profile.username;
+                document.getElementById('inv-id').innerText = "ID: " + profile.national_id;
+                document.getElementById('inv-region').innerText = "Region: " + profile.region;
+            }
+
+            // Fill Invoice Details
+            document.getElementById('inv-ref').innerText = tx.id.substring(0, 8).toUpperCase();
+            document.getElementById('inv-date').innerText = new Date(tx.created_at).toLocaleDateString();
+            document.getElementById('inv-desc').innerText = tx.description || tx.transaction_type;
+            document.getElementById('inv-amount').innerText = parseFloat(tx.amount).toFixed(2);
+            document.getElementById('inv-sub').innerText = parseFloat(tx.amount).toFixed(2);
+            document.getElementById('inv-total').innerText = parseFloat(tx.amount).toFixed(2);
+
+            if (tx.status !== 'paid' && tx.status !== 'cleared') {
+                document.getElementById('stamp-status').innerText = "PENDING";
+                document.getElementById('stamp-status').style.color = "rgba(243, 156, 18, 0.1)";
+                document.getElementById('stamp-status').style.borderColor = "rgba(243, 156, 18, 0.1)";
+                document.getElementById('inv-status-text').innerText = "Pending";
+                document.getElementById('inv-status-text').style.color = "#f39c12";
+            }
+        }
+
+        window.onload = loadInvoice;
+    </script>
+</body>
+</html>

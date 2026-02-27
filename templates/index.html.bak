@@ -1,0 +1,255 @@
+﻿{% extends 'base.html' %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+    /* Marketing Layout Styles */
+    .hero-marketing {
+        text-align: center;
+        padding: 4rem 1rem;
+        background: linear-gradient(135deg, rgba(0, 168, 255, 0.1) 0%, rgba(18, 18, 18, 1) 100%);
+        border-radius: 12px;
+        margin-bottom: 3rem;
+        border: 1px solid #333;
+        position: relative;
+        overflow: hidden;
+    }
+    .hero-marketing h1 { font-size: 3.5rem; color: #fff; margin-bottom: 1rem; letter-spacing: -1px; }
+    .hero-marketing h1 span { color: #00a8ff; }
+    .hero-marketing p { font-size: 1.2rem; color: #a4b0be; max-width: 600px; margin: 0 auto 2rem; line-height: 1.6; }
+    .hero-marketing .cta-buttons { display: flex; gap: 1rem; justify-content: center; }
+    
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 4rem; }
+    .feature-card { background: #1a1a1a; padding: 2rem; border-radius: 8px; text-align: center; border-top: 3px solid #333; transition: transform 0.3s ease; }
+    .feature-card:hover { transform: translateY(-5px); border-top-color: #2ed573; }
+    .feature-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    .feature-card h3 { color: #fff; margin-bottom: 0.5rem; }
+    .feature-card p { color: #a4b0be; font-size: 0.95rem; line-height: 1.5; }
+
+    /* Existing Functional UI Styles */
+    .index-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; margin-bottom: 4rem; }
+    @media (max-width: 768px) { .index-grid { grid-template-columns: 1fr; } }
+    
+    .timeline-box { background: #1e1e1e; padding: 2rem; border-radius: 8px; border-left: 4px solid #00a8ff; height: 550px; display: flex; flex-direction: column; }
+    .timeline-scroll { flex-grow: 1; overflow-y: auto; padding-right: 10px; }
+    .update-item { background: #2a2a2a; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; border-left: 3px solid #2ed573; }
+    
+    .auth-box { background: #1e1e1e; padding: 2rem; border-radius: 8px; border-top: 4px solid #00a8ff; height: 550px; position: relative; }
+    .form-group { margin-bottom: 1.2rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; color: #a4b0be; font-size: 0.9rem; }
+    .form-group input { width: 100%; padding: 0.8rem; background: #121212; border: 1px solid #333; color: white; border-radius: 4px; font-family: inherit; transition: border-color 0.3s; }
+    .form-group input:focus { border-color: #00a8ff; outline: none; }
+    
+    .tab-btn { background: none; border: none; color: #a4b0be; cursor: pointer; font-size: 1.1rem; margin-right: 1rem; padding-bottom: 0.5rem; font-weight: bold; }
+    .tab-btn.active { color: #00a8ff; border-bottom: 2px solid #00a8ff; }
+    .link-btn { background: none; border: none; color: #00a8ff; text-decoration: underline; cursor: pointer; font-size: 0.85rem; padding: 0; margin-top: 0.5rem; }
+    .btn { background: #00a8ff; color: #121212; border: none; padding: 0.8rem 1.5rem; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1rem; text-decoration: none; display: inline-block; transition: opacity 0.3s; }
+    .btn:hover { opacity: 0.8; }
+    .btn-green { background: #2ed573; }
+    .hidden { display: none; }
+</style>
+
+<div class="hero-marketing">
+    <h1>Own Your Hustle. <span>Drive The Future.</span></h1>
+    <p>Join the Yene Safe Ride Promoter Network today. Earn uncapped commissions by activating drivers and riders across Namibia, and build a team to earn a 3% lifetime override.</p>
+    <div class="cta-buttons">
+        <a href="/register" class="btn btn-green" style="padding: 1rem 2rem; font-size: 1.1rem;">Apply as a Promoter</a>
+        <a href="#control-center" class="btn" style="background: #2a2a2a; color: #fff;">System Login</a>
+    </div>
+</div>
+
+<div class="features-grid">
+    <div class="feature-card">
+        <div class="feature-icon">💸</div>
+        <h3>Instant Payouts</h3>
+        <p>Register drivers and riders using your digital dashboard. Request wallet withdrawals and get paid directly to your account.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">🤝</div>
+        <h3>Build Your Empire</h3>
+        <p>Share your unique referral link to recruit sub-agents. You will earn a 3% passive override on every activation they complete.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3>Digital Operations</h3>
+        <p>No more messy WhatsApp groups. Use our built-in CRM to track your KPIs, communicate with Admin, and manage your recruits.</p>
+    </div>
+</div>
+
+<div class="index-grid" id="control-center">
+    
+    <div class="timeline-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <div>
+                <h3 style="margin-bottom: 0.2rem; color: #fff;">📢 Live Operations Radar</h3>
+                <p style="color: #a4b0be; font-size: 0.85rem;">Public broadcasts and regional promos.</p>
+            </div>
+            <button onclick="fetchUpdates()" class="btn" style="margin-top: 0; padding: 0.4rem 0.8rem; font-size: 0.8rem; background: #2a2a2a; color: white;">🔄 Refresh</button>
+        </div>
+        <div class="timeline-scroll" id="timeline-content">
+            <p style="color: #a4b0be; text-align: center; margin-top: 2rem;">Connecting to control center...</p>
+        </div>
+    </div>
+
+    <div class="auth-box">
+        <div style="margin-bottom: 1.5rem; border-bottom: 1px solid #333; padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <button class="tab-btn active" id="tab-login" onclick="switchMode('standard')">System Login</button>
+            </div>
+        </div>
+
+        <form id="login-form" onsubmit="handleStandardLogin(event)">
+            <p style="color: #a4b0be; font-size: 0.85rem; margin-bottom: 1.5rem;">Access your secure workspace.</p>
+            <div class="form-group">
+                <label>System Username</label>
+                <input type="text" id="login-username" required placeholder="e.g. agent_john">
+            </div>
+            <div class="form-group">
+                <label>PIN or Password</label>
+                <input type="password" id="login-password" required>
+            </div>
+            <button type="submit" class="btn" style="width: 100%; margin-top: 1rem;" id="login-btn">Secure Login</button>
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <button type="button" class="link-btn" onclick="switchMode('reset')">Forgot details? Use Account Reset</button>
+            </div>
+            <div id="login-msg" style="margin-top: 1rem; font-size: 0.9rem; text-align: center; font-weight: bold;"></div>
+        </form>
+
+        <form id="reset-form" class="hidden" onsubmit="handleResetLogin(event)">
+            <p style="color: #ff4757; font-size: 0.85rem; margin-bottom: 1.5rem; line-height: 1.4;">
+                ⚠️ <strong>Account Reset Mode</strong><br>
+                Requires a Temp PIN provided by the Admin.
+            </p>
+            <div class="form-group">
+                <label>National ID Number</label>
+                <input type="text" id="reset-id" required placeholder="Your registered ID">
+            </div>
+            <div class="form-group">
+                <label>Cellphone Number</label>
+                <input type="tel" id="reset-phone" required placeholder="+264 81...">
+            </div>
+            <div class="form-group">
+                <label>Admin Temp PIN</label>
+                <input type="password" id="reset-pin" required placeholder="6-digit Temp PIN" maxlength="6">
+            </div>
+            <button type="submit" class="btn" style="width: 100%; margin-top: 1rem; background: #ff4757; color: white;" id="reset-btn">Verify Reset & Login</button>
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <button type="button" class="link-btn" onclick="switchMode('standard')">← Back to Standard Login</button>
+            </div>
+            <div id="reset-msg" style="margin-top: 1rem; font-size: 0.9rem; text-align: center; font-weight: bold;"></div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // System fully connected to your Supabase Keys
+    const supabaseUrl = 'https://kcxphxihykonzuagtgke.supabase.co';
+    const supabaseKey = 'sb_publishable_g7evtigGLrMyHUSOZisn-g_XHwIVwrF';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    // 1. Timeline Fetching Logic
+    async function fetchUpdates() {
+        const timelineDiv = document.getElementById('timeline-content');
+        const { data, error } = await supabase.from('admin_updates').select('*').order('created_at', { ascending: false }).limit(10);
+        
+        if (data && data.length > 0) {
+            timelineDiv.innerHTML = data.map(update => `
+                <div class="update-item">
+                    <span style="font-size: 0.8rem; color: #00a8ff; font-weight: bold;">${new Date(update.created_at).toLocaleString()} | 📍 ${update.region}</span>
+                    <h4 style="color: #ffffff; margin: 0.5rem 0;">${update.title}</h4>
+                    <p style="color: #a4b0be; font-size: 0.95rem; line-height: 1.5; margin: 0;">${update.message}</p>
+                </div>
+            `).join('');
+        } else {
+            timelineDiv.innerHTML = '<p style="color: #a4b0be; text-align: center; margin-top: 2rem;">No active operations broadcasted yet.</p>';
+        }
+    }
+    window.onload = fetchUpdates;
+
+    // 2. Switch between Standard Login and Reset Mode
+    function switchMode(mode) {
+        if (mode === 'standard') {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('reset-form').classList.add('hidden');
+            document.getElementById('tab-login').innerText = "System Login";
+            document.getElementById('tab-login').classList.add('active');
+        } else {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('reset-form').classList.remove('hidden');
+            document.getElementById('tab-login').innerText = "Account Recovery";
+            document.getElementById('tab-login').classList.remove('active');
+        }
+    }
+
+    // 3. STANDARD LOGIN & SMART ROUTING LOGIC
+    async function handleStandardLogin(e) {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value.toLowerCase();
+        const password = document.getElementById('login-password').value;
+        const msgBox = document.getElementById('login-msg');
+        const btn = document.getElementById('login-btn');
+
+        btn.disabled = true;
+        msgBox.innerHTML = '<span style="color: #00a8ff;">Locating user...</span>';
+
+        try {
+            // Fetch the user's role to determine where to send them
+            const { data: profileData, error: profileErr } = await supabase.from('agent_profiles').select('email, status, role').eq('username', username).single();
+            if (profileErr || !profileData) throw new Error("Username not found in the system.");
+            if (profileData.status === 'pending_approval') throw new Error("Your account is still under review by the Admin.");
+            if (profileData.status === 'suspended') throw new Error("Account suspended. Contact Support.");
+
+            msgBox.innerHTML = '<span style="color: #00a8ff;">Verifying credentials...</span>';
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email: profileData.email, password: password });
+            if (authError) throw authError;
+
+            msgBox.innerHTML = '<span style="color: #2ed573;">Login Successful! Routing...</span>';
+            
+            // SMART ROUTING BASED ON DATABASE ROLE
+            if (profileData.role === 'admin') {
+                setTimeout(() => { window.location.href = '/dashboard/admin'; }, 1000);
+            } else {
+                setTimeout(() => { window.location.href = '/dashboard/agent'; }, 1000);
+            }
+
+        } catch (error) {
+            msgBox.innerHTML = `<span style="color: #ff4757;">❌ ${error.message}</span>`;
+            btn.disabled = false;
+        }
+    }
+
+    // 4. ACCOUNT RESET LOGIN & SMART ROUTING LOGIC
+    async function handleResetLogin(e) {
+        e.preventDefault();
+        const idNum = document.getElementById('reset-id').value;
+        const phone = document.getElementById('reset-phone').value;
+        const tempPin = document.getElementById('reset-pin').value;
+        const msgBox = document.getElementById('reset-msg');
+        const btn = document.getElementById('reset-btn');
+
+        btn.disabled = true; msgBox.innerHTML = '<span style="color: #00a8ff;">Verifying Identity & Temp PIN...</span>';
+
+        try {
+            // Fetch role here as well just in case an Admin needs a reset
+            const { data: profileData, error: profileErr } = await supabase.from('agent_profiles').select('email, status, role').eq('national_id', idNum).eq('phone_number', phone).eq('temp_pin', tempPin).single();
+            if (profileErr || !profileData) throw new Error("Invalid ID, Cellphone, or Temp PIN.");
+            
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email: profileData.email, password: tempPin });
+            if (authError) throw authError;
+
+            msgBox.innerHTML = '<span style="color: #2ed573;">Verified! Redirecting...</span>';
+            
+            // SMART ROUTING FOR RESET
+            if (profileData.role === 'admin') {
+                setTimeout(() => { window.location.href = '/dashboard/admin'; }, 1500);
+            } else {
+                setTimeout(() => { window.location.href = '/dashboard/agent'; }, 1500);
+            }
+
+        } catch (error) {
+            msgBox.innerHTML = `<span style="color: #ff4757;">❌ ${error.message}</span>`;
+            btn.disabled = false;
+        }
+    }
+</script>
+{% endblock %}
