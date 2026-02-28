@@ -26,6 +26,7 @@
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #00a8ff; }
     </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
 </head>
 <body>
     <nav class="navbar">
@@ -65,5 +66,6 @@
 
         document.addEventListener("DOMContentLoaded", checkAuthStatus);
     </script>
+  <script defer src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>
