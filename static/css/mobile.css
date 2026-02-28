@@ -1,0 +1,80 @@
+/* ===== YENE MOBILE DASHBOARD FIX ===== */
+
+/* GENERAL */
+@media (max-width: 900px){
+  body {
+    font-size: 14px;
+  }
+}
+
+/* SIDEBAR becomes top menu */
+@media (max-width: 900px){
+  .sidebar {
+    width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+    display: flex !important;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .sidebar .item {
+    flex: 0 0 auto;
+  }
+}
+
+/* TOPBAR spacing */
+@media (max-width: 900px){
+  .topbar {
+    padding: 10px !important;
+    flex-wrap: wrap !important;
+  }
+}
+
+/* MAIN CONTENT full width */
+@media (max-width: 900px){
+  .main {
+    width: 100% !important;
+    padding: 12px !important;
+  }
+}
+
+/* GRID STACKING */
+@media (max-width: 900px){
+  .grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+}
+
+/* CARDS full width */
+@media (max-width: 900px){
+  .card {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* FORMS */
+@media (max-width: 900px){
+  input, select, textarea, button, .btn {
+    width: 100% !important;
+    margin-bottom: 8px;
+  }
+}
+
+/* KPI stats readable */
+@media (max-width: 900px){
+  .kpi-text {
+    font-size: 16px !important;
+  }
+}
+
+/* Prevent overflow */
+@media (max-width: 900px){
+  * {
+    word-break: break-word;
+  }
+}
