@@ -180,7 +180,15 @@
 
   async function loadStats() {
       try {
-          const res = await fetch("/api/agent/stats");
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 8000);
+
+          const res = await fetch("/api/agent/stats", {
+            signal: controller.signal,
+            credentials: "same-origin"
+          });
+
+          clearTimeout(timeout);
           const data = await res.json();
           if (data.success !== false) {
               const dCount = data.drivers || 0;

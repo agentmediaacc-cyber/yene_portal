@@ -1,127 +1,79 @@
-/* ===== YENE MOBILE APP FEEL ===== */
+/* YENE Mobile Fix Pack */
 
-:root{
-  --yene-blue:#4aa3ff;
-  --bg:#0b1220;
+* { box-sizing: border-box; }
+body { overflow-x: hidden; }
+
+/* overlay */
+#menuOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  display: none;
+  z-index: 9998;
+}
+#menuOverlay.show{ display:block; }
+
+/* lock scroll when menu open */
+html.menu-open, body.menu-open{
+  overflow:hidden !important;
+  height:100%;
 }
 
-/* Prevent ugly zoom on iOS when inputs are small */
-input, select, textarea { font-size: 16px; }
-
-/* MOBILE LAYOUT */
 @media (max-width: 900px){
 
-  /* Give space for bottom nav */
-  body { padding-bottom: 72px; }
+  /* make topbar stay clean */
+  .topbar, .header, .navbar{
+    position: sticky;
+    top: 0;
+    z-index: 9997;
+  }
 
-  /* Sidebar becomes a drawer */
-  .sidebar{
+  /* hamburger always clickable */
+  .hamburger{
+    position: relative;
+    z-index: 9999;
+  }
+
+  /* Sidebar off-canvas */
+  #sidebar, .sidebar{
     position: fixed !important;
     top: 0;
     left: 0;
     height: 100vh !important;
-    width: 78vw !important;
-    max-width: 340px !important;
+    width: min(86vw, 320px) !important;
     transform: translateX(-110%);
-    transition: transform .22s ease;
+    transition: transform .2s ease;
     z-index: 9999;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  .sidebar.open{
+  #sidebar.open, .sidebar.open{
     transform: translateX(0);
   }
 
-  /* Dark overlay when drawer is open */
-  body.nav-open::before{
-    content:"";
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.45);
-    z-index: 9998;
-  }
-
-  /* Topbar tight + burger visible */
-  .topbar{
-    position: sticky !important;
-    top: 0;
-    z-index: 50;
-    padding: 10px 12px !important;
-    display:flex !important;
-    align-items:center !important;
-    gap: 10px !important;
-    flex-wrap: nowrap !important;
-  }
-  .hamburger{
-    display: inline-flex !important;
-    align-items:center;
-    justify-content:center;
-    width: 42px;
-    height: 42px;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,.14);
-  }
-
-  /* Main full width */
-  .main{
+  /* main content full width */
+  .main, main, .dash, .view, .page, .content{
+    margin-left: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
     padding: 12px !important;
   }
 
-  /* Stack grid */
-  .grid{
-    display:grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
-  }
+  /* stack grids */
+  .grid { display: block !important; }
 
-  /* Cards */
-  .card{
+  /* cards full width */
+  .card, .profile-card, .item, .panel, .kpi, .stat{
     width: 100% !important;
     max-width: 100% !important;
-    border-radius: 16px;
   }
 
-  /* Forms full width */
-  input, select, textarea, button, .btn{
+  /* forms readable */
+  form, .field, input, select, textarea, button{
     width: 100% !important;
-    margin-bottom: 10px;
+    max-width: 100% !important;
   }
-
-  /* Bottom nav */
-  .bottom-nav{
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 64px;
-    display: flex;
-    gap: 6px;
-    padding: 8px 10px;
-    background: rgba(8, 14, 26, .95);
-    border-top: 1px solid rgba(255,255,255,.10);
-    z-index: 9997;
-    backdrop-filter: blur(8px);
-  }
-  .bottom-nav a{
-    flex:1;
-    display:flex;
-    flex-direction: column;
-    align-items:center;
-    justify-content:center;
-    text-decoration:none;
-    font-size: 12px;
-    border-radius: 12px;
-    color: rgba(255,255,255,.72);
-  }
-  .bottom-nav a.active{
-    color: #fff;
-    background: rgba(74,163,255,.14);
-    outline: 1px solid rgba(74,163,255,.30);
-  }
-
-  /* FontAwesome icons spacing in nav */
-  .bottom-nav i{
-    font-size: 18px;
-    margin-bottom: 4px;
+  input, select, textarea{
+    font-size: 16px !important; /* prevents iPhone zoom */
   }
 }
