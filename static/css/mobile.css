@@ -83,3 +83,93 @@ html.menu-open, body.menu-open{
   #sidebar, .sidebar { position: fixed !important; z-index: 1000 !important; }
   .topbar { position: sticky; top: 0; z-index: 900; }
 }
+
+/* ============================================================
+   YENE MOBILE HARD FIX (Agent Dashboard)
+   Forces correct layout on phones.
+   ============================================================ */
+@media (max-width: 768px) {
+
+  /* stop weird centering / overflow */
+  html, body {
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  /* ensure topbar behaves like a real topbar */
+  .topbar {
+    position: sticky !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1200 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    background: #fff !important;
+  }
+
+  /* hamburger must NEVER sit in the middle */
+  .hamburger {
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 1300 !important;
+    width: 44px !important;
+    height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 10px !important;
+    background: #ffffff !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12) !important;
+  }
+
+  /* push the whole page content down so it doesn't sit under hamburger/topbar */
+  .main, main, .dash, .view, .grid {
+    margin-top: 60px !important;
+    padding-top: 10px !important;
+  }
+
+  /* sidebar becomes off-canvas */
+  #sidebar, .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: -320px !important;
+    height: 100vh !important;
+    width: 290px !important;
+    max-width: 85vw !important;
+    overflow-y: auto !important;
+    z-index: 1250 !important;
+    background: #fff !important;
+    transition: left 0.2s ease-in-out !important;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.15) !important;
+  }
+
+  #sidebar.open, .sidebar.open {
+    left: 0 !important;
+  }
+
+  /* prevent "logo & car" from floating in center */
+  img, svg, .avatar, .profile-card img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* if you have a header/hero section that centers everything, neutralize it */
+  .profile-card, .card, .card-top-blue, .card-top-green, .card-top-purple {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 10px 0 !important;
+  }
+
+  /* make forms readable */
+  input, select, button, textarea {
+    font-size: 16px !important; /* stops iOS zoom + improves usability */
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+}
