@@ -206,3 +206,42 @@ html.menu-open, body.menu-open{
     max-width: 100% !important;
   }
 }
+
+/* ===== ULTRA FIX: Agent sidebar stuck center ===== */
+@media (max-width: 768px){
+
+  /* kill any parent transforms that break fixed positioning */
+  body, .dash, .main, .layout, .app, .shell {
+    transform: none !important;
+  }
+
+  /* sidebar must be pinned to left */
+  #sidebar, .sidebar{
+    position: fixed !important;
+    top: 0 !important;
+    left: -280px !important;
+    right: auto !important;
+    width: 260px !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    transform: none !important;
+    display: block !important;
+    z-index: 9999 !important;
+  }
+
+  /* when open */
+  #sidebar.open, .sidebar.open{
+    left: 0 !important;
+  }
+
+  /* overlay fix so page clickable */
+  .main, .dash{
+    margin-left: 0 !important;
+  }
+
+  /* stop centered content */
+  .profile-card{
+    display: block !important;
+    text-align: left !important;
+  }
+}
