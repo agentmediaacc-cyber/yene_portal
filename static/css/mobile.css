@@ -245,3 +245,20 @@ html.menu-open, body.menu-open{
     text-align: left !important;
   }
 }
+
+/* === KILL HAMBURGER + SIDEBAR ON MOBILE (FINAL) === */
+@media (max-width: 768px){
+  .hamburger { display: none !important; }
+  #sidebar, .sidebar { display: none !important; }
+
+  /* make main content full width */
+  .main, .dash {
+    margin: 0 !important;
+    padding: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* prevent any weird offscreen/center overlays */
+  body { overflow-x: hidden !important; }
+}
