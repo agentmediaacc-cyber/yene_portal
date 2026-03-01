@@ -173,3 +173,36 @@ html.menu-open, body.menu-open{
   }
 
 }
+
+/* ===== FINAL FIX: SIDEBAR CENTER BUG (Agent Dashboard) ===== */
+@media (max-width: 768px){
+
+  /* Sidebar must ALWAYS be left-docked */
+  #sidebar, .sidebar{
+    left: -320px !important;
+    right: auto !important;
+    margin: 0 !important;
+    transform: none !important;
+    translate: none !important;
+    display: block !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+  }
+
+  /* When opened: lock it to the LEFT edge */
+  #sidebar.open, .sidebar.open{
+    left: 0 !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  /* Sidebar content should not be centered */
+  #sidebar * , .sidebar *{
+    text-align: left !important;
+  }
+
+  /* Prevent that big logo from taking over the whole sidebar */
+  .profile-card, .profile-card *{
+    max-width: 100% !important;
+  }
+}
