@@ -64,7 +64,7 @@
 <div class="dash">
   <div class="topbar">
     <div style="font-weight: 900; color: var(--yene); letter-spacing: 1px;"><i class="fa-solid fa-car-side"></i> YENE PROMOTER</div>
-    <button class="hamburger" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+    <button class="hamburger" type="button" id="hamburgerBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
   </div>
 
   <aside class="sidebar" id="sidebar">
@@ -275,7 +275,40 @@
       btn.disabled = false;
   }
 
-  function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+  function toggleSidebar(forceClose=false) {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+
+  const isOpen = sidebar.classList.contains('open');
+  if (forceClose) sidebar.classList.remove('open');
+  else sidebar.classList.toggle('open');
+
+  // overlay for mobile so menu doesn't disturb content
+  let overlay = document.getElementById('mobileOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'mobileOverlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.right = '0';
+    overlay.style.bottom = '0';
+    overlay.style.background = 'rgba(0,0,0,0.35)';
+    overlay.style.zIndex = '999';
+    overlay.style.display = 'none';
+    overlay.addEventListener('click', () => toggleSidebar(true));
+    document.body.appendChild(overlay);
+  }
+
+  const nowOpen = sidebar.classList.contains('open');
+  if (window.innerWidth <= 768) {
+    overlay.style.display = nowOpen ? 'block' : 'none';
+    document.body.style.overflow = nowOpen ? 'hidden' : '';
+  } else {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+}
 
   function showView(viewId, el) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -284,6 +317,18 @@
     if (el) el.classList.add('active');
     if (window.innerWidth <= 768) toggleSidebar();
   }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('hamburgerBtn');
+  if (btn) btn.addEventListener('click', () => toggleSidebar());
+  // close sidebar when selecting a menu item on mobile
+  document.querySelectorAll('#sidebar a, #sidebar button').forEach(el => {
+    el.addEventListener('click', () => {
+      if (window.innerWidth <= 768) toggleSidebar(true);
+    });
+  });
+});
+
 </script>
 
 <!-- Mobile Bottom Navigation -->

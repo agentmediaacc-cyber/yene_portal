@@ -77,3 +77,9 @@ html.menu-open, body.menu-open{
     font-size: 16px !important; /* prevents iPhone zoom */
   }
 }
+
+/* --- YENE agent dashboard: ensure sidebar layers correctly on phone --- */
+@media (max-width: 768px) {
+  #sidebar, .sidebar { position: fixed !important; z-index: 1000 !important; }
+  .topbar { position: sticky; top: 0; z-index: 900; }
+}
