@@ -2,348 +2,743 @@
 {% block content %}
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/agent_dashboard_v2.css') }}">
 
-<style>
-  :root {
-    --yene: #4aa8ff; --bg: #0b1220; --panel: #0f1a2f; --card: #111b2e; --card2: #0b1427;
-    --text: #eaf2ff; --muted: #a9b7d6; --line: rgba(255,255,255,.10);
-    --danger: #ff5c5c; --ok: #2ed573; --warn: #ffa502; --gold: #f1c40f; --purple: #9c88ff;
-  }
-  * { box-sizing: border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-  body { margin: 0; background: var(--bg); color: var(--text); overflow: hidden; }
-  .dash { display: flex; height: 100vh; }
-  .topbar { display: none; background: var(--panel); padding: 15px 20px; border-bottom: 1px solid var(--line); align-items: center; justify-content: space-between; }
-  .hamburger { cursor: pointer; font-size: 1.5rem; color: var(--yene); border: none; background: transparent; }
-  .sidebar { width: 280px; background: linear-gradient(180deg,#070d18 0%, #091027 100%); border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 1000; transition: 0.3s; }
-  .profile-card { padding: 24px 16px; border-bottom: 1px solid var(--line); text-align: center; position: relative; }
-  .badge-icon { position: absolute; top: 16px; right: 16px; font-size: 1.2rem; display: none; color: var(--gold); }
-  .profile-card .avatar { width: 64px; height: 64px; background: rgba(74,168,255,.14); border: 2px solid var(--yene); border-radius: 50%; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 900; color: var(--yene); text-transform: uppercase; }
-  .profile-card h4 { margin: 0; color: var(--text); font-size: 18px; }
-  .profile-card p { margin: 4px 0 0; color: var(--ok); font-size: 12px; font-weight: bold; }
-  .tier-label { display: inline-block; background: rgba(241, 196, 15, 0.1); color: var(--gold); border: 1px solid rgba(241, 196, 15, 0.3); padding: 4px 10px; border-radius: 999px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; font-weight: 900; }
-  .nav { padding: 10px; flex-grow: 1; overflow-y: auto; }
-  .nav .item { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; color: var(--muted); cursor: pointer; border: 1px solid transparent; transition: 0.15s; margin-bottom: 4px; }
-  .nav .item:hover { background: rgba(74,168,255,.10); color: var(--text); border-color: rgba(74,168,255,.18); }
-  .nav .item.active { background: rgba(74,168,255,.14); color: var(--text); border-color: rgba(74,168,255,.28); font-weight: bold; }
-  .nav .item i { width: 20px; text-align: center; }
-  .sidebar-footer { padding: 12px 10px 16px; border-top: 1px solid var(--line); }
-  .main { flex: 1; overflow-y: auto; padding: 24px; position: relative; }
-  .view { display: none; animation: fadeIn 0.2s ease-in; }
-  .view.active { display: block; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-  h2 { margin-top: 0; margin-bottom: 20px; color: var(--text); font-size: 20px; }
-  h3 { margin-top: 0; color: var(--text); font-size: 16px; margin-bottom: 12px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  @media(max-width: 980px) { .grid { grid-template-columns: 1fr; } }
-  .card { background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); background-color: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; position: relative; }
-  .card-top-blue { border-top: 3px solid var(--yene); }
-  .card-top-green { border-top: 3px solid var(--ok); }
-  .card-top-purple { border-top: 3px solid var(--purple); }
-  .card-top-warn { border-top: 3px solid var(--warn); }
-  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-  .field label { color: var(--muted); font-size: 13px; }
-  .field input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: var(--text); outline: none; }
-  .field input:focus { border-color: var(--yene); }
-  .btn { border: 1px solid var(--line); background: var(--card2); color: var(--text); padding: 12px 16px; border-radius: 12px; cursor: pointer; transition: 0.15s; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-  .btn:hover { border-color: rgba(74,168,255,.35); }
-  .btn.primary { background: var(--yene); color: #041021; border-color: transparent; }
-  .btn.ok { background: var(--ok); color: #02110a; border-color: transparent; }
-  .btn.purple { background: var(--purple); color: #fff; border-color: transparent; }
-  .table-wrap { overflow: auto; border-radius: 14px; border: 1px solid var(--line); background: rgba(0,0,0,.05); }
-  table { width: 100%; border-collapse: collapse; min-width: 600px; }
-  th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; }
-  th { color: var(--yene); font-weight: 900; background: rgba(74,168,255,.06); }
-  progress { width: 100%; height: 8px; border-radius: 4px; margin-top: 5px; appearance: none; }
-  progress::-webkit-progress-bar { background-color: var(--card2); border-radius: 4px; border: 1px solid var(--line); }
-  progress::-webkit-progress-value { background-color: var(--yene); border-radius: 4px; }
-  .locked-overlay { position: absolute; inset: 0; background: rgba(11, 18, 32, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 16px; text-align: center; padding: 24px; z-index: 10; backdrop-filter: blur(4px); }
-  @media (max-width: 768px) { .topbar { display: flex; } .sidebar { position: fixed; height: 100vh; transform: translateX(-100%); } .sidebar.open { transform: translateX(0); } }
+<div id="security-overlay" class="security-overlay">
+  <i class="fa-solid fa-shield-halved fa-3x fa-beat-fade" style="margin-bottom: 18px;"></i>
+  <div style="font-weight:900; letter-spacing:.4px;">Authenticating Agent...</div>
+  <div class="muted" style="margin-top:6px;">Please wait</div>
+</div>
 
-/* --- MOBILE FIX OVERRIDE (last rule wins) --- */
-@media (max-width: 768px){
-  .hamburger{ position: fixed !important; top: 12px !important; left: 12px !important; z-index: 1300 !important; }
-  #sidebar, .sidebar{ position: fixed !important; top:0 !important; height:100vh !important; }
-}
+<div class="app">
+  <!-- Header (always visible, no hamburger on mobile) -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-badge"><i class="fa-solid fa-car-side"></i></div>
+      <div>
+        <div class="brand-title">YENE PROMOTER</div>
+        <div class="brand-sub">Agent Portal</div>
+      </div>
+    </div>
 
-</style>
+    <div class="header-right">
+      <div class="agent-mini">
+        <div class="agent-avatar" id="user-initial"><i class="fa-solid fa-user"></i></div>
+        <div class="agent-mini-text">
+          <div class="agent-name" id="display-name">Loading...</div>
+          <div class="agent-status" id="display-status">Connecting...</div>
+        </div>
+      </div>
 
-<div class="dash">
-  <div class="topbar">
-    <div style="font-weight: 900; color: var(--yene); letter-spacing: 1px;"><i class="fa-solid fa-car-side"></i> YENE PROMOTER</div>
-    <button class="hamburger" type="button" id="hamburgerBtn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
-  </div>
+      <button class="btn ghost" onclick="handleLogout()">
+        <i class="fa-solid fa-right-from-bracket"></i> <span class="hide-sm">Sign Out</span>
+      </button>
+    </div>
+  </header>
 
+  <!-- Desktop Sidebar -->
   <aside class="sidebar" id="sidebar">
-    <div class="profile-card">
-      <i class="fa-solid fa-star badge-icon" id="elite-badge" title="Elite Agent"></i>
-      <div class="avatar" id="user-initial"><i class="fa-solid fa-user"></i></div>
-      <h4 id="display-name">{{ session.get('email', 'Agent') }}</h4>
-      <p id="display-status">Status: {{ session.get('status', 'ACTIVE') | upper }}</p>
-      <div class="tier-label" id="tier-display">Standard Agent</div>
+    <div class="tier-card">
+      <div class="tier-row">
+        <div class="tier-pill" id="tier-display">Standard Agent</div>
+        <i class="fa-solid fa-star tier-star" id="elite-badge" title="Elite Agent"></i>
+      </div>
+
+      <div class="muted" style="margin-top:10px;">
+        Your link:
+      </div>
+      <div class="ref-row">
+        <input id="ref-link" class="input" readonly>
+        <button class="btn purple" onclick="copyRefLink()"><i class="fa-regular fa-copy"></i></button>
+      </div>
     </div>
 
-    <div class="nav">
-      <div class="item active" onclick="showView('v-home', this)"><i class="fa-solid fa-gauge-high"></i> Dashboard</div>
-      <div class="item" onclick="showView('v-register', this)"><i class="fa-solid fa-user-plus"></i> Register Network</div>
-      <div class="item" onclick="showView('v-wallet', this)"><i class="fa-solid fa-wallet"></i> Wallet & Payouts</div>
-      <div class="item" onclick="showView('v-team', this)"><i class="fa-solid fa-users-rays"></i> My Team</div>
-    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="v-home" onclick="showView('v-home', this)">
+        <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-view="v-register" onclick="showView('v-register', this)">
+        <i class="fa-solid fa-user-plus"></i><span>Register</span>
+      </button>
+      <button class="nav-item" data-view="v-wallet" onclick="showView('v-wallet', this)">
+        <i class="fa-solid fa-wallet"></i><span>Wallet</span>
+      </button>
+      <button class="nav-item" data-view="v-team" onclick="showView('v-team', this)">
+        <i class="fa-solid fa-users-rays"></i><span>My Team</span>
+      </button>
+      <button class="nav-item" data-view="v-statements" onclick="showView('v-statements', this)">
+        <i class="fa-solid fa-file-invoice"></i><span>Statements</span>
+      </button>
+    </nav>
 
-    <div class="sidebar-footer">
-      <button class="btn" style="width: 100%;" onclick="window.location.href='/logout'"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+    <div class="sidebar-footer muted">
+      Tip: Use “Register” to capture drivers/clients weekly.
     </div>
   </aside>
 
+  <!-- Main -->
   <main class="main">
-    <div id="v-home" class="view active">
-      <h2><i class="fa-solid fa-gauge-high"></i> Agent Dashboard</h2>
-      <div class="grid">
-        <div class="card card-top-blue">
-          <h3>Road to Team Leader</h3>
-          <div class="sub">Target: 10 Drivers Registered</div>
-          <progress id="kpi-drivers" value="0" max="10"></progress>
-          <div style="text-align: right; font-size: 12px; color: var(--muted); margin-top: 8px;" id="kpi-text">0 / 10</div>
-          
-          <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line);">
-            <h3>Your Network Summary</h3>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-              <span>Drivers Registered:</span> <strong style="color:var(--yene);" id="stat-drivers">0</strong>
+
+    <!-- DASHBOARD -->
+    <section id="v-home" class="view active">
+      <div class="page-title">
+        <h2><i class="fa-solid fa-gauge-high"></i> Dashboard</h2>
+        <div class="muted" id="week-label">This Week</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card top-blue">
+          <div class="card-title">Weekly Summary (Mon–Sun)</div>
+          <div class="kpis">
+            <div class="kpi">
+              <div class="kpi-label">Drivers registered</div>
+              <div class="kpi-value" id="kpi-drivers-week">0</div>
             </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span>Clients Registered:</span> <strong style="color:var(--ok);" id="stat-clients">0</strong>
+            <div class="kpi">
+              <div class="kpi-label">Clients registered</div>
+              <div class="kpi-value" id="kpi-clients-week">0</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Last week total</div>
+              <div class="kpi-value" id="kpi-lastweek-total">0</div>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="muted">Road to Team Leader: register 10 drivers (all-time)</div>
+          <progress id="kpi-drivers-all" value="0" max="10"></progress>
+          <div class="muted right" id="kpi-text-all" style="margin-top:6px;">0 / 10</div>
+        </div>
+
+        <div class="card top-warn">
+          <div class="card-title"><i class="fa-solid fa-bullhorn"></i> Announcements</div>
+          <div id="broadcast-feed" class="feed">
+            <div class="muted">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px;">
+        <div class="card top-purple">
+          <div class="card-title">Recent activity (this week)</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Type</th><th>Name</th><th>Phone</th><th>Date</th></tr>
+              </thead>
+              <tbody id="recent-week">
+                <tr><td colspan="4" class="muted center">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card top-green">
+          <div class="card-title">Quick actions</div>
+          <div class="btn-row">
+            <button class="btn primary" onclick="showView('v-register', document.querySelector('[data-view=v-register]'))">
+              <i class="fa-solid fa-user-plus"></i> Register
+            </button>
+            <button class="btn ok" onclick="showView('v-wallet', document.querySelector('[data-view=v-wallet]'))">
+              <i class="fa-solid fa-wallet"></i> Wallet
+            </button>
+            <button class="btn" onclick="showView('v-statements', document.querySelector('[data-view=v-statements]'))">
+              <i class="fa-solid fa-file-invoice"></i> Statements
+            </button>
+          </div>
+
+          <div class="note">
+            <b>Weekly invoice:</b> Monday → Sunday, auto-updated.
+            <div class="muted" style="margin-top:6px;">
+              (On Render Free we finalize on next login / system ping.)
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div id="v-register" class="view">
-      <h2><i class="fa-solid fa-user-plus"></i> Grow Your Network</h2>
-      <div class="grid">
-        <div class="card card-top-blue">
-          <h3><i class="fa-solid fa-car"></i> Register a Driver</h3>
+    <!-- REGISTER -->
+    <section id="v-register" class="view">
+      <div class="page-title">
+        <h2><i class="fa-solid fa-user-plus"></i> Register Network</h2>
+        <div class="muted">Fast mobile forms (no sidebar overlap)</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card top-blue">
+          <div class="card-title"><i class="fa-solid fa-car"></i> Register Driver</div>
+
           <form id="driver-form" onsubmit="submitDriver(event)">
-            <div class="field"><label>Driver Full Name</label><input type="text" id="d-name" required></div>
-            <div class="field"><label>WhatsApp Number</label><input type="tel" id="d-phone" placeholder="+264..." required></div>
-            <div class="field"><label>Town / Operating Area</label><input type="text" id="d-town" required></div>
-            <button type="submit" class="btn primary" id="btn-driver" style="width: 100%; margin-top: 10px;">Submit Driver</button>
+            <div class="field">
+              <label>Driver Full Name</label>
+              <input class="input" type="text" id="d-name" required>
+            </div>
+            <div class="field">
+              <label>WhatsApp Number</label>
+              <input class="input" type="tel" id="d-phone" placeholder="+264..." required>
+            </div>
+            <div class="field">
+              <label>Town / Operating Area</label>
+              <input class="input" type="text" id="d-town" required>
+            </div>
+            <button type="submit" class="btn primary full" id="btn-driver">
+              <i class="fa-solid fa-paper-plane"></i> Submit Driver
+            </button>
+            <div class="muted" style="margin-top:10px;">
+              Tip: after registration, the system tracks weekly counts (Mon–Sun).
+            </div>
           </form>
         </div>
 
-        <div class="card card-top-green">
-          <h3><i class="fa-solid fa-mobile-screen"></i> Register a Client</h3>
-          <div class="sub">Help riders download the app and enter your code to earn referrals.</div>
+        <div class="card top-green">
+          <div class="card-title"><i class="fa-solid fa-mobile-screen"></i> Register Client</div>
+          <div class="muted" style="margin-bottom:10px;">Once-off activation earnings after first ride.</div>
+
           <form id="client-form" onsubmit="submitClient(event)">
-            <div class="field"><label>Client Full Name</label><input type="text" id="c-name" required></div>
-            <div class="field"><label>Phone Number</label><input type="tel" id="c-phone" placeholder="+264..." required></div>
-            <button type="submit" class="btn ok" id="btn-client" style="width: 100%; margin-top: 10px;">Submit Client</button>
+            <div class="field">
+              <label>Client Full Name</label>
+              <input class="input" type="text" id="c-name" required>
+            </div>
+            <div class="field">
+              <label>Phone Number</label>
+              <input class="input" type="text" id="c-phone" required>
+            </div>
+            <button type="submit" class="btn ok full" id="btn-client">
+              <i class="fa-solid fa-paper-plane"></i> Submit Client
+            </button>
           </form>
         </div>
       </div>
-    </div>
 
-    <div id="v-wallet" class="view">
-      <h2><i class="fa-solid fa-wallet"></i> Earnings & Wallet</h2>
-      <div class="card card-top-green" style="text-align: center; padding: 40px 20px;">
-        <h1 style="color: var(--ok); font-size: 48px; margin: 0 0 10px 0; font-weight: 900;">N$ 0.00</h1>
-        <div class="sub" style="font-size: 16px;">Available Balance</div>
-        <div style="margin-top: 20px; color: var(--muted);">Payout tracking module loading soon...</div>
+      <div class="card top-warn" style="margin-top:14px;">
+        <div class="card-title">Anti-fraud (next upgrade we can add)</div>
+        <ul class="list">
+          <li>In-dashboard screen capture (phone profile screen only)</li>
+          <li>OCR code verification (reads Yene Code from captured image)</li>
+          <li>Timestamp watermarking in Supabase storage</li>
+        </ul>
+        <div class="muted">We’ll add this after UI is stable (so it won’t freeze phones).</div>
       </div>
-    </div>
+    </section>
 
-    <div id="v-team" class="view">
-      <h2><i class="fa-solid fa-users-rays"></i> Team Management</h2>
-      <div class="card card-top-purple" style="position: relative; min-height: 300px;">
-        <div id="team-lock" class="locked-overlay">
-          <i class="fa-solid fa-lock fa-3x" style="color: var(--danger); margin-bottom: 16px;"></i>
-          <h3 style="color: var(--text);">Locked: Team Leader Feature</h3>
-          <div class="sub" style="color: #fff; max-width: 400px; margin-bottom: 20px;">
-            Register 10 drivers to unlock your unique referral link!
+    <!-- WALLET -->
+    <section id="v-wallet" class="view">
+      <div class="page-title">
+        <h2><i class="fa-solid fa-wallet"></i> Wallet</h2>
+        <div class="muted">Pending vs Available (ready for weekly payroll)</div>
+      </div>
+
+      <div class="card top-green center">
+        <div class="big" id="wallet-balance">N$ 0.00</div>
+        <div class="muted">Available Balance</div>
+
+        <div class="withdraw-row">
+          <input class="input" type="number" id="withdraw-amount" placeholder="Amount (N$)">
+          <button class="btn ok" onclick="requestWithdrawal()">
+            <i class="fa-solid fa-money-bill-transfer"></i> Request Payout
+          </button>
+        </div>
+
+        <div class="note danger">
+          * Standard network fee deducted upon withdrawal (if enabled)
+        </div>
+      </div>
+    </section>
+
+    <!-- TEAM -->
+    <section id="v-team" class="view">
+      <div class="page-title">
+        <h2><i class="fa-solid fa-users-rays"></i> My Team</h2>
+        <div class="muted">Unlock at 10 drivers (all-time)</div>
+      </div>
+
+      <div class="card top-purple" style="position:relative;">
+        <div id="team-lock" class="lock">
+          <i class="fa-solid fa-lock fa-2x" style="margin-bottom:10px;"></i>
+          <div style="font-weight:900;">Locked: Team Leader Feature</div>
+          <div class="muted" style="margin-top:6px;">
+            Register 10 drivers to unlock downline tracking.
           </div>
         </div>
+
+        <div class="card-title"><i class="fa-solid fa-sitemap"></i> Network Downline</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Agent Name</th><th>Status</th><th>Joined</th></tr></thead>
+            <tbody id="team-table-body">
+              <tr><td colspan="3" class="muted center">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </section>
+
+    <!-- STATEMENTS -->
+    <section id="v-statements" class="view">
+      <div class="page-title">
+        <h2><i class="fa-solid fa-file-invoice"></i> Statements</h2>
+        <div class="muted">Weekly ledger + CSV export</div>
+      </div>
+
+      <div class="card">
+        <div class="btn-row" style="margin-bottom:10px;">
+          <button class="btn" onclick="downloadCSV()"><i class="fa-solid fa-download"></i> CSV</button>
+          <button class="btn" onclick="loadLedger(true)"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+
+        <div class="table-wrap">
+          <table id="statement-table">
+            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount (N$)</th></tr></thead>
+            <tbody id="wallet-history">
+              <tr><td colspan="4" class="muted center">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
+
+  <!-- MOBILE BOTTOM NAV (replaces hamburger completely) -->
+  <nav class="bottom-nav">
+    <button class="bn-item active" data-view="v-home" onclick="showView('v-home', this)">
+      <i class="fa-solid fa-gauge-high"></i><span>Home</span>
+    </button>
+    <button class="bn-item" data-view="v-register" onclick="showView('v-register', this)">
+      <i class="fa-solid fa-user-plus"></i><span>Register</span>
+    </button>
+    <button class="bn-item" data-view="v-wallet" onclick="showView('v-wallet', this)">
+      <i class="fa-solid fa-wallet"></i><span>Wallet</span>
+    </button>
+    <button class="bn-item" data-view="v-statements" onclick="showView('v-statements', this)">
+      <i class="fa-solid fa-file-invoice"></i><span>Ledger</span>
+    </button>
+  </nav>
 </div>
 
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-  const userStatus = "{{ session.get('status', 'PENDING') | upper }}";
-  
-  window.onload = function() {
-      // Color code the status
-      const statusText = document.getElementById('display-status');
-      if (userStatus === 'ACTIVE' || userStatus === 'APPROVED') {
-          statusText.style.color = "var(--ok)";
-      } else {
-          statusText.style.color = "var(--warn)";
-          document.getElementById('driver-form').innerHTML = '<div class="sub" style="color: var(--warn); text-align: center;">Your account is pending admin approval. You cannot register drivers yet.</div>';
-          document.getElementById('client-form').innerHTML = '<div class="sub" style="color: var(--warn); text-align: center;">Your account is pending admin approval. You cannot register clients yet.</div>';
-      }
-      
-      // Load their stats from the database
-      loadStats();
+  const SUPABASE_URL = {{ (SUPABASE_URL or '') | tojson }};
+  const SUPABASE_ANON = {{ (SUPABASE_ANON_KEY or '') | tojson }};
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  let myAuthUser = null;
+  let myAgentProfile = null;
+  let driverCountAll = 0;
+
+  function escapeHtml(s){
+    return String(s ?? "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
 
-  async function loadStats() {
-      try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 8000);
+  function getWeekRange(date = new Date()) {
+    // Monday 00:00 to next Monday 00:00 (local)
+    const d = new Date(date);
+    const day = d.getDay(); // 0 Sun ... 6 Sat
+    const diffToMonday = (day === 0 ? -6 : (1 - day));
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + diffToMonday);
+    monday.setHours(0,0,0,0);
 
-          const res = await fetch("/api/agent/stats", {
-            signal: controller.signal,
-            credentials: "same-origin"
-          });
+    const nextMonday = new Date(monday);
+    nextMonday.setDate(monday.getDate() + 7);
 
-          clearTimeout(timeout);
-          const data = await res.json();
-          if (data.success !== false) {
-              const dCount = data.drivers || 0;
-              const cCount = data.clients || 0;
-              
-              document.getElementById('stat-drivers').innerText = dCount;
-              document.getElementById('stat-clients').innerText = cCount;
-              document.getElementById('kpi-drivers').value = dCount;
-              document.getElementById('kpi-text').innerText = `${dCount} / 10`;
-              
-              if(dCount >= 10) {
-                  document.getElementById('team-lock').style.display = 'none';
-                  document.getElementById('tier-display').innerText = "👑 Team Leader";
-                  document.getElementById('elite-badge').style.display = 'block';
-              }
-          }
-      } catch (err) {
-          console.error("Failed to load stats", err);
-      }
+    return { start: monday, end: nextMonday };
   }
 
-  async function submitDriver(e) {
-      e.preventDefault();
-      const btn = document.getElementById('btn-driver');
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-      btn.disabled = true;
-
-      const payload = {
-          full_name: document.getElementById('d-name').value,
-          phone: document.getElementById('d-phone').value,
-          town: document.getElementById('d-town').value
-      };
-
-      try {
-          const res = await fetch("/api/agent/register_driver", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
-          });
-          const data = await res.json();
-          if (data.success) {
-              alert("Driver successfully registered!");
-              e.target.reset();
-              loadStats(); // Automatically refresh the score!
-          } else {
-              alert("Error: " + data.error);
-          }
-      } catch (err) {
-          alert("Network error. Try again.");
-      }
-      btn.innerHTML = 'Submit Driver';
-      btn.disabled = false;
+  function fmtRangeLabel(start, end) {
+    const s = start.toLocaleDateString();
+    const e = new Date(end.getTime() - 1).toLocaleDateString();
+    return `${s} → ${e}`;
   }
 
-  async function submitClient(e) {
-      e.preventDefault();
-      const btn = document.getElementById('btn-client');
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
-      btn.disabled = true;
-
-      const payload = {
-          full_name: document.getElementById('c-name').value,
-          phone: document.getElementById('c-phone').value
-      };
-
-      try {
-          const res = await fetch("/api/agent/register_client", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
-          });
-          const data = await res.json();
-          if (data.success) {
-              alert("Client successfully registered!");
-              e.target.reset();
-              loadStats(); // Automatically refresh the score!
-          } else {
-              alert("Error: " + data.error);
-          }
-      } catch (err) {
-          alert("Network error. Try again.");
-      }
-      btn.innerHTML = 'Submit Client';
-      btn.disabled = false;
+  function setActiveNav(viewId) {
+    document.querySelectorAll('.nav-item, .bn-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll(`[data-view="${viewId}"]`).forEach(b => b.classList.add('active'));
   }
-
-  function toggleSidebar(forceClose=false) {
-  const sidebar = document.getElementById('sidebar');
-  if (!sidebar) return;
-
-  const isOpen = sidebar.classList.contains('open');
-  if (forceClose) sidebar.classList.remove('open');
-  else sidebar.classList.toggle('open');
-
-  // overlay for mobile so menu doesn't disturb content
-  let overlay = document.getElementById('mobileOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'mobileOverlay';
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.right = '0';
-    overlay.style.bottom = '0';
-    overlay.style.background = 'rgba(0,0,0,0.35)';
-    overlay.style.zIndex = '999';
-    overlay.style.display = 'none';
-    overlay.addEventListener('click', () => toggleSidebar(true));
-    document.body.appendChild(overlay);
-  }
-
-  const nowOpen = sidebar.classList.contains('open');
-  if (window.innerWidth <= 768) {
-    overlay.style.display = nowOpen ? 'block' : 'none';
-    document.body.style.overflow = nowOpen ? 'hidden' : '';
-  } else {
-    overlay.style.display = 'none';
-    document.body.style.overflow = '';
-  }
-}
 
   function showView(viewId, el) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.querySelectorAll('.nav .item').forEach(i => i.classList.remove('active'));
-    document.getElementById(viewId).classList.add('active');
-    if (el) el.classList.add('active');
-    if (window.innerWidth <= 768) toggleSidebar();
+    const v = document.getElementById(viewId);
+    if (v) v.classList.add('active');
+
+    setActiveNav(viewId);
+
+    // Load on demand
+    if (viewId === 'v-wallet' || viewId === 'v-statements') loadLedger();
+    if (viewId === 'v-team') loadTeamData();
   }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('hamburgerBtn');
-  if (btn) btn.addEventListener('click', () => toggleSidebar());
-  // close sidebar when selecting a menu item on mobile
-  document.querySelectorAll('#sidebar a, #sidebar button').forEach(el => {
-    el.addEventListener('click', () => {
-      if (window.innerWidth <= 768) toggleSidebar(true);
+  async function handleLogout() {
+    await sb.auth.signOut();
+    window.location.href = "/login";
+  }
+
+  async function init() {
+    const { data: { session }, error } = await sb.auth.getSession();
+    if (error || !session) { window.location.href="/login"; return; }
+    myAuthUser = session.user;
+
+    const { data: profile, error: pErr } = await sb
+      .from('agent_profiles')
+      .select('*')
+      .eq('id', myAuthUser.id)
+      .maybeSingle();
+
+    if (pErr) { alert("Profile load error: " + pErr.message); return; }
+    if (!profile) { alert("Agent profile not found. Ask admin to create/approve."); return; }
+
+    myAgentProfile = profile;
+
+    const st = String(profile.status || '').toLowerCase();
+    if (st === 'blocked' || st === 'suspended') {
+      alert("Your account is blocked. Contact admin.");
+      await sb.auth.signOut();
+      window.location.href="/login";
+      return;
+    }
+
+    // UI identity
+    document.getElementById('display-name').innerText = profile.full_name || "Agent";
+    document.getElementById('display-status').innerText = "Status: " + (profile.status || "UNKNOWN");
+    document.getElementById('user-initial').innerText = (profile.full_name || "A").trim().charAt(0).toUpperCase();
+
+    const agentKey = profile.id || profile.auth_id;
+    document.getElementById('ref-link').value = window.location.origin + "/register?ref_agent_id=" + encodeURIComponent(agentKey);
+
+    // week label
+    const { start, end } = getWeekRange(new Date());
+    document.getElementById('week-label').innerText = "Week: " + fmtRangeLabel(start, end);
+
+    // load data (fast + minimal queries)
+    await Promise.all([loadBroadcasts(), loadAllTimeDriverCount(), loadWeekSummary()]);
+    document.getElementById('security-overlay').style.display = 'none';
+  }
+
+  async function loadAllTimeDriverCount() {
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+
+    const { count, error } = await sb
+      .from('drivers')
+      .select('id', { count:'exact', head:true })
+      .eq('recruiter_agent_id', agentKey);
+
+    driverCountAll = count || 0;
+
+    document.getElementById('kpi-drivers-all').value = driverCountAll;
+    document.getElementById('kpi-text-all').innerText = `${driverCountAll} / 10`;
+
+    if (driverCountAll >= 10) {
+      document.getElementById('team-lock').style.display = 'none';
+      document.getElementById('tier-display').innerText = "👑 Team Leader";
+      document.getElementById('elite-badge').style.display = 'inline-block';
+    } else {
+      document.getElementById('tier-display').innerText = "Standard Agent";
+      document.getElementById('elite-badge').style.display = 'none';
+      document.getElementById('team-lock').style.display = 'flex';
+    }
+  }
+
+  async function loadWeekSummary() {
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+
+    const now = new Date();
+    const cur = getWeekRange(now);
+    const prev = getWeekRange(new Date(now.getTime() - 7*24*60*60*1000));
+
+    // drivers this week
+    const d1 = sb.from('drivers')
+      .select('id, full_name, phone, created_at')
+      .eq('recruiter_agent_id', agentKey)
+      .gte('created_at', cur.start.toISOString())
+      .lt('created_at', cur.end.toISOString())
+      .order('created_at', { ascending:false })
+      .limit(10);
+
+    // clients this week
+    const c1 = sb.from('clients')
+      .select('id, full_name, phone, created_at')
+      .eq('recruiter_agent_id', agentKey)
+      .gte('created_at', cur.start.toISOString())
+      .lt('created_at', cur.end.toISOString())
+      .order('created_at', { ascending:false })
+      .limit(10);
+
+    // counts
+    const dCount = sb.from('drivers')
+      .select('id', { count:'exact', head:true })
+      .eq('recruiter_agent_id', agentKey)
+      .gte('created_at', cur.start.toISOString())
+      .lt('created_at', cur.end.toISOString());
+
+    const cCount = sb.from('clients')
+      .select('id', { count:'exact', head:true })
+      .eq('recruiter_agent_id', agentKey)
+      .gte('created_at', cur.start.toISOString())
+      .lt('created_at', cur.end.toISOString());
+
+    const dPrevCount = sb.from('drivers')
+      .select('id', { count:'exact', head:true })
+      .eq('recruiter_agent_id', agentKey)
+      .gte('created_at', prev.start.toISOString())
+      .lt('created_at', prev.end.toISOString());
+
+    const cPrevCount = sb.from('clients')
+      .select('id', { count:'exact', head:true })
+      .eq('recruiter_agent_id', agentKey)
+      .gte('created_at', prev.start.toISOString())
+      .lt('created_at', prev.end.toISOString());
+
+    const [d1r, c1r, dcr, ccr, dpr, cpr] = await Promise.all([d1, c1, dCount, cCount, dPrevCount, cPrevCount]);
+
+    const driversWeek = dcr.count || 0;
+    const clientsWeek = ccr.count || 0;
+    const lastWeekTotal = (dpr.count || 0) + (cpr.count || 0);
+
+    document.getElementById('kpi-drivers-week').innerText = driversWeek;
+    document.getElementById('kpi-clients-week').innerText = clientsWeek;
+    document.getElementById('kpi-lastweek-total').innerText = lastWeekTotal;
+
+    // recent table (merge)
+    const rows = [];
+    (d1r.data || []).forEach(x => rows.push({type:'Driver', name:x.full_name, phone:x.phone, at:x.created_at}));
+    (c1r.data || []).forEach(x => rows.push({type:'Client', name:x.full_name, phone:x.phone, at:x.created_at}));
+    rows.sort((a,b)=> new Date(b.at) - new Date(a.at));
+
+    const tbody = document.getElementById('recent-week');
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="4" class="muted center">No registrations yet this week.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.slice(0,10).map(r => `
+      <tr>
+        <td><b>${r.type}</b></td>
+        <td>${escapeHtml(r.name || '')}</td>
+        <td>${escapeHtml(r.phone || '')}</td>
+        <td>${r.at ? new Date(r.at).toLocaleString() : ''}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadBroadcasts() {
+    const feed = document.getElementById('broadcast-feed');
+    const { data: messages, error } = await sb
+      .from('broadcasts')
+      .select('message, created_at')
+      .order('created_at', { ascending:false })
+      .limit(5);
+
+    if (error) {
+      feed.innerHTML = `<div class="muted">Error loading announcements.</div>`;
+      return;
+    }
+    if (!messages || !messages.length) {
+      feed.innerHTML = `<div class="muted">No announcements right now.</div>`;
+      return;
+    }
+
+    feed.innerHTML = messages.map(msg => `
+      <div class="feed-item">
+        <div class="feed-msg">${escapeHtml(msg.message)}</div>
+        <div class="feed-time">${new Date(msg.created_at).toLocaleString()}</div>
+      </div>
+    `).join('');
+  }
+
+  function lockIfPending() {
+    const st = String(myAgentProfile.status || '').toLowerCase();
+    return (st === 'pending' || st === 'pending_approval');
+  }
+
+  async function submitDriver(e) {
+    e.preventDefault();
+    if (!myAgentProfile) return alert("Profile error.");
+    if (lockIfPending()) return alert("Your account is pending approval. You cannot register yet.");
+
+    const btn = document.getElementById('btn-driver');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+    const payload = {
+      recruiter_agent_id: agentKey,
+      recruiter_auth_id: myAuthUser.id,
+      recruiter_name: myAgentProfile.full_name || null,
+      full_name: document.getElementById('d-name').value,
+      phone: document.getElementById('d-phone').value,
+      town: document.getElementById('d-town').value
+    };
+
+    const { error } = await sb.from('drivers').insert(payload);
+    if (error) alert("Error: " + error.message);
+    else {
+      alert("Driver successfully registered!");
+      e.target.reset();
+      await Promise.all([loadAllTimeDriverCount(), loadWeekSummary()]);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Driver';
+  }
+
+  async function submitClient(e) {
+    e.preventDefault();
+    if (!myAgentProfile) return alert("Profile error.");
+    if (lockIfPending()) return alert("Your account is pending approval. You cannot register yet.");
+
+    const btn = document.getElementById('btn-client');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+    const payload = {
+      recruiter_agent_id: agentKey,
+      recruiter_auth_id: myAuthUser.id,
+      recruiter_name: myAgentProfile.full_name || null,
+      full_name: document.getElementById('c-name').value,
+      phone: document.getElementById('c-phone').value
+    };
+
+    const { error } = await sb.from('clients').insert(payload);
+    if (error) alert("Error: " + error.message);
+    else {
+      alert("Client successfully registered!");
+      e.target.reset();
+      await loadWeekSummary();
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Client';
+  }
+
+  async function loadTeamData() {
+    const tbody = document.getElementById('team-table-body');
+    if (driverCountAll < 10) {
+      tbody.innerHTML = `<tr><td colspan="3" class="muted center">Unlock Team Leader to see downline.</td></tr>`;
+      return;
+    }
+
+    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
+    const { data: team, error } = await sb
+      .from('agent_profiles')
+      .select('full_name, status, created_at')
+      .eq('referred_by_id', agentKey)
+      .order('created_at', { ascending:false });
+
+    if (error) {
+      tbody.innerHTML = `<tr><td colspan="3" class="muted center">Error loading team.</td></tr>`;
+      return;
+    }
+    if (!team || !team.length) {
+      tbody.innerHTML = `<tr><td colspan="3" class="muted center">No agents recruited yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = team.map(m => {
+      const s = String(m.status||'').toLowerCase();
+      const ok = (s === 'approved' || s === 'active');
+      return `
+        <tr>
+          <td><b>${escapeHtml(m.full_name || 'Agent')}</b></td>
+          <td style="font-weight:900; color:${ok ? 'var(--ok)' : 'var(--warn)'}">${escapeHtml(m.status || 'PENDING')}</td>
+          <td>${m.created_at ? new Date(m.created_at).toLocaleDateString() : ''}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function loadLedger(force=false) {
+    const tbody = document.getElementById('wallet-history');
+    const balEl = document.getElementById('wallet-balance');
+    tbody.innerHTML = `<tr><td colspan="4" class="muted center">Loading...</td></tr>`;
+
+    const agentKey = myAgentProfile?.id || myAgentProfile?.auth_id;
+    if (!agentKey) return;
+
+    const { data, error } = await sb
+      .from('wallet_ledger')
+      .select('created_at, description, type, amount')
+      .eq('agent_id', agentKey)
+      .order('created_at', { ascending:false })
+      .limit(80);
+
+    if (error) {
+      tbody.innerHTML = `<tr><td colspan="4" class="muted center">No ledger table yet.</td></tr>`;
+      balEl.innerText = "N$ 0.00";
+      return;
+    }
+
+    if (!data || !data.length) {
+      tbody.innerHTML = `<tr><td colspan="4" class="muted center">No transactions yet.</td></tr>`;
+      balEl.innerText = "N$ 0.00";
+      return;
+    }
+
+    let total = 0;
+    data.forEach(x => total += Number(x.amount || 0));
+    balEl.innerText = "N$ " + total.toFixed(2);
+
+    tbody.innerHTML = data.map(x => `
+      <tr>
+        <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ''}</td>
+        <td>${escapeHtml(x.description || '')}</td>
+        <td>${escapeHtml(x.type || '')}</td>
+        <td><b>${Number(x.amount || 0).toFixed(2)}</b></td>
+      </tr>
+    `).join('');
+  }
+
+  async function requestWithdrawal() {
+    const amount = Number(document.getElementById('withdraw-amount').value || 0);
+    if (!amount || amount <= 0) return alert("Enter a valid amount.");
+
+    const agentKey = myAgentProfile?.id || myAgentProfile?.auth_id;
+    if (!agentKey) return alert("Profile error.");
+
+    const { error } = await sb.from('withdrawals').insert({
+      agent_id: agentKey,
+      amount: amount,
+      status: 'REQUESTED'
     });
-  });
-});
 
+    if (error) return alert("Withdrawal request failed: " + error.message);
+
+    alert("Withdrawal requested. Admin will review.");
+    document.getElementById('withdraw-amount').value = "";
+  }
+
+  function downloadCSV() {
+    const table = document.getElementById('statement-table');
+    if (!table) return;
+
+    let csv = [];
+    for (const row of table.querySelectorAll('tr')) {
+      const cols = Array.from(row.querySelectorAll('th,td')).map(c => `"${String(c.innerText).replaceAll('"','""')}"`);
+      csv.push(cols.join(','));
+    }
+
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'yene_statement.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyRefLink() {
+    const el = document.getElementById('ref-link');
+    el.select();
+    el.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+    alert("Referral link copied!");
+  }
+
+  window.addEventListener('load', init);
 </script>
-
-<!-- Mobile Bottom Navigation -->
-<nav class="bottom-nav">
-  <a href="#v-home" id="bn-home"><i class="fa-solid fa-gauge-high"></i><span>Home</span></a>
-  <a href="#v-register" id="bn-register"><i class="fa-solid fa-user-plus"></i><span>Register</span></a>
-  <a href="#v-team" id="bn-team"><i class="fa-solid fa-users-rays"></i><span>Team</span></a>
-  <a href="#v-wallet" id="bn-wallet"><i class="fa-solid fa-wallet"></i><span>Wallet</span></a>
-</nav>
 
 {% endblock %}
