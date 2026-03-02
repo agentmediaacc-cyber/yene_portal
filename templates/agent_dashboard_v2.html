@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block title %}YENE Agent{% endblock %}
+
+{% block content %}
+<div class="a2">
+  <header class="a2h">
+    <div class="a2brand">
+      <div class="a2logo">Y</div>
+      <div class="a2txt">
+        <div class="a2title">YENE Agent</div>
+        <div class="a2sub" id="a2Status">Loading…</div>
+      </div>
+    </div>
+    <div class="a2actions">
+      <a class="a2btn ghost" href="/">Home</a>
+      <a class="a2btn danger" href="/logout">Logout</a>
+    </div>
+  </header>
+
+  <main class="a2m">
+    <!-- HOME -->
+    <section class="a2v active" id="v-home">
+      <div class="a2grid">
+        <div class="a2card"><div class="k">Drivers</div><div class="v" id="kDrivers">—</div><div class="h">Total recruited</div></div>
+        <div class="a2card"><div class="k">Clients</div><div class="v" id="kClients">—</div><div class="h">Total recruited</div></div>
+        <div class="a2card"><div class="k">Wallet</div><div class="v" id="kWallet">—</div><div class="h">Available (N$)</div></div>
+        <div class="a2card"><div class="k">Pending</div><div class="v" id="kPending">—</div><div class="h">Pending (N$)</div></div>
+      </div>
+
+      <div class="a2panel">
+        <div class="t">Weekly Cycle (Mon → Sun)</div>
+        <div class="p small" id="weekLabel">Loading…</div>
+        <div class="a2row">
+          <button class="a2btn primary" data-go="register">Register</button>
+          <button class="a2btn" data-go="team">Team</button>
+          <button class="a2btn" data-go="invoice">Invoices</button>
+        </div>
+      </div>
+
+      <div class="a2panel">
+        <div class="t">Notifications</div>
+        <div class="p small">System + transaction updates. (Auto refresh)</div>
+        <div id="notifBox" class="notifBox">Loading…</div>
+      </div>
+    </section>
+
+    <!-- REGISTER -->
+    <section class="a2v" id="v-register">
+      <div class="a2panel">
+        <div class="t">Secure Registration (Screen Proof)</div>
+        <div class="p small">
+          Capture ONLY the recruit’s Yene profile screen (no face photos).
+          OCR will read the code and match it to typed input.
+        </div>
+
+        <div class="capBox">
+          <video id="cam" autoplay playsinline muted></video>
+          <canvas id="cap" hidden></canvas>
+          <div class="capBtns">
+            <button class="a2btn" id="btnCam">Start Camera</button>
+            <button class="a2btn" id="btnSnap" disabled>Capture Screen</button>
+            <button class="a2btn" id="btnStop" disabled>Stop</button>
+          </div>
+          <div class="p small" id="ocrText">OCR: not started</div>
+        </div>
+      </div>
+
+      <div class="a2panel">
+        <div class="t">Register Driver</div>
+        <form id="fDriver" class="a2form">
+          <label>Driver name</label><input id="dName" required>
+          <label>Driver phone</label><input id="dPhone" required>
+          <label>Town</label><input id="dTown" value="Rundu" required>
+
+          <label>Yene Code (from screen)</label>
+          <input id="dCode" placeholder="OCR fills this" required>
+
+          <button class="a2btn primary" type="submit">Submit Driver</button>
+          <div class="msg" id="dMsg"></div>
+        </form>
+      </div>
+
+      <div class="a2panel">
+        <div class="t">Register Client</div>
+        <form id="fClient" class="a2form">
+          <label>Client name</label><input id="cName" required>
+          <label>Client phone</label><input id="cPhone" required>
+
+          <label>Yene Code (from screen)</label>
+          <input id="cCode" placeholder="OCR fills this" required>
+
+          <button class="a2btn primary" type="submit">Submit Client</button>
+          <div class="msg" id="cMsg"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- TEAM -->
+    <section class="a2v" id="v-team">
+      <div class="a2panel">
+        <div class="t">Team Management</div>
+        <div class="a2row">
+          <button class="a2btn" id="btnThisWeek">This Week</button>
+          <button class="a2btn" id="btnLastWeek">Last Week</button>
+          <button class="a2btn" id="btnAll">All</button>
+        </div>
+
+        <div class="tableWrap">
+          <table class="tbl" id="teamTbl" hidden>
+            <thead>
+              <tr>
+                <th>Type</th><th>Name</th><th>Phone</th><th>Week Rides</th><th>5/15/25</th><th>Days Left</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="teamBody"></tbody>
+          </table>
+        </div>
+        <div class="msg" id="teamMsg"></div>
+      </div>
+    </section>
+
+    <!-- INVOICES -->
+    <section class="a2v" id="v-invoice">
+      <div class="a2panel">
+        <div class="t">Invoices & Weekly Reports</div>
+        <div class="p small">
+          Week closes Sunday 23:59 (freeze). Monday invoice is generated automatically.
+        </div>
+        <button class="a2btn" id="btnInvoices">Load Invoices</button>
+
+        <div class="tableWrap">
+          <table class="tbl" id="invTbl" hidden>
+            <thead><tr><th>Week</th><th>Pending</th><th>Available</th><th>PDF</th></tr></thead>
+            <tbody id="invBody"></tbody>
+          </table>
+        </div>
+        <div class="msg" id="invMsg"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom Tabs (NO HAMBURGER) -->
+  <nav class="a2nav">
+    <button class="tab active" data-view="home">Home</button>
+    <button class="tab" data-view="register">Register</button>
+    <button class="tab" data-view="team">Team</button>
+    <button class="tab" data-view="invoice">Invoices</button>
+  </nav>
+</div>
+
+<!-- tesseract for OCR (client-side) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function setView(v){
+    document.querySelectorAll('.a2v').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    $('v-'+v).classList.add('active');
+    document.querySelector('.tab[data-view="'+v+'"]').classList.add('active');
+    window.scrollTo({top:0, behavior:'instant'});
+  }
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+  document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => setView(b.dataset.go)));
+
+  // --- load header stats (fast) ---
+  async function loadHeader(){
+    const r = await fetch("/api/agent/summary", {credentials:"same-origin"});
+    const j = await r.json();
+    if(!j.success){ $('a2Status').textContent = "Session issue"; return; }
+    $('a2Status').textContent = j.status || "Active";
+    $('kDrivers').textContent = j.drivers ?? 0;
+    $('kClients').textContent = j.clients ?? 0;
+    $('kWallet').textContent = j.wallet_available ?? 0;
+    $('kPending').textContent = j.wallet_pending ?? 0;
+    $('weekLabel').textContent = `Week: ${j.week_id} (${j.week_start} → ${j.week_end})`;
+  }
+
+  // --- notifications ---
+  async function loadNotifs(){
+    const r = await fetch("/api/agent/notifications", {credentials:"same-origin"});
+    const j = await r.json();
+    if(!j.success){ $('notifBox').textContent = "No notifications"; return; }
+    if(!j.data || j.data.length === 0){ $('notifBox').textContent = "No notifications yet"; return; }
+    $('notifBox').innerHTML = j.data.map(n => `
+      <div class="nItem">
+        <div class="nTop">${(n.title||"Update")}</div>
+        <div class="nSub">${(n.message||"")}</div>
+        <div class="nTime">${(n.created_at||"").slice(0,19).replace("T"," ")}</div>
+      </div>
+    `).join("");
+  }
+
+  // --- Camera + OCR ---
+  let stream = null;
+  async function startCamera(){
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}, audio:false});
+    $('cam').srcObject = stream;
+    $('btnSnap').disabled = false;
+    $('btnStop').disabled = false;
+    $('btnCam').disabled = true;
+  }
+  function stopCamera(){
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    $('btnSnap').disabled = true;
+    $('btnStop').disabled = true;
+    $('btnCam').disabled = false;
+  }
+  async function snapAndOcr(){
+    $('ocrText').textContent = "OCR: reading…";
+    const video = $('cam');
+    const canvas = $('cap');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+
+    // OCR client-side
+    const { data } = await Tesseract.recognize(dataUrl, 'eng');
+    const text = (data.text || "").replace(/\s+/g," ").trim();
+    $('ocrText').textContent = "OCR: " + (text.slice(0,120) || "No text found");
+
+    // naive code extract example: adjust regex to your Yene code format
+    const m = text.match(/[A-Z0-9]{4,12}/);
+    if(m){
+      $('dCode').value = m[0];
+      $('cCode').value = m[0];
+    }
+
+    // upload proof to backend (stores image + watermark server side)
+    await fetch("/api/agent/upload_proof", {
+      method:"POST",
+      headers: {"Content-Type":"application/json"},
+      credentials:"same-origin",
+      body: JSON.stringify({ image_base64: dataUrl })
+    });
+  }
+
+  $('btnCam').addEventListener('click', startCamera);
+  $('btnStop').addEventListener('click', stopCamera);
+  $('btnSnap').addEventListener('click', snapAndOcr);
+
+  // --- register endpoints ---
+  $('fDriver').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    $('dMsg').textContent = "Working…";
+    const payload = {
+      name: $('dName').value.trim(),
+      phone: $('dPhone').value.trim(),
+      town: $('dTown').value.trim(),
+      yene_code: $('dCode').value.trim()
+    };
+    const r = await fetch("/api/agent/register_driver_v2", {
+      method:"POST", headers: {"Content-Type":"application/json"},
+      credentials:"same-origin",
+      body: JSON.stringify(payload)
+    });
+    const j = await r.json();
+    $('dMsg').textContent = j.success ? "✅ Driver registered (weekly tracking started)" : ("❌ "+(j.error||"Failed"));
+    if(j.success){ $('fDriver').reset(); loadHeader(); }
+  });
+
+  $('fClient').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    $('cMsg').textContent = "Working…";
+    const payload = {
+      name: $('cName').value.trim(),
+      phone: $('cPhone').value.trim(),
+      yene_code: $('cCode').value.trim()
+    };
+    const r = await fetch("/api/agent/register_client_v2", {
+      method:"POST", headers: {"Content-Type":"application/json"},
+      credentials:"same-origin",
+      body: JSON.stringify(payload)
+    });
+    const j = await r.json();
+    $('cMsg').textContent = j.success ? "✅ Client registered (once-off tracking started)" : ("❌ "+(j.error||"Failed"));
+    if(j.success){ $('fClient').reset(); loadHeader(); }
+  });
+
+  // --- Team lists ---
+  async function loadTeam(mode){
+    $('teamMsg').textContent = "Loading…";
+    $('teamTbl').hidden = true;
+    $('teamBody').innerHTML = "";
+    const r = await fetch(`/api/agent/team?mode=${encodeURIComponent(mode)}`, {credentials:"same-origin"});
+    const j = await r.json();
+    if(!j.success){ $('teamMsg').textContent = "❌ "+(j.error||"Failed"); return; }
+    const rows = (j.data||[]).map(x => `
+      <tr>
+        <td>${x.type||""}</td>
+        <td>${x.name||""}</td>
+        <td>${x.phone||""}</td>
+        <td>${x.week_rides ?? 0}</td>
+        <td>${(x.hit_5?"5✅":"5—")} ${(x.hit_15?"15✅":"15—")} ${(x.hit_25?"25✅":"25—")}</td>
+        <td>${x.days_left ?? "—"}</td>
+        <td>${x.status||""}</td>
+      </tr>
+    `).join("");
+    $('teamBody').innerHTML = rows || `<tr><td colspan="7">No data</td></tr>`;
+    $('teamTbl').hidden = false;
+    $('teamMsg').textContent = "";
+  }
+  $('btnThisWeek').addEventListener('click', ()=>loadTeam("this_week"));
+  $('btnLastWeek').addEventListener('click', ()=>loadTeam("last_week"));
+  $('btnAll').addEventListener('click', ()=>loadTeam("all"));
+
+  // --- Invoices ---
+  $('btnInvoices').addEventListener('click', async ()=>{
+    $('invMsg').textContent = "Loading…";
+    $('invTbl').hidden = true;
+    $('invBody').innerHTML = "";
+    const r = await fetch("/api/agent/invoices", {credentials:"same-origin"});
+    const j = await r.json();
+    if(!j.success){ $('invMsg').textContent = "❌ "+(j.error||"Failed"); return; }
+    const rows = (j.data||[]).map(x => `
+      <tr>
+        <td>${x.week_id}</td>
+        <td>${x.pending}</td>
+        <td>${x.available}</td>
+        <td>${x.pdf_url ? `<a href="${x.pdf_url}" target="_blank">Download</a>` : "—"}</td>
+      </tr>
+    `).join("");
+    $('invBody').innerHTML = rows || `<tr><td colspan="4">No invoices yet</td></tr>`;
+    $('invTbl').hidden = false;
+    $('invMsg').textContent = "";
+  });
+
+  // init
+  loadHeader();
+  loadNotifs();
+  setInterval(loadNotifs, 20000);
+</script>
+{% endblock %}

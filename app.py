@@ -349,6 +349,281 @@ def admin_entry():
 
 
 # --- AGENT DASHBOARD API ROUTES ---
+
+# ===== AGENT DASHBOARD V2 HELPERS =====
+from datetime import datetime, timedelta, timezone, date
+import re
+import base64
+from io import BytesIO
+
+def _na_time_now():
+    # Namibia is UTC+2 (no DST)
+    return datetime.now(timezone(timedelta(hours=2)))
+
+def _week_window(d: date):
+    # Monday=0 ... Sunday=6
+    start = d - timedelta(days=d.weekday())
+    end = start + timedelta(days=6)
+    return start, end
+
+def _week_id(d: date):
+    iso_year, iso_week, _ = d.isocalendar()
+    return f"{iso_year}-W{iso_week:02d}"
+
+def _agent_email():
+    return session.get("email")
+
+@app.route("/agent/dashboard2")
+@require_login("AGENT")
+def agent_dashboard2():
+    return render_template("agent_dashboard_v2.html")
+
+@app.route("/api/agent/summary")
+@require_login("AGENT")
+def api_agent_summary():
+    today = _na_time_now().date()
+    ws, we = _week_window(today)
+    wid = _week_id(today)
+
+    email = _agent_email()
+    # existing stats endpoint already counts totals
+    try:
+        # reuse your existing logic but add wallet fields (safe defaults)
+        agent = sb_admin.table("agent_profiles").select("id,status").eq("email", email).execute().data
+        if not agent:
+            agent = sb_admin.table("agents").select("id,status").eq("email", email).execute().data
+        status = (agent[0].get("status") if agent else "active") or "active"
+
+        # counts
+        aid = agent[0]["id"] if agent else None
+        drivers = len(sb_admin.table("drivers").select("id").eq("recruiter_agent_id", aid).execute().data or []) if aid else 0
+        clients = len(sb_admin.table("clients").select("id").eq("recruiter_agent_id", aid).execute().data or []) if aid else 0
+
+        # wallet (if tables exist; otherwise 0)
+        wa = 0
+        wp = 0
+        try:
+            w = sb_admin.table("agent_wallets").select("available,pending").eq("agent_id", aid).limit(1).execute().data
+            if w:
+                wa = w[0].get("available") or 0
+                wp = w[0].get("pending") or 0
+        except Exception:
+            pass
+
+        return jsonify({
+            "success": True,
+            "status": status,
+            "drivers": drivers,
+            "clients": clients,
+            "wallet_available": wa,
+            "wallet_pending": wp,
+            "week_id": wid,
+            "week_start": str(ws),
+            "week_end": str(we),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/agent/notifications")
+@require_login("AGENT")
+def api_agent_notifications():
+    email = _agent_email()
+    agent = sb_admin.table("agent_profiles").select("id").eq("email", email).execute().data
+    if not agent:
+        agent = sb_admin.table("agents").select("id").eq("email", email).execute().data
+    if not agent:
+        return jsonify({"success": True, "data": []})
+    aid = agent[0]["id"]
+
+    try:
+        rows = sb_admin.table("agent_notifications").select("*").eq("agent_id", aid).order("created_at", desc=True).limit(20).execute().data or []
+        return jsonify({"success": True, "data": rows})
+    except Exception:
+        return jsonify({"success": True, "data": []})
+
+@app.route("/api/agent/upload_proof", methods=["POST"])
+@require_login("AGENT")
+def api_agent_upload_proof():
+    # MVP: store proof record (image storage can be added once bucket is ready)
+    data = request.json or {}
+    img = data.get("image_base64") or ""
+    if not img.startswith("data:image"):
+        return jsonify({"success": False, "error": "Invalid image"}), 400
+
+    email = _agent_email()
+    agent = sb_admin.table("agent_profiles").select("id").eq("email", email).execute().data
+    if not agent:
+        agent = sb_admin.table("agents").select("id").eq("email", email).execute().data
+    if not agent:
+        return jsonify({"success": False, "error": "Agent not found"}), 404
+    aid = agent[0]["id"]
+
+    now = _na_time_now().isoformat()
+
+    # store minimal proof row (later: upload to supabase storage + hash + watermark)
+    sb_admin.table("registration_proofs").insert({
+        "agent_id": aid,
+        "captured_at": now,
+        "note": "screen-proof-captured"
+    }).execute()
+
+    return jsonify({"success": True})
+
+@app.route("/api/agent/register_driver_v2", methods=["POST"])
+@require_login("AGENT")
+def api_agent_register_driver_v2():
+    payload = request.json or {}
+    name = (payload.get("name") or "").strip()
+    phone = (payload.get("phone") or "").strip()
+    town = (payload.get("town") or "").strip()
+    yene_code = (payload.get("yene_code") or "").strip()
+
+    if not (name and phone and town and yene_code):
+        return jsonify({"success": False, "error": "Missing fields"}), 400
+
+    today = _na_time_now().date()
+    ws, we = _week_window(today)
+    wid = _week_id(today)
+
+    email = _agent_email()
+    agent = sb_admin.table("agent_profiles").select("id").eq("email", email).execute().data
+    if not agent:
+        agent = sb_admin.table("agents").select("id").eq("email", email).execute().data
+    if not agent:
+        return jsonify({"success": False, "error": "Agent not found"}), 404
+    aid = agent[0]["id"]
+
+    # Create referral row (your exact table names may differ; adjust later)
+    sb_admin.table("agent_referrals").insert({
+        "agent_id": aid,
+        "type": "driver",
+        "name": name,
+        "phone": phone,
+        "town": town,
+        "yene_code": yene_code,
+        "registered_at": _na_time_now().isoformat(),
+        "week_id": wid,
+        "week_start": str(ws),
+        "week_end": str(we),
+        "earning_active": True,
+        "earning_end_at": (_na_time_now() + timedelta(days=30)).isoformat(),
+        "weekly_cycle_start": str(ws),
+    }).execute()
+
+    return jsonify({"success": True})
+
+@app.route("/api/agent/register_client_v2", methods=["POST"])
+@require_login("AGENT")
+def api_agent_register_client_v2():
+    payload = request.json or {}
+    name = (payload.get("name") or "").strip()
+    phone = (payload.get("phone") or "").strip()
+    yene_code = (payload.get("yene_code") or "").strip()
+    if not (name and phone and yene_code):
+        return jsonify({"success": False, "error": "Missing fields"}), 400
+
+    today = _na_time_now().date()
+    ws, we = _week_window(today)
+    wid = _week_id(today)
+
+    email = _agent_email()
+    agent = sb_admin.table("agent_profiles").select("id").eq("email", email).execute().data
+    if not agent:
+        agent = sb_admin.table("agents").select("id").eq("email", email).execute().data
+    if not agent:
+        return jsonify({"success": False, "error": "Agent not found"}), 404
+    aid = agent[0]["id"]
+
+    sb_admin.table("agent_referrals").insert({
+        "agent_id": aid,
+        "type": "client",
+        "name": name,
+        "phone": phone,
+        "yene_code": yene_code,
+        "registered_at": _na_time_now().isoformat(),
+        "week_id": wid,
+        "week_start": str(ws),
+        "week_end": str(we),
+        "client_once_off_paid": False,
+    }).execute()
+
+    return jsonify({"success": True})
+
+@app.route("/api/agent/team")
+@require_login("AGENT")
+def api_agent_team():
+    mode = (request.args.get("mode") or "this_week").strip()
+    today = _na_time_now().date()
+    ws, we = _week_window(today)
+    wid = _week_id(today)
+
+    # last week window
+    ws2 = ws - timedelta(days=7)
+    we2 = we - timedelta(days=7)
+    wid2 = _week_id(ws2)
+
+    email = _agent_email()
+    agent = sb_admin.table("agent_profiles").select("id").eq("email", email).execute().data
+    if not agent:
+        agent = sb_admin.table("agents").select("id").eq("email", email).execute().data
+    if not agent:
+        return jsonify({"success": False, "error": "Agent not found"}), 404
+    aid = agent[0]["id"]
+
+    q = sb_admin.table("agent_referrals").select("*").eq("agent_id", aid).order("registered_at", desc=True)
+    if mode == "this_week":
+        q = q.eq("week_id", wid)
+    elif mode == "last_week":
+        q = q.eq("week_id", wid2)
+    rows = q.limit(200).execute().data or []
+
+    # Map to UI fields; weekly rides & milestones will be filled once ride counters are connected
+    data = []
+    now = _na_time_now()
+    for r in rows:
+        days_left = None
+        if r.get("type") == "driver" and r.get("earning_end_at"):
+            try:
+                end = datetime.fromisoformat(r["earning_end_at"])
+                days_left = max(0, (end - now).days)
+            except Exception:
+                pass
+        data.append({
+            "type": r.get("type"),
+            "name": r.get("name"),
+            "phone": r.get("phone"),
+            "week_rides": r.get("week_rides") or 0,
+            "hit_5": bool(r.get("hit_5")),
+            "hit_15": bool(r.get("hit_15")),
+            "hit_25": bool(r.get("hit_25")),
+            "days_left": days_left,
+            "status": "Active" if r.get("earning_active", True) else "Cut off",
+        })
+
+    return jsonify({"success": True, "data": data})
+
+@app.route("/api/agent/invoices")
+@require_login("AGENT")
+def api_agent_invoices():
+    email = _agent_email()
+    agent = sb_admin.table("agent_profiles").select("id").eq("email", email).execute().data
+    if not agent:
+        agent = sb_admin.table("agents").select("id").eq("email", email).execute().data
+    if not agent:
+        return jsonify({"success": False, "error": "Agent not found"}), 404
+    aid = agent[0]["id"]
+
+    try:
+        rows = sb_admin.table("agent_invoices").select("*").eq("agent_id", aid).order("week_start", desc=True).limit(20).execute().data or []
+        data = [{
+            "week_id": r.get("week_id"),
+            "pending": r.get("pending") or 0,
+            "available": r.get("available") or 0,
+            "pdf_url": r.get("pdf_url")
+        } for r in rows]
+        return jsonify({"success": True, "data": data})
+    except Exception:
+        return jsonify({"success": True, "data": []})
 @app.route("/api/agent/stats")
 @require_login("AGENT")
 def api_agent_stats():
