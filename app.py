@@ -4,6 +4,9 @@ from flask import Flask, render_template, request, jsonify, session, flash, redi
 from functools import wraps
 import requests
 import os
+SUPABASE_URL = os.getenv('SUPABASE_URL', '')
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', '')
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -64,7 +67,7 @@ def index():
 
 @app.route("/admin/login", methods=["GET"])
 def admin_login():
-    return render_template("login.html", login_mode="admin")
+    return render_template("login.html", SUPABASE_URL=SUPABASE_URL, SUPABASE_ANON_KEY=SUPABASE_ANON_KEY, login_mode="admin")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -111,7 +114,7 @@ def login():
             flash(f"Login error: {str(e)}")
             return redirect(url_for("login"))
 
-    return render_template("login.html", login_mode="agent")
+    return render_template("login.html", SUPABASE_URL=SUPABASE_URL, SUPABASE_ANON_KEY=SUPABASE_ANON_KEY, login_mode="agent")
 
 
 @app.route("/dashboard/admin")

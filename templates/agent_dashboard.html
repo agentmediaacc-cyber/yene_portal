@@ -385,7 +385,7 @@
     const { data: profile, error: pErr } = await sb
       .from('agent_profiles')
       .select('*')
-      .eq('id', myAuthUser.id)
+      .eq('auth_id', myAuthUser.id)
       .maybeSingle();
 
     if (pErr) { alert("Profile load error: " + pErr.message); return; }
