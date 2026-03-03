@@ -315,7 +315,6 @@
   </nav>
 </div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = {{ (SUPABASE_URL or '') | tojson }};
   const SUPABASE_ANON = {{ (SUPABASE_ANON_KEY or '') | tojson }};
@@ -527,6 +526,7 @@
   }
 
   async function loadBroadcasts() {
+    const sb = await getSB();
     const feed = document.getElementById('broadcast-feed');
     const { data: messages, error } = await sb
       .from('broadcasts')
@@ -557,6 +557,7 @@
   }
 
   async function submitDriver(e) {
+    const sb = await getSB();
     e.preventDefault();
     if (!myAgentProfile) return alert("Profile error.");
     if (lockIfPending()) return alert("Your account is pending approval. You cannot register yet.");
@@ -588,6 +589,7 @@
   }
 
   async function submitClient(e) {
+    const sb = await getSB();
     e.preventDefault();
     if (!myAgentProfile) return alert("Profile error.");
     if (lockIfPending()) return alert("Your account is pending approval. You cannot register yet.");
@@ -618,6 +620,7 @@
   }
 
   async function loadTeamData() {
+    const sb = await getSB();
     const tbody = document.getElementById('team-table-body');
     if (driverCountAll < 10) {
       tbody.innerHTML = `<tr><td colspan="3" class="muted center">Unlock Team Leader to see downline.</td></tr>`;
@@ -654,6 +657,7 @@
   }
 
   async function loadLedger(force=false) {
+    const sb = await getSB();
     const tbody = document.getElementById('wallet-history');
     const balEl = document.getElementById('wallet-balance');
     tbody.innerHTML = `<tr><td colspan="4" class="muted center">Loading...</td></tr>`;
@@ -695,6 +699,7 @@
   }
 
   async function requestWithdrawal() {
+    const sb = await getSB();
     const amount = Number(document.getElementById('withdraw-amount').value || 0);
     if (!amount || amount <= 0) return alert("Enter a valid amount.");
 
