@@ -378,6 +378,8 @@
   }
 
   async function init() {
+    const sb = await window.sbReady;
+    if(!sb){ alert('Supabase not ready'); return; }
     const { data: { session }, error } = await sb.auth.getSession();
     if (error || !session) { window.location.href="/login"; return; }
     myAuthUser = session.user;
