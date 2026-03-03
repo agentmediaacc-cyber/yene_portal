@@ -1,6 +1,6 @@
 from supabase import create_client, Client
 from flask_cors import CORS
-from flask import Flask, render_template, request, jsonify, session, flash, redirect, url_for, Response
+from flask import jsonify,  Flask, render_template, request, jsonify, session, flash, redirect, url_for, Response
 from functools import wraps
 import requests
 import os
@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 # --- Inject Supabase env into all templates (agent login needs this) ---
 import os
-from flask import Flask
+from flask import jsonify,  Flask
 
 @app.context_processor
 def inject_supabase_env():
@@ -822,3 +822,23 @@ def debug_env():
         "SUPABASE_ANON_KEY_set": bool(os.getenv("SUPABASE_ANON_KEY")),
         "runtime": "ok"
     }
+
+
+@app.get("/api/public-config")
+def public_config():
+    url = (os.getenv("SUPABASE_URL") or "").strip()
+    anon = (os.getenv("SUPABASE_ANON_KEY") or "").strip()
+
+    if not url or not anon:
+        return jsonify({
+            "ok": False,
+            "error": "Missing SUPABASE_URL or SUPABASE_ANON_KEY on server",
+            "SUPABASE_URL_len": len(url),
+            "SUPABASE_ANON_KEY_len": len(anon),
+        }), 500
+
+    return jsonify({
+        "ok": True,
+        "SUPABASE_URL": url,
+        "SUPABASE_ANON_KEY": anon
+    })
