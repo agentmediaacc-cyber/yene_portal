@@ -813,3 +813,12 @@ def api_admin_manage_driver(id):
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=False)
+
+@app.get("/debug/env")
+def debug_env():
+    # SAFE: only shows whether env vars exist, never prints secrets
+    return {
+        "SUPABASE_URL_set": bool(os.getenv("SUPABASE_URL")),
+        "SUPABASE_ANON_KEY_set": bool(os.getenv("SUPABASE_ANON_KEY")),
+        "runtime": "ok"
+    }

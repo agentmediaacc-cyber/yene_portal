@@ -73,6 +73,22 @@
     .dot.ok{background:var(--ok)}
     .dot.warn{background:var(--warn)}
   </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- YENE_SUPABASE_INIT -->
+<script>
+(function(){
+  const SUPABASE_URL = {{ (SUPABASE_URL or '') | tojson }};
+  const SUPABASE_ANON_KEY = {{ (SUPABASE_ANON_KEY or '') | tojson }};
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.warn("Supabase env missing in HTML. Server env or template injection is missing.");
+    return;
+  }
+  window.supabase = window.supabase || supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+})();
+</script>
+<!-- END YENE_SUPABASE_INIT -->
+
 </head>
 <body>
 
