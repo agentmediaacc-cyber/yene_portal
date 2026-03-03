@@ -90,6 +90,30 @@
 <!-- END YENE_SUPABASE_INIT -->
 
   {% include '_supabase_init.html' %}
+
+<script>
+  (function(){
+    // ✅ Global Supabase init for ALL pages
+    const SUPABASE_URL = {{ (SUPABASE_URL or '') | tojson }};
+    const SUPABASE_ANON_KEY = {{ (SUPABASE_ANON_KEY or '') | tojson }};
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error("Supabase client not ready. Missing SUPABASE_URL / SUPABASE_ANON_KEY from server template context.");
+      window.SUPABASE_NOT_READY = true;
+      return;
+    }
+
+    if (!window.supabase || !window.supabase.createClient) {
+      console.error("Supabase JS library not loaded.");
+      window.SUPABASE_NOT_READY = true;
+      return;
+    }
+
+    window.__SB_INIT_DONE__ = true;
+    window.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  })();
+</script>
+
 </head>
 <body>
 
