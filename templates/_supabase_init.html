@@ -1,0 +1,15 @@
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // Single shared Supabase client for ALL pages
+  (function(){
+    const SUPABASE_URL = {{ (SUPABASE_URL or '') | tojson }};
+    const SUPABASE_ANON = {{ (SUPABASE_ANON_KEY or '') | tojson }};
+
+    if (!SUPABASE_URL || !SUPABASE_ANON) {
+      console.error("Supabase client not ready: missing SUPABASE_URL or SUPABASE_ANON_KEY.");
+      window.sb = null;
+      return;
+    }
+    window.sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  })();
+</script>

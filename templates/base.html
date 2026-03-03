@@ -57,6 +57,7 @@
 </script>
 <!-- END YENE_SUPABASE_INIT -->
 
+  {% include '_supabase_init.html' %}
 </head>
 <body>
     <nav class="navbar">
@@ -72,30 +73,9 @@
         {% block content %}{% endblock %}
     </div>
 
-    <script>
-        // Register the PWA Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/static/sw.js').then(function(registration) {
-                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                }, function(err) {
-                    console.log('ServiceWorker registration failed: ', err);
-                });
-            });
-        }
+    
+<!-- removed broken auth auto-redirect block -->
 
-        async function checkAuthStatus() {
-            const { data: { user } } = await window.supabase.auth.getUser();
-            if (user) document.getElementById('nav-logout').style.display = 'inline-block';
-        }
-
-        async function handleLogout() {
-            const { error } = await window.supabase.auth.signOut();
-            if (!error) window.location.href = '/'; 
-        }
-
-        document.addEventListener("DOMContentLoaded", checkAuthStatus);
-    </script>
   <script defer src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 </body>
 </html>
