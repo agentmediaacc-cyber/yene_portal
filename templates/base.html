@@ -28,6 +28,20 @@
     </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/agent_v2.css') }}?v=2">
+
+<script>
+  // Ensure a single global Supabase client for all pages
+  (function(){
+    const SUPABASE_URL = {{ (SUPABASE_URL or '') | tojson }};
+    const SUPABASE_ANON_KEY = {{ (SUPABASE_ANON_KEY or '') | tojson }};
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.warn("Supabase env missing in template. Check Render env vars.");
+      return;
+    }
+    window.supabase = window.supabase || supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  })();
+</script>
+
 </head>
 <body>
     <nav class="navbar">

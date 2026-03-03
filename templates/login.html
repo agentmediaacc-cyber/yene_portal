@@ -103,5 +103,57 @@
       }
     };
   </script>
+
+<!-- YENE_AGENT_SUPABASE_LOGIN_FIX -->
+<script>
+  (function(){
+    // Attach to first form on the page
+    const form = document.querySelector("form");
+    if (!form) { console.warn("Login fix: no form found"); return; }
+
+    // Find email + password inputs robustly
+    const emailEl = document.querySelector('input[type="email"], input[name="email"], input#email');
+    const passEl  = document.querySelector('input[type="password"], input[name="password"], input#password');
+
+    if (!emailEl || !passEl) {
+      console.warn("Login fix: missing email/password inputs");
+      return;
+    }
+
+    // Prevent double binding
+    if (form.dataset.sbBound === "1") return;
+    form.dataset.sbBound = "1";
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      if (!window.supabase) {
+        alert("Supabase client not ready. Check SUPABASE_URL / SUPABASE_ANON_KEY on Render.");
+        return;
+      }
+
+      const email = (emailEl.value || "").trim();
+      const password = passEl.value || "";
+
+      if (!email || !password) {
+        alert("Enter email and password.");
+        return;
+      }
+
+      // Create browser session (this stops the /agent -> /login bounce)
+      const { data, error } = await window.supabase.auth.signInWithPassword({ email, password });
+
+      if (error || !data?.session) {
+        alert("Login failed: " + (error?.message || "No session"));
+        return;
+      }
+
+      // Success
+      window.location.href = "/agent";
+    });
+  })();
+</script>
+<!-- END YENE_AGENT_SUPABASE_LOGIN_FIX -->
+
 </body>
 </html>

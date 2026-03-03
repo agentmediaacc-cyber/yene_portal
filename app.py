@@ -12,6 +12,19 @@ load_dotenv()
 
 # --- 1. THE FOUNDATION & TOOLS ---
 app = Flask(__name__)
+
+# --- Inject Supabase env into all templates (agent login needs this) ---
+import os
+from flask import Flask
+
+@app.context_processor
+def inject_supabase_env():
+    return {
+        "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
+        "SUPABASE_ANON_KEY": os.getenv("SUPABASE_ANON_KEY", ""),
+    }
+# --- end inject ---
+
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-me")
 CORS(app)
 
