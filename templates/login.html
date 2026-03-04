@@ -141,7 +141,13 @@
       }
 
       // Create browser session (this stops the /agent -> /login bounce)
-      const { data, error } = await window.supabase.auth.signInWithPassword({ email, password });
+            const sb = await window.sbReady;
+      if(!sb){
+        alert('Supabase client not ready. Please refresh.');
+        return;
+      }
+
+const { data, error } = await sb.auth.signInWithPassword({ email, password });
 
       if (error || !data?.session) {
         alert("Login failed: " + (error?.message || "No session"));
