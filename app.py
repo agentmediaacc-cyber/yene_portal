@@ -177,6 +177,12 @@ def login():
             return redirect(url_for("login"))
 
     return render_template("login.html", SUPABASE_URL=SUPABASE_URL, SUPABASE_ANON_KEY=SUPABASE_ANON_KEY, login_mode="agent")
+@app.route('/dashboard/admin')
+def admin_dashboard():
+    # PUBLIC HTML PAGE:
+    # Auth is handled in browser via Supabase session.
+    # Admin API calls should be protected via Bearer token if needed.
+    return render_template('admin_dashboard.html')
 
 
 @app.route("/dashboard/admin")
@@ -405,6 +411,10 @@ def api_admin_payment_rules():
 @app.route("/api/admin/broadcasts")
 def api_admin_broadcasts():
     return jsonify({"success": True, "data": sb_admin.table("broadcasts").select("*").execute().data or []})
+@app.route('/admin')
+def admin_entry():
+    return redirect('/dashboard/admin')
+
 
 @app.route("/admin")
 def admin_entry():
