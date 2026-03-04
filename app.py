@@ -857,3 +857,27 @@ def public_config():
         "SUPABASE_URL": url,
         "SUPABASE_ANON_KEY": anon
     })
+
+
+
+import os
+from flask import jsonify, request
+
+@app.get("/api/agent/me")
+def api_agent_me():
+    """
+    Minimal endpoint used by frontend to confirm server is alive + env is present.
+    IMPORTANT: This does NOT rely on Flask session.
+    Your real auth is handled by Supabase in the browser.
+    """
+    url = (os.getenv("SUPABASE_URL") or "").strip()
+    anon = (os.getenv("SUPABASE_ANON_KEY") or "").strip()
+
+    # Return ok even if no user; frontend should use Supabase session for identity.
+    return jsonify({
+        "ok": True,
+        "has_supabase_env": bool(url and anon),
+        "note": "Use Supabase auth session in browser. This endpoint prevents 404 login loops.",
+        "path": request.path
+    }), 200
+
