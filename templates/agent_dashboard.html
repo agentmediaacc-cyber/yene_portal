@@ -1,751 +1,171 @@
 {% extends 'base.html' %}
 {% block content %}
-
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/agent_dashboard_v2.css') }}">
+<style>
+:root{--yene:#4aa8ff;--bg:#0b1220;--panel:#0f1a2f;--card:#111b2e;--card2:#0b1427;--text:#eaf2ff;--muted:#a9b7d6;--line:rgba(255,255,255,.10);--ok:#2ed573;--warn:#ffa502;--danger:#ff5c5c;}
+*{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+body{margin:0;background:var(--bg);color:var(--text);overflow-x:hidden}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.header{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;position:sticky;top:10px;z-index:50}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.6px;color:var(--yene)}
+.badge{padding:6px 10px;border-radius:999px;border:1px solid rgba(74,168,255,.35);background:rgba(74,168,255,.10);color:var(--text);font-size:12px;font-weight:800}
+.btn{border:1px solid var(--line);background:var(--card2);color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:800}
+.btn.primary{background:var(--yene);color:#041021;border-color:transparent}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01));background-color:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.h2{margin:0 0 10px 0;font-size:16px}
+.sub{color:var(--muted);font-size:13px;line-height:1.4}
+.kpi{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.k{flex:1;min-width:140px;background:rgba(0,0,0,.15);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:12px}
+.k .n{font-size:26px;font-weight:900}
+.k .t{color:var(--muted);font-size:12px;margin-top:2px}
+.field{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.field label{color:var(--muted);font-size:12px}
+.field input{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--text);outline:none}
+.field input:focus{border-color:var(--yene)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px}
+.table th{color:var(--yene);text-align:left;background:rgba(74,168,255,.06);font-weight:900}
+.tablewrap{overflow:auto;border-radius:14px;border:1px solid var(--line)}
+.small{font-size:12px;color:var(--muted)}
+hr{border:none;border-top:1px solid rgba(255,255,255,.07);margin:14px 0}
+.toast{margin-top:10px;color:var(--warn);font-size:12px}
+</style>
 
-<div id="security-overlay" class="security-overlay">
-  <i class="fa-solid fa-shield-halved fa-3x fa-beat-fade" style="margin-bottom: 18px;"></i>
-  <div style="font-weight:900; letter-spacing:.4px;">Authenticating Agent...</div>
-  <div class="muted" style="margin-top:6px;">Please wait</div>
-</div>
+<div class="wrap">
+  <div class="header">
+    <div class="brand"><i class="fa-solid fa-car-side"></i> YENE PROMOTER <span class="badge" id="tier">Agent</span></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="small" id="who">Loading…</span>
+      <button class="btn" onclick="location.href='/logout'"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </div>
 
-<div class="app">
-  <!-- Header (always visible, no hamburger on mobile) -->
-  <header class="header">
-    <div class="brand">
-      <div class="brand-badge"><i class="fa-solid fa-car-side"></i></div>
-      <div>
-        <div class="brand-title">YENE PROMOTER</div>
-        <div class="brand-sub">Agent Portal</div>
+  <div class="grid">
+    <div class="card">
+      <div class="h2"><i class="fa-solid fa-gauge-high"></i> This Week</div>
+      <div class="sub">Weekly Summary (Mon–Sun). Updates automatically.</div>
+
+      <div class="kpi">
+        <div class="k"><div class="n" id="dweek">0</div><div class="t">Drivers registered</div></div>
+        <div class="k"><div class="n" id="cweek">0</div><div class="t">Clients registered</div></div>
+        <div class="k"><div class="n" id="dall">0</div><div class="t">Drivers (all-time)</div></div>
       </div>
+
+      <div class="toast" id="weekrange"></div>
+      <hr>
+
+      <div class="h2"><i class="fa-solid fa-user-plus"></i> Quick Register</div>
+
+      <div class="sub"><b>Driver</b></div>
+      <form onsubmit="regDriver(event)">
+        <div class="field"><label>Full name</label><input id="dn" required></div>
+        <div class="field"><label>Phone</label><input id="dp" required placeholder="+264..."></div>
+        <div class="field"><label>Town</label><input id="dt" required></div>
+        <div class="row">
+          <button class="btn primary" type="submit"><i class="fa-solid fa-paper-plane"></i> Submit Driver</button>
+        </div>
+      </form>
+
+      <hr>
+      <div class="sub"><b>Client</b></div>
+      <form onsubmit="regClient(event)">
+        <div class="field"><label>Full name</label><input id="cn" required></div>
+        <div class="field"><label>Phone</label><input id="cp" required placeholder="+264..."></div>
+        <div class="row">
+          <button class="btn primary" type="submit"><i class="fa-solid fa-paper-plane"></i> Submit Client</button>
+        </div>
+      </form>
     </div>
 
-    <div class="header-right">
-      <div class="agent-mini">
-        <div class="agent-avatar" id="user-initial"><i class="fa-solid fa-user"></i></div>
-        <div class="agent-mini-text">
-          <div class="agent-name" id="display-name">Loading...</div>
-          <div class="agent-status" id="display-status">Connecting...</div>
-        </div>
+    <div class="card">
+      <div class="h2"><i class="fa-solid fa-clock-rotate-left"></i> Recent activity (this week)</div>
+      <div class="sub">Your latest registrations.</div>
+      <div class="tablewrap" style="margin-top:10px">
+        <table class="table">
+          <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th>Date</th></tr></thead>
+          <tbody id="act">
+            <tr><td colspan="4" class="small">Loading…</td></tr>
+          </tbody>
+        </table>
       </div>
-
-      <button class="btn ghost" onclick="handleLogout()">
-        <i class="fa-solid fa-right-from-bracket"></i> <span class="hide-sm">Sign Out</span>
-      </button>
+      <div class="small" style="margin-top:10px;opacity:.7">Debug: /api/debug-session (only keys + preview)</div>
     </div>
-  </header>
-
-  <!-- Desktop Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <div class="tier-card">
-      <div class="tier-row">
-        <div class="tier-pill" id="tier-display">Standard Agent</div>
-        <i class="fa-solid fa-star tier-star" id="elite-badge" title="Elite Agent"></i>
-      </div>
-
-      <div class="muted" style="margin-top:10px;">
-        Your link:
-      </div>
-      <div class="ref-row">
-        <input id="ref-link" class="input" readonly>
-        <button class="btn purple" onclick="copyRefLink()"><i class="fa-regular fa-copy"></i></button>
-      </div>
-    </div>
-
-    <nav class="nav">
-      <button class="nav-item active" data-view="v-home" onclick="showView('v-home', this)">
-        <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
-      </button>
-      <button class="nav-item" data-view="v-register" onclick="showView('v-register', this)">
-        <i class="fa-solid fa-user-plus"></i><span>Register</span>
-      </button>
-      <button class="nav-item" data-view="v-wallet" onclick="showView('v-wallet', this)">
-        <i class="fa-solid fa-wallet"></i><span>Wallet</span>
-      </button>
-      <button class="nav-item" data-view="v-team" onclick="showView('v-team', this)">
-        <i class="fa-solid fa-users-rays"></i><span>My Team</span>
-      </button>
-      <button class="nav-item" data-view="v-statements" onclick="showView('v-statements', this)">
-        <i class="fa-solid fa-file-invoice"></i><span>Statements</span>
-      </button>
-    </nav>
-
-    <div class="sidebar-footer muted">
-      Tip: Use “Register” to capture drivers/clients weekly.
-    </div>
-  </aside>
-
-  <!-- Main -->
-  <main class="main">
-
-    <!-- DASHBOARD -->
-    <section id="v-home" class="view active">
-      <div class="page-title">
-        <h2><i class="fa-solid fa-gauge-high"></i> Dashboard</h2>
-        <div class="muted" id="week-label">This Week</div>
-      </div>
-
-      <div class="grid-2">
-        <div class="card top-blue">
-          <div class="card-title">Weekly Summary (Mon–Sun)</div>
-          <div class="kpis">
-            <div class="kpi">
-              <div class="kpi-label">Drivers registered</div>
-              <div class="kpi-value" id="kpi-drivers-week">0</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Clients registered</div>
-              <div class="kpi-value" id="kpi-clients-week">0</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Last week total</div>
-              <div class="kpi-value" id="kpi-lastweek-total">0</div>
-            </div>
-          </div>
-          <div class="divider"></div>
-          <div class="muted">Road to Team Leader: register 10 drivers (all-time)</div>
-          <progress id="kpi-drivers-all" value="0" max="10"></progress>
-          <div class="muted right" id="kpi-text-all" style="margin-top:6px;">0 / 10</div>
-        </div>
-
-        <div class="card top-warn">
-          <div class="card-title"><i class="fa-solid fa-bullhorn"></i> Announcements</div>
-          <div id="broadcast-feed" class="feed">
-            <div class="muted">Loading...</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid-2" style="margin-top:14px;">
-        <div class="card top-purple">
-          <div class="card-title">Recent activity (this week)</div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Type</th><th>Name</th><th>Phone</th><th>Date</th></tr>
-              </thead>
-              <tbody id="recent-week">
-                <tr><td colspan="4" class="muted center">Loading...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card top-green">
-          <div class="card-title">Quick actions</div>
-          <div class="btn-row">
-            <button class="btn primary" onclick="showView('v-register', document.querySelector('[data-view=v-register]'))">
-              <i class="fa-solid fa-user-plus"></i> Register
-            </button>
-            <button class="btn ok" onclick="showView('v-wallet', document.querySelector('[data-view=v-wallet]'))">
-              <i class="fa-solid fa-wallet"></i> Wallet
-            </button>
-            <button class="btn" onclick="showView('v-statements', document.querySelector('[data-view=v-statements]'))">
-              <i class="fa-solid fa-file-invoice"></i> Statements
-            </button>
-          </div>
-
-          <div class="note">
-            <b>Weekly invoice:</b> Monday → Sunday, auto-updated.
-            <div class="muted" style="margin-top:6px;">
-              (On Render Free we finalize on next login / system ping.)
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- REGISTER -->
-    <section id="v-register" class="view">
-      <div class="page-title">
-        <h2><i class="fa-solid fa-user-plus"></i> Register Network</h2>
-        <div class="muted">Fast mobile forms (no sidebar overlap)</div>
-      </div>
-
-      <div class="grid-2">
-        <div class="card top-blue">
-          <div class="card-title"><i class="fa-solid fa-car"></i> Register Driver</div>
-
-          <form id="driver-form" onsubmit="submitDriver(event)">
-            <div class="field">
-              <label>Driver Full Name</label>
-              <input class="input" type="text" id="d-name" required>
-            </div>
-            <div class="field">
-              <label>WhatsApp Number</label>
-              <input class="input" type="tel" id="d-phone" placeholder="+264..." required>
-            </div>
-            <div class="field">
-              <label>Town / Operating Area</label>
-              <input class="input" type="text" id="d-town" required>
-            </div>
-            <button type="submit" class="btn primary full" id="btn-driver">
-              <i class="fa-solid fa-paper-plane"></i> Submit Driver
-            </button>
-            <div class="muted" style="margin-top:10px;">
-              Tip: after registration, the system tracks weekly counts (Mon–Sun).
-            </div>
-          </form>
-        </div>
-
-        <div class="card top-green">
-          <div class="card-title"><i class="fa-solid fa-mobile-screen"></i> Register Client</div>
-          <div class="muted" style="margin-bottom:10px;">Once-off activation earnings after first ride.</div>
-
-          <form id="client-form" onsubmit="submitClient(event)">
-            <div class="field">
-              <label>Client Full Name</label>
-              <input class="input" type="text" id="c-name" required>
-            </div>
-            <div class="field">
-              <label>Phone Number</label>
-              <input class="input" type="text" id="c-phone" required>
-            </div>
-            <button type="submit" class="btn ok full" id="btn-client">
-              <i class="fa-solid fa-paper-plane"></i> Submit Client
-            </button>
-          </form>
-        </div>
-      </div>
-
-      <div class="card top-warn" style="margin-top:14px;">
-        <div class="card-title">Anti-fraud (next upgrade we can add)</div>
-        <ul class="list">
-          <li>In-dashboard screen capture (phone profile screen only)</li>
-          <li>OCR code verification (reads Yene Code from captured image)</li>
-          <li>Timestamp watermarking in Supabase storage</li>
-        </ul>
-        <div class="muted">We’ll add this after UI is stable (so it won’t freeze phones).</div>
-      </div>
-    </section>
-
-    <!-- WALLET -->
-    <section id="v-wallet" class="view">
-      <div class="page-title">
-        <h2><i class="fa-solid fa-wallet"></i> Wallet</h2>
-        <div class="muted">Pending vs Available (ready for weekly payroll)</div>
-      </div>
-
-      <div class="card top-green center">
-        <div class="big" id="wallet-balance">N$ 0.00</div>
-        <div class="muted">Available Balance</div>
-
-        <div class="withdraw-row">
-          <input class="input" type="number" id="withdraw-amount" placeholder="Amount (N$)">
-          <button class="btn ok" onclick="requestWithdrawal()">
-            <i class="fa-solid fa-money-bill-transfer"></i> Request Payout
-          </button>
-        </div>
-
-        <div class="note danger">
-          * Standard network fee deducted upon withdrawal (if enabled)
-        </div>
-      </div>
-    </section>
-
-    <!-- TEAM -->
-    <section id="v-team" class="view">
-      <div class="page-title">
-        <h2><i class="fa-solid fa-users-rays"></i> My Team</h2>
-        <div class="muted">Unlock at 10 drivers (all-time)</div>
-      </div>
-
-      <div class="card top-purple" style="position:relative;">
-        <div id="team-lock" class="lock">
-          <i class="fa-solid fa-lock fa-2x" style="margin-bottom:10px;"></i>
-          <div style="font-weight:900;">Locked: Team Leader Feature</div>
-          <div class="muted" style="margin-top:6px;">
-            Register 10 drivers to unlock downline tracking.
-          </div>
-        </div>
-
-        <div class="card-title"><i class="fa-solid fa-sitemap"></i> Network Downline</div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Agent Name</th><th>Status</th><th>Joined</th></tr></thead>
-            <tbody id="team-table-body">
-              <tr><td colspan="3" class="muted center">Loading...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- STATEMENTS -->
-    <section id="v-statements" class="view">
-      <div class="page-title">
-        <h2><i class="fa-solid fa-file-invoice"></i> Statements</h2>
-        <div class="muted">Weekly ledger + CSV export</div>
-      </div>
-
-      <div class="card">
-        <div class="btn-row" style="margin-bottom:10px;">
-          <button class="btn" onclick="downloadCSV()"><i class="fa-solid fa-download"></i> CSV</button>
-          <button class="btn" onclick="loadLedger(true)"><i class="fa-solid fa-rotate"></i> Refresh</button>
-        </div>
-
-        <div class="table-wrap">
-          <table id="statement-table">
-            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount (N$)</th></tr></thead>
-            <tbody id="wallet-history">
-              <tr><td colspan="4" class="muted center">Loading...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- MOBILE BOTTOM NAV (replaces hamburger completely) -->
-  <nav class="bottom-nav">
-    <button class="bn-item active" data-view="v-home" onclick="showView('v-home', this)">
-      <i class="fa-solid fa-gauge-high"></i><span>Home</span>
-    </button>
-    <button class="bn-item" data-view="v-register" onclick="showView('v-register', this)">
-      <i class="fa-solid fa-user-plus"></i><span>Register</span>
-    </button>
-    <button class="bn-item" data-view="v-wallet" onclick="showView('v-wallet', this)">
-      <i class="fa-solid fa-wallet"></i><span>Wallet</span>
-    </button>
-    <button class="bn-item" data-view="v-statements" onclick="showView('v-statements', this)">
-      <i class="fa-solid fa-file-invoice"></i><span>Ledger</span>
-    </button>
-  </nav>
+  </div>
 </div>
 
 <script>
-  const SUPABASE_URL = {{ (SUPABASE_URL or '') | tojson }};
-  const SUPABASE_ANON = {{ (SUPABASE_ANON_KEY or '') | tojson }};
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+async function jget(url){
+  const r = await fetch(url, {credentials:"same-origin"});
+  if(!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
+async function jpost(url, body){
+  const r = await fetch(url, {
+    method:"POST",
+    credentials:"same-origin",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body||{})
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
 
-  let myAuthUser = null;
-  let myAgentProfile = null;
-  let driverCountAll = 0;
-
-  function escapeHtml(s){
-    return String(s ?? "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
+async function boot(){
+  try{
+    const me = await jget("/api/agent/me");
+    document.getElementById("who").textContent = me.profile?.full_name || "Agent";
+    document.getElementById("tier").textContent = (me.profile?.badge || me.profile?.role || "Agent");
+  }catch(e){
+    location.href="/login";
+    return;
   }
+  await refresh();
+}
 
-  function getWeekRange(date = new Date()) {
-    // Monday 00:00 to next Monday 00:00 (local)
-    const d = new Date(date);
-    const day = d.getDay(); // 0 Sun ... 6 Sat
-    const diffToMonday = (day === 0 ? -6 : (1 - day));
-    const monday = new Date(d);
-    monday.setDate(d.getDate() + diffToMonday);
-    monday.setHours(0,0,0,0);
+async function refresh(){
+  const s = await jget("/api/agent/weekly-summary");
+  dweek.textContent = s.drivers_this_week ?? 0;
+  cweek.textContent = s.clients_this_week ?? 0;
+  dall.textContent  = s.drivers_all_time ?? 0;
+  weekrange.textContent = `Week: ${new Date(s.week_start).toLocaleString()} → ${new Date(s.week_end).toLocaleString()}`;
 
-    const nextMonday = new Date(monday);
-    nextMonday.setDate(monday.getDate() + 7);
+  const a = await jget("/api/agent/recent-activity");
+  const rows = (a.items||[]).map(x => `
+    <tr>
+      <td><b>${x.type||""}</b></td>
+      <td>${(x.name||"")}</td>
+      <td>${(x.phone||"")}</td>
+      <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ""}</td>
+    </tr>
+  `).join("");
+  act.innerHTML = rows || `<tr><td colspan="4" class="small">No activity yet this week.</td></tr>`;
+}
 
-    return { start: monday, end: nextMonday };
+async function regDriver(e){
+  e.preventDefault();
+  try{
+    await jpost("/api/agent/register_driver", {full_name: dn.value, phone: dp.value, town: dt.value});
+    dn.value=""; dp.value=""; dt.value="";
+    await refresh();
+    alert("✅ Driver registered");
+  }catch(err){
+    alert("❌ " + err.message);
   }
-
-  function fmtRangeLabel(start, end) {
-    const s = start.toLocaleDateString();
-    const e = new Date(end.getTime() - 1).toLocaleDateString();
-    return `${s} → ${e}`;
+}
+async function regClient(e){
+  e.preventDefault();
+  try{
+    await jpost("/api/agent/register_client", {full_name: cn.value, phone: cp.value});
+    cn.value=""; cp.value="";
+    await refresh();
+    alert("✅ Client registered");
+  }catch(err){
+    alert("❌ " + err.message);
   }
-
-  function setActiveNav(viewId) {
-    document.querySelectorAll('.nav-item, .bn-item').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll(`[data-view="${viewId}"]`).forEach(b => b.classList.add('active'));
-  }
-
-  function showView(viewId, el) {
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    const v = document.getElementById(viewId);
-    if (v) v.classList.add('active');
-
-    setActiveNav(viewId);
-
-    // Load on demand
-    if (viewId === 'v-wallet' || viewId === 'v-statements') loadLedger();
-    if (viewId === 'v-team') loadTeamData();
-  }
-
-  async function handleLogout() {
-    await sb.auth.signOut();
-    window.location.href = "/login";
-  }
-
-  async function init() {
-    const sb = await window.sbReady;
-    if(!sb){ alert('Supabase not ready'); return; }
-    const { data: { session }, error } = await sb.auth.getSession();
-    if (error || !session) { window.location.href="/login"; return; }
-    myAuthUser = session.user;
-
-    const { data: profile, error: pErr } = await sb
-      .from('agent_profiles')
-      .select('*')
-      .eq('auth_id', myAuthUser.id)
-      .maybeSingle();
-
-    if (pErr) { alert("Profile load error: " + pErr.message); return; }
-    if (!profile) { alert("Agent profile not found. Ask admin to create/approve."); return; }
-
-    myAgentProfile = profile;
-
-    const st = String(profile.status || '').toLowerCase();
-    if (st === 'blocked' || st === 'suspended') {
-      alert("Your account is blocked. Contact admin.");
-      await sb.auth.signOut();
-      window.location.href="/login";
-      return;
-    }
-
-    // UI identity
-    document.getElementById('display-name').innerText = profile.full_name || "Agent";
-    document.getElementById('display-status').innerText = "Status: " + (profile.status || "UNKNOWN");
-    document.getElementById('user-initial').innerText = (profile.full_name || "A").trim().charAt(0).toUpperCase();
-
-    const agentKey = profile.id || profile.auth_id;
-    document.getElementById('ref-link').value = window.location.origin + "/register?ref_agent_id=" + encodeURIComponent(agentKey);
-
-    // week label
-    const { start, end } = getWeekRange(new Date());
-    document.getElementById('week-label').innerText = "Week: " + fmtRangeLabel(start, end);
-
-    // load data (fast + minimal queries)
-    await Promise.all([loadBroadcasts(), loadAllTimeDriverCount(), loadWeekSummary()]);
-    document.getElementById('security-overlay').style.display = 'none';
-  }
-
-  async function loadAllTimeDriverCount() {
-    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
-
-    const { count, error } = await sb
-      .from('drivers')
-      .select('id', { count:'exact', head:true })
-      .eq('recruiter_agent_id', agentKey);
-
-    driverCountAll = count || 0;
-
-    document.getElementById('kpi-drivers-all').value = driverCountAll;
-    document.getElementById('kpi-text-all').innerText = `${driverCountAll} / 10`;
-
-    if (driverCountAll >= 10) {
-      document.getElementById('team-lock').style.display = 'none';
-      document.getElementById('tier-display').innerText = "👑 Team Leader";
-      document.getElementById('elite-badge').style.display = 'inline-block';
-    } else {
-      document.getElementById('tier-display').innerText = "Standard Agent";
-      document.getElementById('elite-badge').style.display = 'none';
-      document.getElementById('team-lock').style.display = 'flex';
-    }
-  }
-
-  async function loadWeekSummary() {
-    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
-
-    const now = new Date();
-    const cur = getWeekRange(now);
-    const prev = getWeekRange(new Date(now.getTime() - 7*24*60*60*1000));
-
-    // drivers this week
-    const d1 = sb.from('drivers')
-      .select('id, full_name, phone, created_at')
-      .eq('recruiter_agent_id', agentKey)
-      .gte('created_at', cur.start.toISOString())
-      .lt('created_at', cur.end.toISOString())
-      .order('created_at', { ascending:false })
-      .limit(10);
-
-    // clients this week
-    const c1 = sb.from('clients')
-      .select('id, full_name, phone, created_at')
-      .eq('recruiter_agent_id', agentKey)
-      .gte('created_at', cur.start.toISOString())
-      .lt('created_at', cur.end.toISOString())
-      .order('created_at', { ascending:false })
-      .limit(10);
-
-    // counts
-    const dCount = sb.from('drivers')
-      .select('id', { count:'exact', head:true })
-      .eq('recruiter_agent_id', agentKey)
-      .gte('created_at', cur.start.toISOString())
-      .lt('created_at', cur.end.toISOString());
-
-    const cCount = sb.from('clients')
-      .select('id', { count:'exact', head:true })
-      .eq('recruiter_agent_id', agentKey)
-      .gte('created_at', cur.start.toISOString())
-      .lt('created_at', cur.end.toISOString());
-
-    const dPrevCount = sb.from('drivers')
-      .select('id', { count:'exact', head:true })
-      .eq('recruiter_agent_id', agentKey)
-      .gte('created_at', prev.start.toISOString())
-      .lt('created_at', prev.end.toISOString());
-
-    const cPrevCount = sb.from('clients')
-      .select('id', { count:'exact', head:true })
-      .eq('recruiter_agent_id', agentKey)
-      .gte('created_at', prev.start.toISOString())
-      .lt('created_at', prev.end.toISOString());
-
-    const [d1r, c1r, dcr, ccr, dpr, cpr] = await Promise.all([d1, c1, dCount, cCount, dPrevCount, cPrevCount]);
-
-    const driversWeek = dcr.count || 0;
-    const clientsWeek = ccr.count || 0;
-    const lastWeekTotal = (dpr.count || 0) + (cpr.count || 0);
-
-    document.getElementById('kpi-drivers-week').innerText = driversWeek;
-    document.getElementById('kpi-clients-week').innerText = clientsWeek;
-    document.getElementById('kpi-lastweek-total').innerText = lastWeekTotal;
-
-    // recent table (merge)
-    const rows = [];
-    (d1r.data || []).forEach(x => rows.push({type:'Driver', name:x.full_name, phone:x.phone, at:x.created_at}));
-    (c1r.data || []).forEach(x => rows.push({type:'Client', name:x.full_name, phone:x.phone, at:x.created_at}));
-    rows.sort((a,b)=> new Date(b.at) - new Date(a.at));
-
-    const tbody = document.getElementById('recent-week');
-    if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="4" class="muted center">No registrations yet this week.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = rows.slice(0,10).map(r => `
-      <tr>
-        <td><b>${r.type}</b></td>
-        <td>${escapeHtml(r.name || '')}</td>
-        <td>${escapeHtml(r.phone || '')}</td>
-        <td>${r.at ? new Date(r.at).toLocaleString() : ''}</td>
-      </tr>
-    `).join('');
-  }
-
-  async function loadBroadcasts() {
-    const sb = await getSB();
-    const feed = document.getElementById('broadcast-feed');
-    const { data: messages, error } = await sb
-      .from('broadcasts')
-      .select('message, created_at')
-      .order('created_at', { ascending:false })
-      .limit(5);
-
-    if (error) {
-      feed.innerHTML = `<div class="muted">Error loading announcements.</div>`;
-      return;
-    }
-    if (!messages || !messages.length) {
-      feed.innerHTML = `<div class="muted">No announcements right now.</div>`;
-      return;
-    }
-
-    feed.innerHTML = messages.map(msg => `
-      <div class="feed-item">
-        <div class="feed-msg">${escapeHtml(msg.message)}</div>
-        <div class="feed-time">${new Date(msg.created_at).toLocaleString()}</div>
-      </div>
-    `).join('');
-  }
-
-  function lockIfPending() {
-    const st = String(myAgentProfile.status || '').toLowerCase();
-    return (st === 'pending' || st === 'pending_approval');
-  }
-
-  async function submitDriver(e) {
-    const sb = await getSB();
-    e.preventDefault();
-    if (!myAgentProfile) return alert("Profile error.");
-    if (lockIfPending()) return alert("Your account is pending approval. You cannot register yet.");
-
-    const btn = document.getElementById('btn-driver');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
-
-    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
-    const payload = {
-      recruiter_agent_id: agentKey,
-      recruiter_auth_id: myAuthUser.id,
-      recruiter_name: myAgentProfile.full_name || null,
-      full_name: document.getElementById('d-name').value,
-      phone: document.getElementById('d-phone').value,
-      town: document.getElementById('d-town').value
-    };
-
-    const { error } = await sb.from('drivers').insert(payload);
-    if (error) alert("Error: " + error.message);
-    else {
-      alert("Driver successfully registered!");
-      e.target.reset();
-      await Promise.all([loadAllTimeDriverCount(), loadWeekSummary()]);
-    }
-
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Driver';
-  }
-
-  async function submitClient(e) {
-    const sb = await getSB();
-    e.preventDefault();
-    if (!myAgentProfile) return alert("Profile error.");
-    if (lockIfPending()) return alert("Your account is pending approval. You cannot register yet.");
-
-    const btn = document.getElementById('btn-client');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
-
-    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
-    const payload = {
-      recruiter_agent_id: agentKey,
-      recruiter_auth_id: myAuthUser.id,
-      recruiter_name: myAgentProfile.full_name || null,
-      full_name: document.getElementById('c-name').value,
-      phone: document.getElementById('c-phone').value
-    };
-
-    const { error } = await sb.from('clients').insert(payload);
-    if (error) alert("Error: " + error.message);
-    else {
-      alert("Client successfully registered!");
-      e.target.reset();
-      await loadWeekSummary();
-    }
-
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Client';
-  }
-
-  async function loadTeamData() {
-    const sb = await getSB();
-    const tbody = document.getElementById('team-table-body');
-    if (driverCountAll < 10) {
-      tbody.innerHTML = `<tr><td colspan="3" class="muted center">Unlock Team Leader to see downline.</td></tr>`;
-      return;
-    }
-
-    const agentKey = myAgentProfile.id || myAgentProfile.auth_id;
-    const { data: team, error } = await sb
-      .from('agent_profiles')
-      .select('full_name, status, created_at')
-      .eq('referred_by_id', agentKey)
-      .order('created_at', { ascending:false });
-
-    if (error) {
-      tbody.innerHTML = `<tr><td colspan="3" class="muted center">Error loading team.</td></tr>`;
-      return;
-    }
-    if (!team || !team.length) {
-      tbody.innerHTML = `<tr><td colspan="3" class="muted center">No agents recruited yet.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = team.map(m => {
-      const s = String(m.status||'').toLowerCase();
-      const ok = (s === 'approved' || s === 'active');
-      return `
-        <tr>
-          <td><b>${escapeHtml(m.full_name || 'Agent')}</b></td>
-          <td style="font-weight:900; color:${ok ? 'var(--ok)' : 'var(--warn)'}">${escapeHtml(m.status || 'PENDING')}</td>
-          <td>${m.created_at ? new Date(m.created_at).toLocaleDateString() : ''}</td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  async function loadLedger(force=false) {
-    const sb = await getSB();
-    const tbody = document.getElementById('wallet-history');
-    const balEl = document.getElementById('wallet-balance');
-    tbody.innerHTML = `<tr><td colspan="4" class="muted center">Loading...</td></tr>`;
-
-    const agentKey = myAgentProfile?.id || myAgentProfile?.auth_id;
-    if (!agentKey) return;
-
-    const { data, error } = await sb
-      .from('wallet_ledger')
-      .select('created_at, description, type, amount')
-      .eq('agent_id', agentKey)
-      .order('created_at', { ascending:false })
-      .limit(80);
-
-    if (error) {
-      tbody.innerHTML = `<tr><td colspan="4" class="muted center">No ledger table yet.</td></tr>`;
-      balEl.innerText = "N$ 0.00";
-      return;
-    }
-
-    if (!data || !data.length) {
-      tbody.innerHTML = `<tr><td colspan="4" class="muted center">No transactions yet.</td></tr>`;
-      balEl.innerText = "N$ 0.00";
-      return;
-    }
-
-    let total = 0;
-    data.forEach(x => total += Number(x.amount || 0));
-    balEl.innerText = "N$ " + total.toFixed(2);
-
-    tbody.innerHTML = data.map(x => `
-      <tr>
-        <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ''}</td>
-        <td>${escapeHtml(x.description || '')}</td>
-        <td>${escapeHtml(x.type || '')}</td>
-        <td><b>${Number(x.amount || 0).toFixed(2)}</b></td>
-      </tr>
-    `).join('');
-  }
-
-  async function requestWithdrawal() {
-    const sb = await getSB();
-    const amount = Number(document.getElementById('withdraw-amount').value || 0);
-    if (!amount || amount <= 0) return alert("Enter a valid amount.");
-
-    const agentKey = myAgentProfile?.id || myAgentProfile?.auth_id;
-    if (!agentKey) return alert("Profile error.");
-
-    const { error } = await sb.from('withdrawals').insert({
-      agent_id: agentKey,
-      amount: amount,
-      status: 'REQUESTED'
-    });
-
-    if (error) return alert("Withdrawal request failed: " + error.message);
-
-    alert("Withdrawal requested. Admin will review.");
-    document.getElementById('withdraw-amount').value = "";
-  }
-
-  function downloadCSV() {
-    const table = document.getElementById('statement-table');
-    if (!table) return;
-
-    let csv = [];
-    for (const row of table.querySelectorAll('tr')) {
-      const cols = Array.from(row.querySelectorAll('th,td')).map(c => `"${String(c.innerText).replaceAll('"','""')}"`);
-      csv.push(cols.join(','));
-    }
-
-    const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'yene_statement.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function copyRefLink() {
-    const el = document.getElementById('ref-link');
-    el.select();
-    el.setSelectionRange(0, 99999);
-    document.execCommand('copy');
-    alert("Referral link copied!");
-  }
-
-  window.addEventListener('load', init);
+}
+boot();
 </script>
-
 {% endblock %}

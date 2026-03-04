@@ -810,6 +810,21 @@ def api_admin_manage_driver(id):
         sb_admin.table("drivers").update(request.json).eq("id", id).execute()
     return jsonify({"success": True})
 
+
+from flask import session
+
+@app.get("/api/debug-session")
+def debug_session():
+    # shows keys & value types only (no full secrets)
+    out = {}
+    for k,v in session.items():
+        if v is None:
+            out[k] = None
+        else:
+            val = str(v)
+            out[k] = {"type": type(v).__name__, "len": len(val), "preview": val[:8]}
+    return jsonify({"ok": True, "session": out})
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=False)
