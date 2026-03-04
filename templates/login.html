@@ -32,6 +32,7 @@
     .small{font-size:13px;color:var(--muted);text-align:center;margin-top:20px;}
     a{color:var(--yene);text-decoration:none;font-weight:800;}
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -135,7 +136,7 @@
       }
 
       // Create browser session (this stops the /agent -> /login bounce)
-            const sb = await window.sbReady;
+            const sb = await ensureSupabase();
       if(!sb){
         alert('Supabase client not ready. Please refresh.');
         return;
@@ -154,6 +155,52 @@ const { data, error } = await sb.auth.signInWithPassword({ email, password });
   })();
 </script>
 <!-- END YENE_AGENT_SUPABASE_LOGIN_FIX -->
+
+
+<script>
+  async function loadSupabaseJs(){
+    if (window.supabase && window.supabase.createClient) return true;
+    return await new Promise((resolve) => {
+      const existing = document.querySelector('script[data-supabasejs="1"]');
+      if (existing) { existing.addEventListener("load", ()=>resolve(true)); return; }
+      const sc = document.createElement("script");
+      sc.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      sc.async = true;
+      sc.setAttribute("data-supabasejs","1");
+      sc.onload = () => resolve(true);
+      sc.onerror = () => resolve(false);
+      document.head.appendChild(sc);
+    });
+  }
+
+  async function ensureSupabase(){
+    // 1) If base already created it, use it
+    if (window.supabaseClient && window.supabaseClient.auth) return window.supabaseClient;
+
+    // 2) Wait for sbReady if it exists
+    if (window.sbReady) {
+      try {
+        const sb = await ensureSupabase();
+        if (sb && sb.auth) { window.supabaseClient = sb; return sb; }
+      } catch(e) {}
+    }
+
+    // 3) Load supabase-js if missing
+    const okJs = await loadSupabaseJs();
+    if (!okJs) return null;
+
+    // 4) Fetch runtime config from server
+    const r = await fetch("/api/public-config", { credentials: "same-origin" });
+    const cfg = await r.json();
+    if (!cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) return null;
+
+    // 5) Create client
+    const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    window.supabaseClient = sb;
+    window.supabase = sb; // backward compatible
+    return sb;
+  }
+</script>
 
 </body>
 </html>
