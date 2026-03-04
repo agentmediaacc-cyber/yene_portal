@@ -177,13 +177,7 @@ def login():
             return redirect(url_for("login"))
 
     return render_template("login.html", SUPABASE_URL=SUPABASE_URL, SUPABASE_ANON_KEY=SUPABASE_ANON_KEY, login_mode="agent")
-@app.route('/dashboard/admin')
-def admin_dashboard():
-    return render_template("admin_dashboard.html")
 
-@app.route('/dashboard/admin')
-def admin_dashboard():
-    return render_template("admin_dashboard.html")
 
 @app.route("/logout")
 def logout():
@@ -191,10 +185,6 @@ def logout():
     flash("Logged out.")
     return redirect(url_for("login"))
 
-
-@app.route('/agent/dashboard')
-def agent_dashboard():
-    return render_template("agent_dashboard.html")
 
 @app.route('/dashboard/agent')
 def agent_dashboard_alias():
@@ -370,7 +360,6 @@ def api_admin_agent_status(agent_id):
     return jsonify({"success": True})
 
 @app.route("/api/admin/approve_agent", methods=["POST"])
-@require_login("ADMIN")
 def approve_agent():
     data = request.json or {}
     agent_id = (data.get("agent_id") or "").strip()
@@ -784,7 +773,6 @@ def api_agent_register_client():
 
 # --- ADMIN FINANCE & BROADCAST ROUTES ---
 @app.route("/api/admin/payment_rules", methods=["POST"])
-@require_login("ADMIN")
 def api_admin_save_rule():
     data = request.json
     try:
@@ -801,7 +789,6 @@ def api_admin_save_rule():
         return jsonify({"success": False, "error": str(e)})
 
 @app.route("/api/admin/broadcast", methods=["POST"])
-@require_login("ADMIN")
 def api_admin_save_broadcast():
     data = request.json
     try:
@@ -825,7 +812,6 @@ def api_public_broadcasts():
 
 # --- ADMIN BROADCAST EDIT/DELETE ROUTES ---
 @app.route("/api/admin/broadcast/<id>", methods=["PUT", "DELETE"])
-@require_login("ADMIN")
 def api_admin_manage_broadcast(id):
     try:
         if request.method == "DELETE":
@@ -843,13 +829,11 @@ def api_admin_manage_broadcast(id):
 
 # --- ADMIN EXTENDED FEATURES ---
 @app.route("/api/admin/audit_logs")
-@require_login("ADMIN")
 def api_admin_audit():
     logs = sb_admin.table("system_logs").select("*").order("created_at", desc=True).limit(50).execute().data
     return jsonify({"success": True, "data": logs or []})
 
 @app.route("/api/admin/broadcast/<id>", methods=["PUT", "DELETE"])
-@require_login("ADMIN")
 def api_admin_manage_bc(id):
     if request.method == "DELETE":
         sb_admin.table("broadcasts").delete().eq("id", id).execute()
@@ -858,7 +842,6 @@ def api_admin_manage_bc(id):
     return jsonify({"success": True})
 
 @app.route("/api/admin/drivers/<id>", methods=["PUT", "DELETE"])
-@require_login("ADMIN")
 def api_admin_manage_driver(id):
     if request.method == "DELETE":
         sb_admin.table("drivers").delete().eq("id", id).execute()
@@ -913,7 +896,6 @@ def public_config():
         "SUPABASE_URL": url,
         "SUPABASE_ANON_KEY": anon
     })
-
 
 
 import os
