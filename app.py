@@ -179,17 +179,11 @@ def login():
     return render_template("login.html", SUPABASE_URL=SUPABASE_URL, SUPABASE_ANON_KEY=SUPABASE_ANON_KEY, login_mode="agent")
 @app.route('/dashboard/admin')
 def admin_dashboard():
-    # PUBLIC HTML PAGE:
-    # Auth is handled in browser via Supabase session.
-    # Admin API calls should be protected via Bearer token if needed.
-    return render_template('admin_dashboard.html')
-
-
-@app.route("/dashboard/admin")
-@require_login("ADMIN")
-def admin_dashboard():
     return render_template("admin_dashboard.html")
 
+@app.route('/dashboard/admin')
+def admin_dashboard():
+    return render_template("admin_dashboard.html")
 
 @app.route("/logout")
 def logout():
@@ -200,12 +194,7 @@ def logout():
 
 @app.route('/agent/dashboard')
 def agent_dashboard():
-    # Public page: actual data access is via /api/agent/* with Supabase Bearer token
-    return render_template(
-        "agent_dashboard.html",
-        SUPABASE_URL=os.getenv("SUPABASE_URL",""),
-        SUPABASE_ANON_KEY=os.getenv("SUPABASE_ANON_KEY","")
-    )
+    return render_template("agent_dashboard.html")
 
 @app.route('/dashboard/agent')
 def agent_dashboard_alias():
@@ -948,3 +937,49 @@ def api_agent_me():
         "note": "Use Supabase auth session in browser. This endpoint prevents 404 login loops.",
         "path": request.path
     }), 200
+
+@app.get("/api/routes")
+def api_routes():
+    out = []
+    for r in sorted(app.url_map.iter_rules(), key=lambda x: str(x)):
+        if r.endpoint != "static":
+            out.append({"methods": sorted(list(r.methods)), "rule": r.rule, "endpoint": r.endpoint})
+    return jsonify({"ok": True, "count": len(out), "routes": out})
+
+@app.get("/api/whoami")
+def api_whoami():
+    token = (request.headers.get("Authorization","").replace("Bearer","").strip())
+    if not token:
+        return jsonify({"ok": False, "error": "Missing Bearer token"}), 401
+
+    url = os.getenv("SUPABASE_URL","").strip()
+    anon = os.getenv("SUPABASE_ANON_KEY","").strip()
+    if not url or not anon:
+        return jsonify({"ok": False, "error": "Server missing SUPABASE_URL or SUPABASE_ANON_KEY"}), 500
+
+    # Validate token with Supabase Auth
+    r = requests.get(
+        url.rstrip("/") + "/auth/v1/user",
+        headers={"Authorization": f"Bearer {token}", "apikey": anon},
+        timeout=15
+    )
+    if r.status_code != 200:
+        return jsonify({"ok": False, "error": "Invalid session", "status": r.status_code, "body": r.text[:200]}), 401
+
+    user = r.json()
+    uid = user.get("id")
+    email = user.get("email")
+
+    # Lookup in agent_profiles using any of the columns you may have
+    # (your table includes auth_id + user_id + email)
+    try:
+        q = supabase.table("agent_profiles")\
+            .select("id, full_name, status, role, auth_id, user_id, email")\
+            .or_(f"auth_id.eq.{uid},user_id.eq.{uid},email.eq.{email}")\
+            .limit(1).execute()
+        prof = (q.data or [None])[0]
+    except Exception as e:
+        return jsonify({"ok": False, "error": "DB lookup failed", "detail": str(e)}), 500
+
+    role = (prof or {}).get("role") or "agent"
+    return jsonify({"ok": True, "role": role, "user_id": uid, "email": email, "profile": prof})
