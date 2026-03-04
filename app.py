@@ -1,6 +1,55 @@
 from supabase import create_client, Client
 from flask_cors import CORS
 from flask import jsonify,  Flask, render_template, request, jsonify, session, flash, redirect, url_for, Response
+
+# -----------------------------
+# Supabase token auth (Agent API)
+# -----------------------------
+import os
+import requests
+from functools import wraps
+from flask import request, jsonify
+
+def _sb_get_user_id_from_token(access_token: str):
+    """Validate Supabase access token and return user_id (uuid string) or None."""
+    url = (os.getenv("SUPABASE_URL","").strip() + "/auth/v1/user")
+    apikey = os.getenv("SUPABASE_ANON_KEY","").strip()
+    if not url.strip() or not apikey.strip():
+        return None
+
+    try:
+        r = requests.get(
+            url,
+            headers={
+                "apikey": apikey,
+                "Authorization": f"Bearer {access_token}",
+            },
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        return data.get("id")
+    except Exception:
+        return None
+
+def require_agent_token(fn):
+    """Protect /api/agent/* using Supabase auth token instead of Flask session."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        auth = request.headers.get("Authorization","")
+        if not auth.lower().startswith("bearer "):
+            return jsonify({"ok": False, "error": "Missing Authorization Bearer token"}), 401
+        token = auth.split(" ", 1)[1].strip()
+        uid = _sb_get_user_id_from_token(token)
+        if not uid:
+            return jsonify({"ok": False, "error": "Invalid/expired token"}), 401
+
+        # Attach for handlers to use
+        request.sb_uid = uid
+        return fn(*args, **kwargs)
+    return wrapper
+
 from functools import wraps
 import requests
 import os
@@ -144,15 +193,13 @@ def logout():
 
 
 @app.route('/agent/dashboard')
-@require_login('AGENT')
 def agent_dashboard():
-    current_status = session.get('status', 'pending_approval')
+    # Public page: actual data access is via /api/agent/* with Supabase Bearer token
     return render_template(
-    'agent_dashboard.html',
-    SUPABASE_URL=URL,
-    SUPABASE_ANON_KEY=ANON_KEY,
-     AGENT_STATUS=current_status)
-
+        "agent_dashboard.html",
+        SUPABASE_URL=os.getenv("SUPABASE_URL",""),
+        SUPABASE_ANON_KEY=os.getenv("SUPABASE_ANON_KEY","")
+    )
 
 @app.route('/dashboard/agent')
 def agent_dashboard_alias():
@@ -395,6 +442,7 @@ def agent_dashboard2():
     return render_template("agent_dashboard_v2.html")
 
 @app.route("/api/agent/summary")
+@require_agent_token
 @require_login("AGENT")
 def api_agent_summary():
     today = _na_time_now().date()
@@ -441,6 +489,7 @@ def api_agent_summary():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/agent/notifications")
+@require_agent_token
 @require_login("AGENT")
 def api_agent_notifications():
     email = _agent_email()
@@ -458,6 +507,7 @@ def api_agent_notifications():
         return jsonify({"success": True, "data": []})
 
 @app.route("/api/agent/upload_proof", methods=["POST"])
+@require_agent_token
 @require_login("AGENT")
 def api_agent_upload_proof():
     # MVP: store proof record (image storage can be added once bucket is ready)
@@ -486,6 +536,7 @@ def api_agent_upload_proof():
     return jsonify({"success": True})
 
 @app.route("/api/agent/register_driver_v2", methods=["POST"])
+@require_agent_token
 @require_login("AGENT")
 def api_agent_register_driver_v2():
     payload = request.json or {}
@@ -529,6 +580,7 @@ def api_agent_register_driver_v2():
     return jsonify({"success": True})
 
 @app.route("/api/agent/register_client_v2", methods=["POST"])
+@require_agent_token
 @require_login("AGENT")
 def api_agent_register_client_v2():
     payload = request.json or {}
@@ -566,6 +618,7 @@ def api_agent_register_client_v2():
     return jsonify({"success": True})
 
 @app.route("/api/agent/team")
+@require_agent_token
 @require_login("AGENT")
 def api_agent_team():
     mode = (request.args.get("mode") or "this_week").strip()
@@ -619,6 +672,7 @@ def api_agent_team():
     return jsonify({"success": True, "data": data})
 
 @app.route("/api/agent/invoices")
+@require_agent_token
 @require_login("AGENT")
 def api_agent_invoices():
     email = _agent_email()
@@ -641,6 +695,7 @@ def api_agent_invoices():
     except Exception:
         return jsonify({"success": True, "data": []})
 @app.route("/api/agent/stats")
+@require_agent_token
 @require_login("AGENT")
 def api_agent_stats():
     email = session.get("email")
@@ -655,6 +710,7 @@ def api_agent_stats():
     return jsonify({"success": True, "drivers": len(d), "clients": len(c)})
 
 @app.route("/api/agent/register_driver", methods=["POST"])
+@require_agent_token
 @require_login("AGENT")
 def api_agent_register_driver():
     data = request.json
@@ -693,6 +749,7 @@ def api_agent_register_driver():
         return jsonify({"success": False, "error": str(e)})
 
 @app.route("/api/agent/register_client", methods=["POST"])
+@require_agent_token
 @require_login("AGENT")
 def api_agent_register_client():
     data = request.json
@@ -864,6 +921,7 @@ import os
 from flask import jsonify, request
 
 @app.get("/api/agent/me")
+@require_agent_token
 def api_agent_me():
     """
     Minimal endpoint used by frontend to confirm server is alive + env is present.
@@ -880,4 +938,3 @@ def api_agent_me():
         "note": "Use Supabase auth session in browser. This endpoint prevents 404 login loops.",
         "path": request.path
     }), 200
-
