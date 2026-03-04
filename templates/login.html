@@ -126,12 +126,6 @@
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-
-      if (!window.supabase) {
-        alert("Supabase client not ready. Check SUPABASE_URL / SUPABASE_ANON_KEY on Render.");
-        return;
-      }
-
       const email = (emailEl.value || "").trim();
       const password = passEl.value || "";
 

@@ -117,7 +117,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-window.sbReady = (async () => {
+window.supabase = null;
+    window.sbReady = (async () => {
   try {
     const r = await fetch("/api/public-config", { credentials: "same-origin" });
     const cfg = await r.json();
