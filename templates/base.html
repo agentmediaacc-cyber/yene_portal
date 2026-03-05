@@ -104,6 +104,51 @@ window.supabase = null;
 })();
 </script>
 
+
+<script>
+/**
+ * ✅ Single global Supabase init (works on Render + mobile)
+ * - Fetches keys from /api/public-config at runtime
+ * - Creates ONE client and stores it in window.supabase
+ * - Provides window.sbReady promise to await everywhere
+ */
+window.sbReady = (async () => {
+  try {
+    const r = await fetch("/api/public-config", { cache: "no-store" });
+    const cfg = await r.json();
+    if (!cfg || !cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+      console.error("Supabase config missing", cfg);
+      return null;
+    }
+
+    // Ensure supabase-js is loaded
+    if (!window.supabase || !window.supabase.createClient) {
+      console.error("supabase-js not loaded");
+      return null;
+    }
+
+    // Create ONE client only
+    if (!window._sbClient) {
+      window._sbClient = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storageKey: "yene-auth"   // IMPORTANT: consistent everywhere
+        }
+      });
+    }
+
+    // Expose client consistently
+    window.sb = window._sbClient;
+    return window._sbClient;
+  } catch (e) {
+    console.error("sbReady failed", e);
+    return null;
+  }
+})();
+</script>
+
 </head>
 <body>
     <nav class="navbar">

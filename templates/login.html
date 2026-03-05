@@ -150,7 +150,11 @@ const { data, error } = await sb.auth.signInWithPassword({ email, password });
       }
 
       // Success
-      window.location.href = "/agent/dashboard";
+      
+            const sessionOk = await _waitForSession(sb);
+            if(!sessionOk){ alert("Login succeeded but session didn’t persist. Please refresh once."); return; }
+            window.location.href = "/agent/dashboard";
+        
     });
   })();
 </script>
@@ -200,6 +204,19 @@ const { data, error } = await sb.auth.signInWithPassword({ email, password });
     window.supabase = sb; // backward compatible
     return sb;
   }
+</script>
+
+
+<script>
+async function _waitForSession(sb, ms=4000){
+  const start = Date.now();
+  while(Date.now() - start < ms){
+    const { data: { session } } = await sb.auth.getSession();
+    if(session) return session;
+    await new Promise(r=>setTimeout(r, 150));
+  }
+  return null;
+}
 </script>
 
 </body>
