@@ -164,7 +164,21 @@ const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (!who.ok || !j.ok) { alert("Role check failed: " + (j.error || "unknown")); return; }
 
       if ((j.role || "").toUpperCase() === "ADMIN") window.location.href = "/dashboard/admin";
-      else window.location.href = "/agent/dashboard";
+      else 
+      // role-based redirect fallback
+      const sb = await window.sbReady;
+      const { data: u } = await sb.auth.getUser();
+      const uid = u?.user?.id;
+      let role = null;
+      const r1 = await sb.from("agent_profiles").select("role").eq("auth_id", uid).maybeSingle();
+      role = r1?.data?.role || null;
+      if (!role) {
+        const r2 = await sb.from("agent_profiles").select("role").eq("user_id", uid).maybeSingle();
+        role = r2?.data?.role || null;
+      }
+      role = String(role || "").toUpperCase().trim();
+      window.location.href = (role === "ADMIN") ? "/dashboard/admin" : "/agent/dashboard";
+
 
         
     });
