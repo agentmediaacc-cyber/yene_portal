@@ -1,205 +1,51 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{% block title %}YENE Portal{% endblock %}</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <style>
-    :root{
-      --yene:#4aa8ff;
-      --bg:#0b1220;
-      --card:#111b2e;
-      --card2:#0b1427;
-      --text:#eaf2ff;
-      --muted:#a9b7d6;
-      --line:rgba(255,255,255,.10);
-      --ok:#2ed573;
-      --warn:#ffa502;
-      --danger:#ff5c5c;
-    }
-    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-    body{margin:0;background:var(--bg);color:var(--text)}
-    a{color:var(--yene);text-decoration:none}
-    .top{
-      position:sticky;top:0;z-index:10;
-      background:rgba(7,13,24,.85);backdrop-filter: blur(10px);
-      border-bottom:1px solid var(--line);
-    }
-    .nav{
-      max-width:1200px;margin:0 auto;padding:12px 14px;
-      display:flex;align-items:center;justify-content:space-between;gap:10px;
-    }
-    .brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.5px}
-    .brand i{color:var(--yene)}
-    .navlinks{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .btn{
-      border:1px solid var(--line);background:var(--card2);color:var(--text);
-      padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:800;font-size:13px;
-      display:inline-flex;align-items:center;gap:8px;
-    }
-    .btn.primary{background:var(--yene);color:#041021;border-color:transparent}
-    .btn.ok{background:var(--ok);color:#02110a;border-color:transparent}
-    .container{max-width:1200px;margin:0 auto;padding:18px 14px 44px}
-    .card{
-      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-      background-color:var(--card);border:1px solid var(--line);
-      border-radius:18px;padding:14px;
-    }
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    @media(max-width:980px){.grid{grid-template-columns:1fr}}
-    .muted{color:var(--muted)}
-    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    @media(max-width:980px){.kpis{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:520px){.kpis{grid-template-columns:1fr}}
-    .kpi{border:1px solid var(--line);border-radius:18px;padding:12px;background:rgba(255,255,255,.02)}
-    .kpi .label{color:var(--muted);font-size:12px}
-    .kpi .value{font-size:22px;font-weight:1000;margin-top:6px}
-    .hero{
-      padding:18px;border-radius:22px;border:1px solid rgba(74,168,255,.22);
-      background:radial-gradient(900px 260px at 30% 0%, rgba(74,168,255,.20), transparent 60%),
-                 linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-    }
-    .hero h1{margin:0;font-size:28px}
-    .hero p{margin:8px 0 0;color:var(--muted);line-height:1.5}
-    .section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:16px 0 10px}
-    .section-title h2{margin:0;font-size:16px}
-    table{width:100%;border-collapse:collapse;min-width:820px}
-    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left;font-size:13px}
-    th{color:var(--yene);font-weight:1000;background:rgba(74,168,255,.06)}
-    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:16px}
-    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:6px 10px;border-radius:999px;color:var(--muted);font-size:12px}
-    .dot{width:8px;height:8px;border-radius:50%;background:#6c7a9b}
-    .dot.ok{background:var(--ok)}
-    .dot.warn{background:var(--warn)}
-  </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>🌐 YENE Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- YENE_SUPABASE_INIT -->
-<script>
-(function(){
-  const 
-  const 
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn("Supabase env missing in HTML. Server env or template injection is missing.");
-    return;
-  }
-  window.supabase = window.supabase || supabase.createClient(
-})();
-</script>
-<!-- END YENE_SUPABASE_INIT -->
+  <script>
+  // ONE global client for the whole site (public pages too)
+  window.sbReady = (async () => {
+    try {
+      const r = await fetch("/api/public-config", { credentials: "same-origin" });
+      const cfg = await r.json();
+      if (!cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+        console.error("Missing public config", cfg);
+        window.supabase = null;
+        return null;
+      }
 
-  {% include '_supabase_init.html' %}
-
-<script>
-  (function(){
-    // ✅ Global Supabase init for ALL pages
-    const 
-    const 
-
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      console.error("Supabase client not ready. Missing 
-      window.SUPABASE_NOT_READY = true;
-      return;
-    }
-
-    if (!window.supabase || !window.supabase.createClient) {
-      console.error("Supabase JS library not loaded.");
-      window.SUPABASE_NOT_READY = true;
-      return;
-    }
-
-    window.__SB_INIT_DONE__ = true;
-    window.sb = 
-  })();
-</script>
-
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-window.supabase = null;
-    window.sbReady = (async () => {
-  try {
-    const r = await fetch("/api/public-config", { credentials: "same-origin" });
-    const cfg = await r.json();
-    if (!cfg.ok) {
-      console.error("Supabase config error:", cfg);
-      window.SUPABASE_INIT_ERROR = cfg;
-      return null;
-    }
-    window.sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
-    return window.sb;
-  } catch (e) {
-    console.error("Supabase init failed:", e);
-    return null;
-  }
-})();
-</script>
-
-
-<script>
-/**
- * ✅ Single global Supabase init (works on Render + mobile)
- * - Fetches keys from /api/public-config at runtime
- * - Creates ONE client and stores it in window.supabase
- * - Provides window.sbReady promise to await everywhere
- */
-window.sbReady = (async () => {
-  try {
-    const r = await fetch("/api/public-config", { cache: "no-store" });
-    const cfg = await r.json();
-    if (!cfg || !cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
-      console.error("Supabase config missing", cfg);
-      return null;
-    }
-
-    // Ensure supabase-js is loaded
-    if (!window.supabase || !window.supabase.createClient) {
-      console.error("supabase-js not loaded");
-      return null;
-    }
-
-    // Create ONE client only
-    if (!window._sbClient) {
-      window._sbClient = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+      window.supabase = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
         auth: {
           persistSession: true,
           autoRefreshToken: true,
-          detectSessionInUrl: true,
-          storageKey: "yene-auth"   // IMPORTANT: consistent everywhere
+          detectSessionInUrl: true
         }
       });
+
+      return window.supabase;
+    } catch (e) {
+      console.error("sbReady init failed", e);
+      window.supabase = null;
+      return null;
     }
+  })();
 
-    // Expose client consistently
-    window.sb = window._sbClient;
-    return window._sbClient;
-  } catch (e) {
-    console.error("sbReady failed", e);
-    return null;
-  }
-})();
-</script>
-
+  // helper: get bearer token for API calls
+  window.getBearer = async () => {
+    const sb = await window.sbReady;
+    if (!sb) return null;
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token || null;
+    return token ? ("Bearer " + token) : null;
+  };
+  </script>
 </head>
+
 <body>
-
-<div class="top">
-  <div class="nav">
-    <div class="brand"><i class="fa-solid fa-bolt"></i> YENE Promoter Portal</div>
-    <div class="navlinks">
-      <a class="btn" href="#features"><i class="fa-solid fa-layer-group"></i> Features</a>
-      <a class="btn" href="#payments"><i class="fa-solid fa-coins"></i> Payments</a>
-      <a class="btn" href="#recruitment"><i class="fa-solid fa-users"></i> Become Agent</a>
-      <a class="btn primary" href="/admin"><i class="fa-solid fa-shield-halved"></i> Admin</a>
-      <a class="btn ok" href="/login"><i class="fa-solid fa-right-to-bracket"></i> Agent Login</a>
-    </div>
-  </div>
-</div>
-
-<div class="container">
   {% block content %}{% endblock %}
-</div>
-
 </body>
 </html>
