@@ -153,7 +153,19 @@ const { data, error } = await sb.auth.signInWithPassword({ email, password });
       
             const sessionOk = await _waitForSession(sb);
             if(!sessionOk){ alert("Login succeeded but session didn’t persist. Please refresh once."); return; }
-            window.location.href = "/agent/dashboard";
+            
+      // Role-based redirect (ADMIN -> /dashboard/admin, AGENT -> /agent/dashboard)
+      const { data: { session: s2 } } = await sb.auth.getSession();
+      const tok = s2?.access_token;
+      if (!tok) { alert("No session token after login."); return; }
+
+      const who = await fetch("/api/whoami", { headers: { "Authorization": "Bearer " + tok } });
+      const j = await who.json().catch(()=>({}));
+      if (!who.ok || !j.ok) { alert("Role check failed: " + (j.error || "unknown")); return; }
+
+      if ((j.role || "").toUpperCase() === "ADMIN") window.location.href = "/dashboard/admin";
+      else window.location.href = "/agent/dashboard";
+
         
     });
   })();
