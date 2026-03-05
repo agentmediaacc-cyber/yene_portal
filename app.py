@@ -67,6 +67,25 @@ load_dotenv()
 # --- 1. THE FOUNDATION & TOOLS ---
 app = Flask(__name__)
 
+# ---------------------------
+# PUBLIC DASHBOARD PAGES
+# Supabase session is handled in browser.
+# Data access must be via /api/* with Bearer token.
+# ---------------------------
+
+@app.route("/dashboard/admin")
+def admin_dashboard():
+    return render_template("admin_dashboard.html")
+
+@app.route("/agent/dashboard")
+def agent_dashboard():
+    return render_template("agent_dashboard.html")
+
+@app.route("/dashboard/agent")
+def agent_dashboard_alias():
+    return redirect(url_for("agent_dashboard"))
+
+
 # --- Inject Supabase env into all templates (agent login needs this) ---
 import os
 from flask import jsonify,  Flask
@@ -411,14 +430,11 @@ def api_admin_payment_rules():
 @app.route("/api/admin/broadcasts")
 def api_admin_broadcasts():
     return jsonify({"success": True, "data": sb_admin.table("broadcasts").select("*").execute().data or []})
-@app.route('/admin')
-def admin_entry():
-    return redirect('/dashboard/admin')
-
-
 @app.route("/admin")
-def admin_entry_2():
+def admin_entry():
     return redirect(url_for("admin_dashboard"))
+
+
 
 
 # --- AGENT DASHBOARD API ROUTES ---
