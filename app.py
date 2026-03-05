@@ -86,6 +86,19 @@ def agent_dashboard_alias():
     return redirect(url_for("agent_dashboard"))
 
 
+# ---------------------------
+# PUBLIC DASHBOARD PAGES
+# Supabase session is handled in browser.
+# Data access must be via /api/* with Bearer token.
+# ---------------------------
+
+
+
+@app.route("/dashboard/agent")
+def agent_dashboard_alias():
+    return redirect(url_for("agent_dashboard"))
+
+
 # --- Inject Supabase env into all templates (agent login needs this) ---
 import os
 from flask import jsonify,  Flask
