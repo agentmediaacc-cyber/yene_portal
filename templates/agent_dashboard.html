@@ -1,171 +1,70 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<style>
-:root{--yene:#4aa8ff;--bg:#0b1220;--panel:#0f1a2f;--card:#111b2e;--card2:#0b1427;--text:#eaf2ff;--muted:#a9b7d6;--line:rgba(255,255,255,.10);--ok:#2ed573;--warn:#ffa502;--danger:#ff5c5c;}
-*{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-body{margin:0;background:var(--bg);color:var(--text);overflow-x:hidden}
-.wrap{max-width:1100px;margin:0 auto;padding:16px}
-.header{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;position:sticky;top:10px;z-index:50}
-.brand{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:.6px;color:var(--yene)}
-.badge{padding:6px 10px;border-radius:999px;border:1px solid rgba(74,168,255,.35);background:rgba(74,168,255,.10);color:var(--text);font-size:12px;font-weight:800}
-.btn{border:1px solid var(--line);background:var(--card2);color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:800}
-.btn.primary{background:var(--yene);color:#041021;border-color:transparent}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-@media(max-width:900px){.grid{grid-template-columns:1fr}}
-.card{background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.01));background-color:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
-.h2{margin:0 0 10px 0;font-size:16px}
-.sub{color:var(--muted);font-size:13px;line-height:1.4}
-.kpi{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
-.k{flex:1;min-width:140px;background:rgba(0,0,0,.15);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:12px}
-.k .n{font-size:26px;font-weight:900}
-.k .t{color:var(--muted);font-size:12px;margin-top:2px}
-.field{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-.field label{color:var(--muted);font-size:12px}
-.field input{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--text);outline:none}
-.field input:focus{border-color:var(--yene)}
-.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-.table{width:100%;border-collapse:collapse}
-.table th,.table td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,.07);font-size:13px}
-.table th{color:var(--yene);text-align:left;background:rgba(74,168,255,.06);font-weight:900}
-.tablewrap{overflow:auto;border-radius:14px;border:1px solid var(--line)}
-.small{font-size:12px;color:var(--muted)}
-hr{border:none;border-top:1px solid rgba(255,255,255,.07);margin:14px 0}
-.toast{margin-top:10px;color:var(--warn);font-size:12px}
-</style>
+  <div id="loading">Loading agent info...</div>
+  <main style="display: none;" id="dashboard-main">
+    <h2>Welcome, <span id="agent-name">Agent</span></h2>
 
-<div class="wrap">
-  <div class="header">
-    <div class="brand"><i class="fa-solid fa-car-side"></i> YENE PROMOTER <span class="badge" id="tier">Agent</span></div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <span class="small" id="who">Loading…</span>
-      <button class="btn" onclick="location.href='/logout'"><i class="fa-solid fa-right-from-bracket"></i></button>
-    </div>
-  </div>
+    <section>
+      <h3>This Week</h3>
+      <p>Weekly Summary (Mon–Sun). Updates automatically.</p>
+      <ul>
+        <li><strong id="driver-count">0</strong> Drivers registered</li>
+        <li><strong id="client-count">0</strong> Clients registered</li>
+        <li><strong id="driver-total">0</strong> Drivers (all-time)</li>
+      </ul>
+    </section>
 
-  <div class="grid">
-    <div class="card">
-      <div class="h2"><i class="fa-solid fa-gauge-high"></i> This Week</div>
-      <div class="sub">Weekly Summary (Mon–Sun). Updates automatically.</div>
+    <section>
+      <h3>Quick Register</h3>
+      <!-- Registration Forms (optional) -->
+    </section>
 
-      <div class="kpi">
-        <div class="k"><div class="n" id="dweek">0</div><div class="t">Drivers registered</div></div>
-        <div class="k"><div class="n" id="cweek">0</div><div class="t">Clients registered</div></div>
-        <div class="k"><div class="n" id="dall">0</div><div class="t">Drivers (all-time)</div></div>
-      </div>
+    <section>
+      <h3>Recent activity (this week)</h3>
+      <table>
+        <thead>
+          <tr><th>Type</th><th>Name</th><th>Phone</th><th>Date</th></tr>
+        </thead>
+        <tbody id="activity-table">
+          <tr><td colspan="4">Loading…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
 
-      <div class="toast" id="weekrange"></div>
-      <hr>
+  <script type="module">
+    sbReady.then(async () => {
+      const main = document.getElementById("dashboard-main");
+      const loading = document.getElementById("loading");
+      main.style.display = "block";
+      loading.style.display = "none";
 
-      <div class="h2"><i class="fa-solid fa-user-plus"></i> Quick Register</div>
+      const uid = session.user.id;
+      const agentRes = await supabase.from("agent_profiles").select("*").eq("user_id", uid).maybeSingle();
+      const agent = agentRes.data;
+      if (agent) document.getElementById("agent-name").textContent = agent.full_name;
 
-      <div class="sub"><b>Driver</b></div>
-      <form onsubmit="regDriver(event)">
-        <div class="field"><label>Full name</label><input id="dn" required></div>
-        <div class="field"><label>Phone</label><input id="dp" required placeholder="+264..."></div>
-        <div class="field"><label>Town</label><input id="dt" required></div>
-        <div class="row">
-          <button class="btn primary" type="submit"><i class="fa-solid fa-paper-plane"></i> Submit Driver</button>
-        </div>
-      </form>
+      const statsRes = await supabase.rpc("agent_dashboard_stats", { uid });
+      if (statsRes.data) {
+        document.getElementById("driver-count").textContent = statsRes.data.week_drivers || 0;
+        document.getElementById("client-count").textContent = statsRes.data.week_clients || 0;
+        document.getElementById("driver-total").textContent = statsRes.data.total_drivers || 0;
+      }
 
-      <hr>
-      <div class="sub"><b>Client</b></div>
-      <form onsubmit="regClient(event)">
-        <div class="field"><label>Full name</label><input id="cn" required></div>
-        <div class="field"><label>Phone</label><input id="cp" required placeholder="+264..."></div>
-        <div class="row">
-          <button class="btn primary" type="submit"><i class="fa-solid fa-paper-plane"></i> Submit Client</button>
-        </div>
-      </form>
-    </div>
+      const actRes = await supabase
+        .from("registrations")
+        .select("*")
+        .eq("agent_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-    <div class="card">
-      <div class="h2"><i class="fa-solid fa-clock-rotate-left"></i> Recent activity (this week)</div>
-      <div class="sub">Your latest registrations.</div>
-      <div class="tablewrap" style="margin-top:10px">
-        <table class="table">
-          <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th>Date</th></tr></thead>
-          <tbody id="act">
-            <tr><td colspan="4" class="small">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="small" style="margin-top:10px;opacity:.7">Debug: /api/debug-session (only keys + preview)</div>
-    </div>
-  </div>
-</div>
-
-<script>
-async function jget(url){
-  const r = await fetch(url, {credentials:"same-origin"});
-  if(!r.ok) throw new Error(await r.text());
-  return await r.json();
-}
-async function jpost(url, body){
-  const r = await fetch(url, {
-    method:"POST",
-    credentials:"same-origin",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(body||{})
-  });
-  if(!r.ok) throw new Error(await r.text());
-  return await r.json();
-}
-
-async function boot(){
-  try{
-    const me = await jget("/api/agent/me");
-    document.getElementById("who").textContent = me.profile?.full_name || "Agent";
-    document.getElementById("tier").textContent = (me.profile?.badge || me.profile?.role || "Agent");
-  }catch(e){
-    location.href="/login";
-    return;
-  }
-  await refresh();
-}
-
-async function refresh(){
-  const s = await jget("/api/agent/weekly-summary");
-  dweek.textContent = s.drivers_this_week ?? 0;
-  cweek.textContent = s.clients_this_week ?? 0;
-  dall.textContent  = s.drivers_all_time ?? 0;
-  weekrange.textContent = `Week: ${new Date(s.week_start).toLocaleString()} → ${new Date(s.week_end).toLocaleString()}`;
-
-  const a = await jget("/api/agent/recent-activity");
-  const rows = (a.items||[]).map(x => `
-    <tr>
-      <td><b>${x.type||""}</b></td>
-      <td>${(x.name||"")}</td>
-      <td>${(x.phone||"")}</td>
-      <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ""}</td>
-    </tr>
-  `).join("");
-  act.innerHTML = rows || `<tr><td colspan="4" class="small">No activity yet this week.</td></tr>`;
-}
-
-async function regDriver(e){
-  e.preventDefault();
-  try{
-    await jpost("/api/agent/register_driver", {full_name: dn.value, phone: dp.value, town: dt.value});
-    dn.value=""; dp.value=""; dt.value="";
-    await refresh();
-    alert("✅ Driver registered");
-  }catch(err){
-    alert("❌ " + err.message);
-  }
-}
-async function regClient(e){
-  e.preventDefault();
-  try{
-    await jpost("/api/agent/register_client", {full_name: cn.value, phone: cp.value});
-    cn.value=""; cp.value="";
-    await refresh();
-    alert("✅ Client registered");
-  }catch(err){
-    alert("❌ " + err.message);
-  }
-}
-boot();
-</script>
+      const tbody = document.getElementById("activity-table");
+      tbody.innerHTML = "";
+      for (const row of actRes.data || []) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${row.type}</td><td>${row.name}</td><td>${row.phone}</td><td>${new Date(row.created_at).toLocaleDateString()}</td>`;
+        tbody.appendChild(tr);
+      }
+    });
+  </script>
 {% endblock %}

@@ -32,7 +32,26 @@
     .small{font-size:13px;color:var(--muted);text-align:center;margin-top:20px;}
     a{color:var(--yene);text-decoration:none;font-weight:800;}
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+    async function waitForSession(sb, ms=2000){
+      const start = Date.now();
+      while(Date.now() - start < ms){
+        const { data } = await sb.auth.getSession();
+        if(data && data.session) return data.session;
+
+        // also wait for auth event
+        await new Promise(res=>{
+          let done = false;
+          const { data: sub } = sb.auth.onAuthStateChange((_e,_s)=>{
+            if(!done){ done=true; sub?.subscription?.unsubscribe?.(); res(); }
+          });
+          setTimeout(()=>{ if(!done){ done=true; sub?.subscription?.unsubscribe?.(); res(); } }, 250);
+        });
+      }
+      return null;
+    }
+
+</script>
 </head>
 <body>
 
@@ -143,6 +162,28 @@
       }
 
 const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      // Wait until session is actually available (prevents dashboard flash->login loop)
+      const sess = await waitForSession(sb, 2500);
+      if(!sess){ alert("Login succeeded but session not ready yet. Refresh and try again."); return; }
+
+      const { data: u1 } = await sb.auth.getUser();
+      const uid = u1?.user?.id;
+      const uemail = u1?.user?.email;
+
+      let role = null;
+      if(uid){
+        const r1 = await sb.from("agent_profiles").select("role,full_name,username,email,auth_id,user_id")
+          .or(`auth_id.eq.${uid},user_id.eq.${uid}`).maybeSingle();
+        role = r1?.data?.role || null;
+      }
+      if(!role && uemail){
+        const r2 = await sb.from("agent_profiles").select("role").eq("email", uemail).maybeSingle();
+        role = r2?.data?.role || null;
+      }
+      role = String(role || "AGENT").toUpperCase().trim();
+      window.location.href = (role === "ADMIN") ? "/dashboard/admin" : "/agent/dashboard";
+      return;
+
 
       if (error || !data?.session) {
         alert("Login failed: " + (error?.message || "No session"));
