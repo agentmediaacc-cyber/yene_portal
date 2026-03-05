@@ -94,9 +94,6 @@ def agent_dashboard_alias():
 
 
 
-@app.route("/dashboard/agent")
-def agent_dashboard_alias():
-    return redirect(url_for("agent_dashboard"))
 
 
 # --- Inject Supabase env into all templates (agent login needs this) ---
@@ -240,9 +237,6 @@ def logout():
     return redirect(url_for("login"))
 
 
-@app.route('/dashboard/agent')
-def agent_dashboard_alias():
-    return redirect(url_for('agent_dashboard'))
 
 
 @app.route("/register", methods=["GET", "POST"])
