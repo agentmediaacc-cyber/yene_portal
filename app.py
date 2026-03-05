@@ -417,7 +417,7 @@ def admin_entry():
 
 
 @app.route("/admin")
-def admin_entry():
+def admin_entry_2():
     return redirect(url_for("admin_dashboard"))
 
 
