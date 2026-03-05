@@ -92,21 +92,35 @@ sb_admin: Client = create_client(URL, SERVICE_KEY) if SERVICE_KEY else supabase
 # --- HELPER FUNCTIONS ---
 
 
-def require_login(role_required):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
+def require_login(required_role=None):
+    """Session-based gate (legacy). Dashboards are PUBLIC now; API uses Supabase Bearer token.
+    This decorator is kept only to protect legacy routes that still rely on Flask session.
+    """
+    from functools import wraps
+    from flask import request, session, redirect, url_for, flash
 
-    if request.path in ['/agent/dashboard', '/dashboard/admin']:
-        return f(*args, **kwargs)
-            if "role" not in session or session.get("role") != role_required:
-                flash(f"Access denied. {role_required} role required.")
+    def decorator(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            # PUBLIC PAGES (do NOT redirect)
+            if request.path in ("/agent/dashboard", "/dashboard/admin"):
+                return fn(*args, **kwargs)
+
+            # Must have some session identity for legacy-protected routes
+            if not session.get("user_id") and not session.get("email") and not session.get("role"):
+                flash("Please log in.")
                 return redirect(url_for("login"))
-            return f(*args, **kwargs)
-        return decorated_function
+
+            # Role enforcement (legacy)
+            if required_role:
+                role = (session.get("role") or session.get("user_role") or "").upper()
+                if role != str(required_role).upper():
+                    flash(f"Access denied. {required_role} role required.")
+                    return redirect(url_for("login"))
+
+            return fn(*args, **kwargs)
+        return wrapped
     return decorator
-
-
 def _require_admin():
     role = session.get("role") or session.get("user_role")
     return str(role or "").upper() == "ADMIN"
