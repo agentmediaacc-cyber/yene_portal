@@ -73,13 +73,15 @@ app = Flask(__name__)
 # Data access must be via /api/* with Bearer token.
 # ---------------------------
 
-@app.route("/dashboard/admin")
+@app.route('/dashboard/admin')
 def admin_dashboard():
-    return render_template("admin_dashboard.html")
+    return render_template('admin_dashboard.html')
 
-@app.route("/agent/dashboard")
+
+@app.route('/agent/dashboard')
 def agent_dashboard():
-    return render_template("agent_dashboard.html")
+    return render_template('agent_dashboard.html')
+
 
 @app.route("/dashboard/agent")
 def agent_dashboard_alias():

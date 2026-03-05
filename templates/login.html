@@ -163,7 +163,19 @@ const { data, error } = await sb.auth.signInWithPassword({ email, password });
       const j = await who.json().catch(()=>({}));
       if (!who.ok || !j.ok) { alert("Role check failed: " + (j.error || "unknown")); return; }
 
-      if ((j.role || "").toUpperCase() === "ADMIN") window.location.href = "/dashboard/admin";
+      if ((j.role || "").toUpperCase() === "ADMIN") // ✅ Role-based redirect (ADMIN -> /dashboard/admin, else -> /agent/dashboard)
+const sb = await window.sbReady;
+if(!sb){ alert("Supabase client not ready. " + (window.__sbInitError||"")); return; }
+
+const access_token = (data && data.session && data.session.access_token) ? data.session.access_token : null;
+if(!access_token){ alert("Missing access token. Try again."); return; }
+
+const r = await fetch("/api/whoami", { headers: { "Authorization": "Bearer " + access_token } });
+const j = await r.json();
+if(!j.ok){ alert("Login role check failed: " + (j.error||"unknown")); return; }
+
+const role = String(j.role||"").toUpperCase().trim();
+window.location.href = (role === "ADMIN") ? "/dashboard/admin" : "/agent/dashboard";
       else 
       // role-based redirect fallback
       const sb = await window.sbReady;
