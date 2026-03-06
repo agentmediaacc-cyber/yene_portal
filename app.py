@@ -1266,6 +1266,8 @@ def api_agent_invoice_pdf_v4():
     uid = user.get("id")
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     week_start = (request.args.get("week_start") or "").strip()
 
     if not week_start:
@@ -1366,6 +1368,8 @@ def api_agent_team_v4():
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
     if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
+    if not prof:
         return jsonify({"ok": True, "rows": [], "referral_code": None})
 
     referral_code = (prof.get("referral_code") or "").strip()
@@ -1389,6 +1393,8 @@ def api_agent_whoami_strict():
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
     uid = user.get("id")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     return jsonify({
         "ok": True,
         "auth_user_id": uid,
@@ -1805,6 +1811,8 @@ def api_agent_me_v3():
     uid = user.get("id")
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     return jsonify({"ok": True, "user_id": uid, "email": email, "profile": prof})
 
 @app.get("/api/agent/summary_v3")
@@ -1816,6 +1824,8 @@ def api_agent_summary_v3():
     uid = user.get("id")
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     monday, sunday = _fa_week_bounds()
 
     def _count(path):
@@ -1873,6 +1883,8 @@ def api_agent_activity_v3():
     uid = user.get("id")
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     rows = []
 
     r = requests.get(
@@ -1930,6 +1942,8 @@ def api_agent_register_driver_v3():
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
     if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
+    if not prof:
         return jsonify({"ok": False, "error": "Agent profile not linked to auth account"}), 400
 
     j = request.get_json(force=True) or {}
@@ -1978,6 +1992,8 @@ def api_agent_register_client_v3():
     uid = user.get("id")
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
         return jsonify({"ok": False, "error": "Agent profile not linked to auth account"}), 400
 
@@ -2099,6 +2115,8 @@ def api_agent_drivers_monitor_v3():
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
     if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
+    if not prof:
         return jsonify({"ok": True, "rows": []})
 
     aid = prof.get("id")
@@ -2134,4 +2152,46 @@ def api_agent_drivers_monitor_v3():
         })
 
     return jsonify({"ok": True, "week_start": monday.isoformat(), "week_end": sunday.isoformat(), "rows": rows})
+
+
+
+
+### === NEW AGENT AUTOLINK FIX ===
+
+def _autolink_profile_by_email(uid, email):
+    """
+    If a newly signed-up agent has an agent_profiles row with matching email
+    but missing auth_id, link it automatically.
+    """
+    if not uid or not email:
+        return None
+
+    # 1) already linked?
+    q1 = f"/agent_profiles?select=*&auth_id=eq.{uid}&limit=1"
+    r1 = requests.get(_fa_rest(q1), headers=_fa_headers(), timeout=10)
+    if r1.status_code == 200 and r1.json():
+        return r1.json()[0]
+
+    # 2) find by email
+    q2 = f"/agent_profiles?select=*&email=eq.{email}&limit=1"
+    r2 = requests.get(_fa_rest(q2), headers=_fa_headers(), timeout=10)
+    if r2.status_code == 200 and r2.json():
+        prof = r2.json()[0]
+        pid = prof.get("id")
+        if pid:
+            patch_payload = {"auth_id": uid, "user_id": uid}
+            requests.patch(
+                _fa_rest(f"/agent_profiles?id=eq.{pid}"),
+                headers=_fa_headers(),
+                json=patch_payload,
+                timeout=10
+            )
+
+            # re-read linked row
+            r3 = requests.get(_fa_rest(q1), headers=_fa_headers(), timeout=10)
+            if r3.status_code == 200 and r3.json():
+                return r3.json()[0]
+        return prof
+
+    return None
 
