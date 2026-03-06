@@ -1268,6 +1268,8 @@ def api_agent_invoice_pdf_v4():
     prof = _strict_find_agent_profile(uid)
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     week_start = (request.args.get("week_start") or "").strip()
 
     if not week_start:
@@ -1370,6 +1372,8 @@ def api_agent_team_v4():
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
+    if not prof:
         return jsonify({"ok": True, "rows": [], "referral_code": None})
 
     referral_code = (prof.get("referral_code") or "").strip()
@@ -1393,6 +1397,8 @@ def api_agent_whoami_strict():
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
     uid = user.get("id")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
     return jsonify({
@@ -1813,6 +1819,8 @@ def api_agent_me_v3():
     prof = _strict_find_agent_profile(uid)
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     return jsonify({"ok": True, "user_id": uid, "email": email, "profile": prof})
 
 @app.get("/api/agent/summary_v3")
@@ -1824,6 +1832,8 @@ def api_agent_summary_v3():
     uid = user.get("id")
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
     monday, sunday = _fa_week_bounds()
@@ -1885,6 +1895,8 @@ def api_agent_activity_v3():
     prof = _strict_find_agent_profile(uid)
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     rows = []
 
     r = requests.get(
@@ -1944,6 +1956,8 @@ def api_agent_register_driver_v3():
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
+    if not prof:
         return jsonify({"ok": False, "error": "Agent profile not linked to auth account"}), 400
 
     j = request.get_json(force=True) or {}
@@ -1992,6 +2006,8 @@ def api_agent_register_client_v3():
     uid = user.get("id")
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
@@ -2114,6 +2130,8 @@ def api_agent_drivers_monitor_v3():
     uid = user.get("id")
     email = user.get("email")
     prof = _strict_find_agent_profile(uid)
+    if not prof:
+        prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
         prof = _autolink_profile_by_email(uid, user.get("email"))
     if not prof:
