@@ -97,7 +97,24 @@
       <tbody id="activityBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
     </table>
   </div>
-</div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px">Weekly history</h3>
+    <table>
+      <thead><tr><th>Week</th><th>Drivers</th><th>Clients</th></tr></thead>
+      <tbody id="weeklyHistoryBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px">Referral team</h3>
+    <div class="muted" id="referralCodeText">Referral code: -</div>
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined</th></tr></thead>
+      <tbody id="teamBody"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
 
 <script>
 (async () => {
@@ -164,7 +181,7 @@
       document.getElementById("walletBalance").textContent = Number(wallet.balance || 0).toFixed(2);
     }
 
-    const inv = await api("/api/agent/invoices_v3");
+    const inv = await api("/api/agent/invoices_v4");
     const invBody = document.getElementById("invoiceBody");
     invBody.innerHTML = "";
     const invRows = (inv && inv.ok) ? inv.rows || [] : [];
@@ -178,7 +195,7 @@
             <td>${Number(x.credits||0).toFixed(2)}</td>
             <td>${Number(x.debits||0).toFixed(2)}</td>
             <td>${Number(x.net||0).toFixed(2)}</td>
-            <td><a href="/api/agent/invoice_csv_v3?week_start=${encodeURIComponent(x.week_start)}" target="_blank">Download CSV</a></td>
+            <td><a href="/api/agent/invoice_pdf_v4?week_start=${encodeURIComponent(x.week_start)}" target="_blank">Download PDF</a></td>
           </tr>`
         );
       }
@@ -243,7 +260,50 @@
     btn.disabled = false;
     if(j && j.ok){
       ["dName","dPhone","dTown","dCode"].forEach(id => document.getElementById(id).value="");
-      await loadAll();
+    
+    const weeks = await api("/api/agent/weekly_breakdown_v4");
+    const wh = document.getElementById("weeklyHistoryBody");
+    if(wh){
+      wh.innerHTML = "";
+      const rows = (weeks && weeks.ok) ? weeks.rows || [] : [];
+      if(rows.length === 0){
+        wh.innerHTML = '<tr><td colspan="3" class="muted">No week history yet.</td></tr>';
+      } else {
+        for(const x of rows){
+          wh.insertAdjacentHTML("beforeend",
+            `<tr><td>${x.week_start} → ${x.week_end}</td><td>${x.drivers}</td><td>${x.clients}</td></tr>`
+          );
+        }
+      }
+    }
+
+    const team = await api("/api/agent/team_v4");
+    const teamBody = document.getElementById("teamBody");
+    const refText = document.getElementById("referralCodeText");
+    if(refText && team && team.ok){
+      refText.textContent = "Referral code: " + (team.referral_code || "-");
+    }
+    if(teamBody){
+      teamBody.innerHTML = "";
+      const rows = (team && team.ok) ? team.rows || [] : [];
+      if(rows.length === 0){
+        teamBody.innerHTML = '<tr><td colspan="5" class="muted">No team members yet.</td></tr>';
+      } else {
+        for(const x of rows){
+          teamBody.insertAdjacentHTML("beforeend",
+            `<tr>
+              <td>${x.full_name||""}</td>
+              <td>${x.email||""}</td>
+              <td>${x.phone||""}</td>
+              <td>${x.role||""}</td>
+              <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ""}</td>
+            </tr>`
+          );
+        }
+      }
+    }
+
+  await loadAll();
     }
   };
 
@@ -262,9 +322,95 @@
     btn.disabled = false;
     if(j && j.ok){
       ["cName","cPhone","cTown","cCode"].forEach(id => document.getElementById(id).value="");
-      await loadAll();
+    
+    const weeks = await api("/api/agent/weekly_breakdown_v4");
+    const wh = document.getElementById("weeklyHistoryBody");
+    if(wh){
+      wh.innerHTML = "";
+      const rows = (weeks && weeks.ok) ? weeks.rows || [] : [];
+      if(rows.length === 0){
+        wh.innerHTML = '<tr><td colspan="3" class="muted">No week history yet.</td></tr>';
+      } else {
+        for(const x of rows){
+          wh.insertAdjacentHTML("beforeend",
+            `<tr><td>${x.week_start} → ${x.week_end}</td><td>${x.drivers}</td><td>${x.clients}</td></tr>`
+          );
+        }
+      }
+    }
+
+    const team = await api("/api/agent/team_v4");
+    const teamBody = document.getElementById("teamBody");
+    const refText = document.getElementById("referralCodeText");
+    if(refText && team && team.ok){
+      refText.textContent = "Referral code: " + (team.referral_code || "-");
+    }
+    if(teamBody){
+      teamBody.innerHTML = "";
+      const rows = (team && team.ok) ? team.rows || [] : [];
+      if(rows.length === 0){
+        teamBody.innerHTML = '<tr><td colspan="5" class="muted">No team members yet.</td></tr>';
+      } else {
+        for(const x of rows){
+          teamBody.insertAdjacentHTML("beforeend",
+            `<tr>
+              <td>${x.full_name||""}</td>
+              <td>${x.email||""}</td>
+              <td>${x.phone||""}</td>
+              <td>${x.role||""}</td>
+              <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ""}</td>
+            </tr>`
+          );
+        }
+      }
+    }
+
+  await loadAll();
     }
   };
+
+
+    const weeks = await api("/api/agent/weekly_breakdown_v4");
+    const wh = document.getElementById("weeklyHistoryBody");
+    if(wh){
+      wh.innerHTML = "";
+      const rows = (weeks && weeks.ok) ? weeks.rows || [] : [];
+      if(rows.length === 0){
+        wh.innerHTML = '<tr><td colspan="3" class="muted">No week history yet.</td></tr>';
+      } else {
+        for(const x of rows){
+          wh.insertAdjacentHTML("beforeend",
+            `<tr><td>${x.week_start} → ${x.week_end}</td><td>${x.drivers}</td><td>${x.clients}</td></tr>`
+          );
+        }
+      }
+    }
+
+    const team = await api("/api/agent/team_v4");
+    const teamBody = document.getElementById("teamBody");
+    const refText = document.getElementById("referralCodeText");
+    if(refText && team && team.ok){
+      refText.textContent = "Referral code: " + (team.referral_code || "-");
+    }
+    if(teamBody){
+      teamBody.innerHTML = "";
+      const rows = (team && team.ok) ? team.rows || [] : [];
+      if(rows.length === 0){
+        teamBody.innerHTML = '<tr><td colspan="5" class="muted">No team members yet.</td></tr>';
+      } else {
+        for(const x of rows){
+          teamBody.insertAdjacentHTML("beforeend",
+            `<tr>
+              <td>${x.full_name||""}</td>
+              <td>${x.email||""}</td>
+              <td>${x.phone||""}</td>
+              <td>${x.role||""}</td>
+              <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ""}</td>
+            </tr>`
+          );
+        }
+      }
+    }
 
   await loadAll();
 })();
