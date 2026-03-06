@@ -33,6 +33,16 @@
     a{color:var(--yene);text-decoration:none;font-weight:800;}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+async function __yeneWaitSession(sb, ms=7000){
+  const start = Date.now();
+  while(Date.now() - start < ms){
+    const { data } = await sb.auth.getSession();
+    if(data && data.session) return data.session;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return null;
+}
+
     async function waitForSession(sb, ms=2000){
       const start = Date.now();
       while(Date.now() - start < ms){
@@ -162,6 +172,24 @@
       }
 
 const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        alert(error.message || "Login failed");
+        return;
+      }
+
+      if (data && data.session && data.session.access_token && data.session.refresh_token) {
+        await sb.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token
+        });
+      }
+
+      const savedSession = await __yeneWaitSession(sb, 7000);
+      if (!savedSession) {
+        alert("Login succeeded but session was not restored yet. Please try again.");
+        return;
+      }
+
       // Wait until session is actually available (prevents dashboard flash->login loop)
       const sess = await waitForSession(sb, 2500);
       if(!sess){ alert("Login succeeded but session not ready yet. Refresh and try again."); return; }

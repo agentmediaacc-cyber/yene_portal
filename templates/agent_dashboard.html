@@ -40,7 +40,7 @@
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">Recent Activity</h3>
+      <h3 style="margin-top:0">Recent activity</h3>
       <table>
         <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th>Town</th><th>Code</th><th>Date</th></tr></thead>
         <tbody id="activityBody"><tr><td colspan="6" class="muted">No data yet.</td></tr></tbody>
@@ -54,12 +54,10 @@
   const statusText = document.getElementById("statusText");
   const statusCard = document.getElementById("statusCard");
   const dashboardArea = document.getElementById("dashboardArea");
-  const retryBtn = document.getElementById("retryBtn");
-  const signOutBtn = document.getElementById("signOutBtn");
 
-  async function waitForSession(sb, ms=6000){
+  async function waitForSession(sb, ms=8000){
     const start = Date.now();
-    while (Date.now() - start < ms){
+    while(Date.now() - start < ms){
       const { data } = await sb.auth.getSession();
       if (data && data.session) return data.session;
       await new Promise(r => setTimeout(r, 200));
@@ -77,11 +75,8 @@
     if(!b) return { ok:false, error:"No session token" };
     const r = await fetch(path, { headers: { "Authorization": b } });
     const txt = await r.text();
-    try {
-      return JSON.parse(txt);
-    } catch(e){
-      return { ok:false, error:"bad json", raw: txt };
-    }
+    try { return JSON.parse(txt); }
+    catch(e){ return { ok:false, error:"bad json", raw: txt }; }
   }
 
   async function loadDashboard(){
@@ -91,37 +86,27 @@
 
     const sb = await window.sbReady;
     if(!sb){
-      statusText.textContent = "Supabase client not ready. Refresh and try again.";
+      statusText.textContent = "Supabase client not ready.";
       return;
     }
 
-    const session = await waitForSession(sb, 6000);
-
+    const session = await waitForSession(sb, 8000);
     if(!session){
-      // IMPORTANT: no instant kickout loop anymore
-      statusText.innerHTML = 'No active session found. Please <a href="/login" style="color:#9ec0ff">login again</a>.';
+      statusText.innerHTML = 'No active session found. Please <a href="/login">login again</a>.';
       return;
     }
 
-    const { data: userData } = await sb.auth.getUser();
-    const user = userData?.user || null;
-    if(!user){
-      statusText.innerHTML = 'Could not read your account. Please <a href="/login" style="color:#9ec0ff">login again</a>.';
+    const me = await api(sb, "/api/agent/me_v3");
+    if(!me || !me.ok){
+      statusText.textContent = "Could not load your profile.";
       return;
     }
 
-    // strict self-only profile lookup
-    const profRes = await sb.from("agent_profiles")
-      .select("*")
-      .eq("auth_id", user.id)
-      .maybeSingle();
-
-    const profile = profRes?.data || null;
-
+    const profile = me.profile || null;
     if(!profile){
       document.getElementById("welcome").textContent = "Welcome, New Agent";
       document.getElementById("weekLabel").textContent = "No data yet. Waiting for your first registration.";
-      statusText.textContent = "Your account is active, but your profile is new or not linked yet.";
+      statusText.textContent = "Your account is active but no profile data is linked yet.";
       dashboardArea.style.display = "block";
       return;
     }
@@ -129,7 +114,6 @@
     document.getElementById("welcome").textContent =
       "Welcome, " + (profile.full_name || profile.username || profile.email || "Agent");
 
-    // try APIs if they exist; if they fail, keep user on dashboard and show empty state
     const summary = await api(sb, "/api/agent/summary_v3");
     if(summary && summary.ok){
       document.getElementById("weekLabel").textContent =
@@ -143,8 +127,7 @@
 
     const wallet = await api(sb, "/api/agent/wallet_v3");
     if(wallet && wallet.ok){
-      document.getElementById("walletBalance").textContent =
-        Number(wallet.balance || 0).toFixed(2);
+      document.getElementById("walletBalance").textContent = Number(wallet.balance || 0).toFixed(2);
     }
 
     const activity = await api(sb, "/api/agent/activity_v3");
@@ -172,9 +155,8 @@
     dashboardArea.style.display = "block";
   }
 
-  retryBtn.onclick = () => loadDashboard();
-
-  signOutBtn.onclick = async () => {
+  document.getElementById("retryBtn").onclick = () => loadDashboard();
+  document.getElementById("signOutBtn").onclick = async () => {
     const sb = await window.sbReady;
     if (sb) await sb.auth.signOut();
     location.href = "/login";
