@@ -1,50 +1,45 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>🌐 YENE Portal</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>YENE Portal</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <script>
-  // ONE global client for the whole site (public pages too)
-  window.sbReady = (async () => {
-    try {
-      const r = await fetch("/api/public-config", { credentials: "same-origin" });
-      const cfg = await r.json();
-      if (!cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
-        console.error("Missing public config", cfg);
-        window.supabase = null;
+    window.sbReady = (async () => {
+      try {
+        const r = await fetch("/api/public-config", { credentials: "same-origin" });
+        const cfg = await r.json();
+        if (!cfg.ok) throw new Error("Missing public config");
+        const sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+          }
+        });
+        window.supabaseClient = sb;
+        return sb;
+      } catch (e) {
+        console.error("Supabase init failed", e);
         return null;
       }
-
-      window.supabase = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      });
-
-      return window.supabase;
-    } catch (e) {
-      console.error("sbReady init failed", e);
-      window.supabase = null;
-      return null;
-    }
-  })();
-
-  // helper: get bearer token for API calls
-  window.getBearer = async () => {
-    const sb = await window.sbReady;
-    if (!sb) return null;
-    const { data } = await sb.auth.getSession();
-    const token = data?.session?.access_token || null;
-    return token ? ("Bearer " + token) : null;
-  };
+    })();
   </script>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#0b1220;color:#e8f0ff}
+    .wrap{max-width:1100px;margin:0 auto;padding:14px}
+    .card{background:#101a33;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;margin:10px 0}
+    .muted{opacity:.8}
+    input,button{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:#e8f0ff}
+    button{background:#2c6cff;border:none;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-size:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  </style>
 </head>
-
 <body>
   {% block content %}{% endblock %}
 </body>

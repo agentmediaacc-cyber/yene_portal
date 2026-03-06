@@ -1,449 +1,186 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>YENE Agent Dashboard</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#0b1220;color:#e8f0ff}
-    .wrap{max-width:1100px;margin:0 auto;padding:14px}
-    .card{background:#101a33;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;margin:10px 0}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .stat{flex:1;min-width:160px}
-    .muted{opacity:.8}
-    input,button{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:#e8f0ff}
-    button{background:#2c6cff;border:none;font-weight:700;cursor:pointer}
-    button:disabled{opacity:.5;cursor:not-allowed}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-size:14px}
-    .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(44,108,255,.18);border:1px solid rgba(44,108,255,.35)}
-    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px}
-    .topbar a{color:#9ec0ff;text-decoration:none}
-    .two{display:grid;grid-template-columns:1fr;gap:10px}
-    @media (min-width: 900px){.two{grid-template-columns:1fr 1fr}}
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
+{% extends "base.html" %}
+{% block inner %}
 <div class="wrap">
   <div class="topbar">
     <div>
       <div class="muted">🌐 YENE Portal</div>
-      <h2 style="margin:6px 0" id="welcome">Welcome, Agent</h2>
-      <div class="muted" id="weekLabel"></div>
+      <h2 id="welcome" style="margin:6px 0">Welcome, Agent</h2>
+      <div class="muted" id="weekLabel">Loading…</div>
     </div>
-    <div><button id="signOutBtn">Sign out</button></div>
-  </div>
-
-  <div class="card">
-    <div class="row">
-      <div class="stat"><div class="muted">Drivers registered (this week)</div><div style="font-size:28px;font-weight:800" id="driversWeek">0</div></div>
-      <div class="stat"><div class="muted">Clients registered (this week)</div><div style="font-size:28px;font-weight:800" id="clientsWeek">0</div></div>
-      <div class="stat"><div class="muted">Drivers (all-time)</div><div style="font-size:28px;font-weight:800" id="driversAll">0</div></div>
-      <div class="stat"><div class="muted">Wallet balance</div><div style="font-size:28px;font-weight:800" id="walletBalance">0</div></div>
+    <div style="display:flex;gap:10px">
+      <button id="retryBtn" type="button">Retry</button>
+      <button id="signOutBtn" type="button">Sign out</button>
     </div>
   </div>
 
-  <div class="two">
+  <div id="statusCard" class="card">
+    <div id="statusText">Checking your session…</div>
+  </div>
+
+  <div id="dashboardArea" style="display:none">
     <div class="card">
-      <h3 style="margin:0 0 10px">Register Driver</h3>
       <div class="row">
-        <div style="flex:1;min-width:220px"><input id="dName" placeholder="Full name" /></div>
-        <div style="flex:1;min-width:220px"><input id="dPhone" placeholder="Phone e.g +264..." /></div>
+        <div style="flex:1;min-width:180px">
+          <div class="muted">Drivers registered (this week)</div>
+          <div id="driversWeek" style="font-size:28px;font-weight:800">0</div>
+        </div>
+        <div style="flex:1;min-width:180px">
+          <div class="muted">Clients registered (this week)</div>
+          <div id="clientsWeek" style="font-size:28px;font-weight:800">0</div>
+        </div>
+        <div style="flex:1;min-width:180px">
+          <div class="muted">Drivers (all-time)</div>
+          <div id="driversAll" style="font-size:28px;font-weight:800">0</div>
+        </div>
+        <div style="flex:1;min-width:180px">
+          <div class="muted">Wallet balance</div>
+          <div id="walletBalance" style="font-size:28px;font-weight:800">0.00</div>
+        </div>
       </div>
-      <div class="row">
-        <div style="flex:1;min-width:220px"><input id="dTown" placeholder="Town" /></div>
-        <div style="flex:1;min-width:220px"><input id="dCode" placeholder="Driver Code from app" /></div>
-      </div>
-      <button id="btnDriver">Submit Driver</button>
-      <div class="muted" id="driverMsg" style="margin-top:8px"></div>
     </div>
 
     <div class="card">
-      <h3 style="margin:0 0 10px">Register Client</h3>
-      <div class="row">
-        <div style="flex:1;min-width:220px"><input id="cName" placeholder="Full name" /></div>
-        <div style="flex:1;min-width:220px"><input id="cPhone" placeholder="Phone e.g +264..." /></div>
-      </div>
-      <div class="row">
-        <div style="flex:1;min-width:220px"><input id="cTown" placeholder="Town" /></div>
-        <div style="flex:1;min-width:220px"><input id="cCode" placeholder="Client Code from app" /></div>
-      </div>
-      <button id="btnClient">Submit Client</button>
-      <div class="muted" id="clientMsg" style="margin-top:8px"></div>
+      <h3 style="margin-top:0">Recent Activity</h3>
+      <table>
+        <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th>Town</th><th>Code</th><th>Date</th></tr></thead>
+        <tbody id="activityBody"><tr><td colspan="6" class="muted">No data yet.</td></tr></tbody>
+      </table>
     </div>
   </div>
-
-  <div class="card">
-    <h3 style="margin:0 0 10px">Driver weekly trips (admin-updated)</h3>
-    <table>
-      <thead><tr><th>Name</th><th>Phone</th><th>Town</th><th>Trips this week</th><th>Bonus</th><th>Admin note</th></tr></thead>
-      <tbody id="driversMonitorBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
-    </table>
-  </div>
-
-  <div class="card">
-    <h3 style="margin:0 0 10px">Invoices / Past weeks</h3>
-    <table>
-      <thead><tr><th>Week</th><th>Credits</th><th>Debits</th><th>Net</th><th>Download</th></tr></thead>
-      <tbody id="invoiceBody"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
-    </table>
-  </div>
-
-  <div class="card">
-    <h3 style="margin:0 0 10px">Recent Activity</h3>
-    <table>
-      <thead><tr><th>Type</th><th>Name</th><th>Phone</th><th>Town</th><th>Code</th><th>Date</th></tr></thead>
-      <tbody id="activityBody"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
-    </table>
-  </div>
-
-  <div class="card">
-    <h3 style="margin:0 0 10px">Weekly history</h3>
-    <table>
-      <thead><tr><th>Week</th><th>Drivers</th><th>Clients</th></tr></thead>
-      <tbody id="weeklyHistoryBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
-    </table>
-  </div>
-
-  <div class="card">
-    <h3 style="margin:0 0 10px">Referral team</h3>
-    <div class="muted" id="referralCodeText">Referral code: -</div>
-    <table>
-      <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Joined</th></tr></thead>
-      <tbody id="teamBody"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
-    </table>
-  </div>
-
+</div>
 
 <script>
 (async () => {
-  async function cfg(){
-    const r = await fetch("/api/public-config");
-    const j = await r.json();
-    if(!j.ok) throw new Error("Missing config");
-    return j;
-  }
-  const c = await cfg();
-  const sb = supabase.createClient(c.SUPABASE_URL, c.SUPABASE_ANON_KEY);
+  const statusText = document.getElementById("statusText");
+  const statusCard = document.getElementById("statusCard");
+  const dashboardArea = document.getElementById("dashboardArea");
+  const retryBtn = document.getElementById("retryBtn");
+  const signOutBtn = document.getElementById("signOutBtn");
 
-  async function waitSession(ms=4500){
+  async function waitForSession(sb, ms=6000){
     const start = Date.now();
-    while(Date.now() - start < ms){
+    while (Date.now() - start < ms){
       const { data } = await sb.auth.getSession();
-      if(data && data.session) return data.session;
-      await new Promise(r => setTimeout(r, 150));
+      if (data && data.session) return data.session;
+      await new Promise(r => setTimeout(r, 200));
     }
     return null;
   }
 
-  const session = await waitSession();
-  if(!session){ location.href="/login"; return; }
-
-  async function bearer(){
+  async function bearer(sb){
     const { data } = await sb.auth.getSession();
-    if(!data.session) return null;
-    return "Bearer " + data.session.access_token;
+    return data?.session?.access_token ? ("Bearer " + data.session.access_token) : null;
   }
 
-  async function api(path, opts={}){
-    const b = await bearer();
-    if(!b){ location.href="/login"; return null; }
-    opts.headers = Object.assign({}, opts.headers||{}, {"Authorization": b, "Content-Type":"application/json"});
-    const r = await fetch(path, opts);
-    const j = await r.json().catch(()=>({ok:false,error:"bad json"}));
-    if(r.status===401){ location.href="/login"; return null; }
-    return j;
+  async function api(sb, path){
+    const b = await bearer(sb);
+    if(!b) return { ok:false, error:"No session token" };
+    const r = await fetch(path, { headers: { "Authorization": b } });
+    const txt = await r.text();
+    try {
+      return JSON.parse(txt);
+    } catch(e){
+      return { ok:false, error:"bad json", raw: txt };
+    }
   }
 
-  document.getElementById("signOutBtn").onclick = async () => {
-    await sb.auth.signOut();
-    location.href="/login";
-  };
+  async function loadDashboard(){
+    statusCard.style.display = "block";
+    dashboardArea.style.display = "none";
+    statusText.textContent = "Checking your session…";
 
-  async function loadAll(){
-    const me = await api("/api/agent/whoami_strict");
-    if(!me || !me.ok){ 
-      document.getElementById("welcome").textContent = "Welcome, Agent";
-      alert("Could not verify your personal agent profile.");
+    const sb = await window.sbReady;
+    if(!sb){
+      statusText.textContent = "Supabase client not ready. Refresh and try again.";
       return;
     }
-    if(!me.profile_found){
+
+    const session = await waitForSession(sb, 6000);
+
+    if(!session){
+      // IMPORTANT: no instant kickout loop anymore
+      statusText.innerHTML = 'No active session found. Please <a href="/login" style="color:#9ec0ff">login again</a>.';
+      return;
+    }
+
+    const { data: userData } = await sb.auth.getUser();
+    const user = userData?.user || null;
+    if(!user){
+      statusText.innerHTML = 'Could not read your account. Please <a href="/login" style="color:#9ec0ff">login again</a>.';
+      return;
+    }
+
+    // strict self-only profile lookup
+    const profRes = await sb.from("agent_profiles")
+      .select("*")
+      .eq("auth_id", user.id)
+      .maybeSingle();
+
+    const profile = profRes?.data || null;
+
+    if(!profile){
       document.getElementById("welcome").textContent = "Welcome, New Agent";
-      document.getElementById("driversWeek").textContent = "0";
-      document.getElementById("clientsWeek").textContent = "0";
-      document.getElementById("driversAll").textContent = "0";
-      document.getElementById("walletBalance").textContent = "0.00";
-      document.getElementById("weekLabel").textContent = "No data yet. Waiting for your first registrations.";
-      const ab = document.getElementById("activityBody");
-      if(ab) ab.innerHTML = '<tr><td colspan="6" class="muted">No registrations yet.</td></tr>';
-      const ib = document.getElementById("invoiceBody");
-      if(ib) ib.innerHTML = '<tr><td colspan="5" class="muted">No invoices yet.</td></tr>';
-      const db = document.getElementById("driversMonitorBody");
-      if(db) db.innerHTML = '<tr><td colspan="6" class="muted">No drivers yet.</td></tr>';
+      document.getElementById("weekLabel").textContent = "No data yet. Waiting for your first registration.";
+      statusText.textContent = "Your account is active, but your profile is new or not linked yet.";
+      dashboardArea.style.display = "block";
       return;
     }
 
-    document.getElementById("welcome").textContent = "Welcome, " + (me.profile?.full_name || me.profile?.username || me.profile?.email || "Agent");
+    document.getElementById("welcome").textContent =
+      "Welcome, " + (profile.full_name || profile.username || profile.email || "Agent");
 
-    const profileId = me.profile?.id || "";
-    const profileAuthId = me.profile?.auth_id || "";
-    if(!profileAuthId){
-      console.warn("Profile exists but auth_id missing.");
+    // try APIs if they exist; if they fail, keep user on dashboard and show empty state
+    const summary = await api(sb, "/api/agent/summary_v3");
+    if(summary && summary.ok){
+      document.getElementById("weekLabel").textContent =
+        "Week: " + (summary.week_start || "") + " → " + (summary.week_end || "");
+      document.getElementById("driversWeek").textContent = summary.drivers_week || 0;
+      document.getElementById("clientsWeek").textContent = summary.clients_week || 0;
+      document.getElementById("driversAll").textContent = summary.drivers_all || 0;
+    } else {
+      document.getElementById("weekLabel").textContent = "No weekly summary yet.";
     }
 
-    const me2 = await api("/api/agent/me_v3");
-    if(me2 && me2.ok && me.profile_found){
-      const name = me.profile?.full_name || me.profile?.username || me.profile?.email || "Agent";
-      document.getElementById("welcome").textContent = "Welcome, " + name;
-    }
-
-    const sum = await api("/api/agent/summary_v3");
-    if(sum && sum.ok){
-      document.getElementById("driversWeek").textContent = sum.drivers_week || 0;
-      document.getElementById("clientsWeek").textContent = sum.clients_week || 0;
-      document.getElementById("driversAll").textContent = sum.drivers_all || 0;
-      document.getElementById("weekLabel").textContent = "Week: " + sum.week_start + " → " + sum.week_end;
-    }
-
-    const wallet = await api("/api/agent/wallet_v3");
+    const wallet = await api(sb, "/api/agent/wallet_v3");
     if(wallet && wallet.ok){
-      document.getElementById("walletBalance").textContent = Number(wallet.balance || 0).toFixed(2);
+      document.getElementById("walletBalance").textContent =
+        Number(wallet.balance || 0).toFixed(2);
     }
 
-    const inv = await api("/api/agent/invoices_v4");
-    const invBody = document.getElementById("invoiceBody");
-    invBody.innerHTML = "";
-    const invRows = (inv && inv.ok) ? inv.rows || [] : [];
-    if(invRows.length === 0){
-      invBody.innerHTML = '<tr><td colspan="5" class="muted">No invoice entries yet.</td></tr>';
+    const activity = await api(sb, "/api/agent/activity_v3");
+    const body = document.getElementById("activityBody");
+    body.innerHTML = "";
+    const rows = (activity && activity.ok) ? (activity.rows || []) : [];
+    if(rows.length === 0){
+      body.innerHTML = '<tr><td colspan="6" class="muted">No registrations yet.</td></tr>';
     } else {
-      for(const x of invRows){
-        invBody.insertAdjacentHTML("beforeend",
-          `<tr>
-            <td>${x.week_start} → ${x.week_end}</td>
-            <td>${Number(x.credits||0).toFixed(2)}</td>
-            <td>${Number(x.debits||0).toFixed(2)}</td>
-            <td>${Number(x.net||0).toFixed(2)}</td>
-            <td><a href="/api/agent/invoice_pdf_v4?week_start=${encodeURIComponent(x.week_start)}" target="_blank">Download PDF</a></td>
-          </tr>`
-        );
+      for(const r of rows){
+        body.insertAdjacentHTML("beforeend", `
+          <tr>
+            <td>${r.subject_type || ""}</td>
+            <td>${r.full_name || ""}</td>
+            <td>${r.phone || ""}</td>
+            <td>${r.town || ""}</td>
+            <td>${r.external_code || ""}</td>
+            <td>${r.created_at ? new Date(r.created_at).toLocaleString() : ""}</td>
+          </tr>
+        `);
       }
     }
 
-    const mon = await api("/api/agent/drivers_monitor_v3");
-    const monBody = document.getElementById("driversMonitorBody");
-    monBody.innerHTML = "";
-    const monRows = (mon && mon.ok) ? mon.rows || [] : [];
-    if(monRows.length === 0){
-      monBody.innerHTML = '<tr><td colspan="6" class="muted">No drivers found yet.</td></tr>';
-    } else {
-      for(const x of monRows){
-        monBody.insertAdjacentHTML("beforeend",
-          `<tr>
-            <td>${x.full_name||""}</td>
-            <td>${x.phone||""}</td>
-            <td>${x.town||""}</td>
-            <td>${x.trips_this_week||0}</td>
-            <td>${Number(x.bonus_amount||0).toFixed(2)}</td>
-            <td>${x.admin_note||""}</td>
-          </tr>`
-        );
-      }
-    }
-
-    const act = await api("/api/agent/activity_v3");
-    const actBody = document.getElementById("activityBody");
-    actBody.innerHTML = "";
-    const actRows = (act && act.ok) ? act.rows || [] : [];
-    if(actRows.length === 0){
-      actBody.innerHTML = '<tr><td colspan="6" class="muted">No registrations yet.</td></tr>';
-    } else {
-      for(const r of actRows){
-        const d = new Date(r.created_at);
-        actBody.insertAdjacentHTML("beforeend",
-          `<tr>
-            <td><span class="pill">${r.subject_type}</span></td>
-            <td>${r.full_name||""}</td>
-            <td>${r.phone||""}</td>
-            <td>${r.town||""}</td>
-            <td>${r.external_code||""}</td>
-            <td>${d.toLocaleString()}</td>
-          </tr>`
-        );
-      }
-    }
+    statusCard.style.display = "none";
+    dashboardArea.style.display = "block";
   }
 
-  document.getElementById("btnDriver").onclick = async () => {
-    const btn = document.getElementById("btnDriver");
-    btn.disabled = true;
-    document.getElementById("driverMsg").textContent = "Saving…";
-    const payload = {
-      full_name: document.getElementById("dName").value,
-      phone: document.getElementById("dPhone").value,
-      town: document.getElementById("dTown").value,
-      driver_code: document.getElementById("dCode").value
-    };
-    const j = await api("/api/agent/register_driver_v3", {method:"POST", body: JSON.stringify(payload)});
-    document.getElementById("driverMsg").textContent = (j && j.ok) ? "✅ Driver registered." : ("❌ " + (j?.error || "Failed"));
-    btn.disabled = false;
-    if(j && j.ok){
-      ["dName","dPhone","dTown","dCode"].forEach(id => document.getElementById(id).value="");
-    
-    const weeks = await api("/api/agent/weekly_breakdown_v4");
-    const wh = document.getElementById("weeklyHistoryBody");
-    if(wh){
-      wh.innerHTML = "";
-      const rows = (weeks && weeks.ok) ? weeks.rows || [] : [];
-      if(rows.length === 0){
-        wh.innerHTML = '<tr><td colspan="3" class="muted">No week history yet.</td></tr>';
-      } else {
-        for(const x of rows){
-          wh.insertAdjacentHTML("beforeend",
-            `<tr><td>${x.week_start} → ${x.week_end}</td><td>${x.drivers}</td><td>${x.clients}</td></tr>`
-          );
-        }
-      }
-    }
+  retryBtn.onclick = () => loadDashboard();
 
-    const team = await api("/api/agent/team_v4");
-    const teamBody = document.getElementById("teamBody");
-    const refText = document.getElementById("referralCodeText");
-    if(refText && team && team.ok){
-      refText.textContent = "Referral code: " + (team.referral_code || "-");
-    }
-    if(teamBody){
-      teamBody.innerHTML = "";
-      const rows = (team && team.ok) ? team.rows || [] : [];
-      if(rows.length === 0){
-        teamBody.innerHTML = '<tr><td colspan="5" class="muted">No team members yet.</td></tr>';
-      } else {
-        for(const x of rows){
-          teamBody.insertAdjacentHTML("beforeend",
-            `<tr>
-              <td>${x.full_name||""}</td>
-              <td>${x.email||""}</td>
-              <td>${x.phone||""}</td>
-              <td>${x.role||""}</td>
-              <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ""}</td>
-            </tr>`
-          );
-        }
-      }
-    }
-
-  await loadAll();
-    }
+  signOutBtn.onclick = async () => {
+    const sb = await window.sbReady;
+    if (sb) await sb.auth.signOut();
+    location.href = "/login";
   };
 
-  document.getElementById("btnClient").onclick = async () => {
-    const btn = document.getElementById("btnClient");
-    btn.disabled = true;
-    document.getElementById("clientMsg").textContent = "Saving…";
-    const payload = {
-      full_name: document.getElementById("cName").value,
-      phone: document.getElementById("cPhone").value,
-      town: document.getElementById("cTown").value,
-      client_code: document.getElementById("cCode").value
-    };
-    const j = await api("/api/agent/register_client_v3", {method:"POST", body: JSON.stringify(payload)});
-    document.getElementById("clientMsg").textContent = (j && j.ok) ? "✅ Client registered." : ("❌ " + (j?.error || "Failed"));
-    btn.disabled = false;
-    if(j && j.ok){
-      ["cName","cPhone","cTown","cCode"].forEach(id => document.getElementById(id).value="");
-    
-    const weeks = await api("/api/agent/weekly_breakdown_v4");
-    const wh = document.getElementById("weeklyHistoryBody");
-    if(wh){
-      wh.innerHTML = "";
-      const rows = (weeks && weeks.ok) ? weeks.rows || [] : [];
-      if(rows.length === 0){
-        wh.innerHTML = '<tr><td colspan="3" class="muted">No week history yet.</td></tr>';
-      } else {
-        for(const x of rows){
-          wh.insertAdjacentHTML("beforeend",
-            `<tr><td>${x.week_start} → ${x.week_end}</td><td>${x.drivers}</td><td>${x.clients}</td></tr>`
-          );
-        }
-      }
-    }
-
-    const team = await api("/api/agent/team_v4");
-    const teamBody = document.getElementById("teamBody");
-    const refText = document.getElementById("referralCodeText");
-    if(refText && team && team.ok){
-      refText.textContent = "Referral code: " + (team.referral_code || "-");
-    }
-    if(teamBody){
-      teamBody.innerHTML = "";
-      const rows = (team && team.ok) ? team.rows || [] : [];
-      if(rows.length === 0){
-        teamBody.innerHTML = '<tr><td colspan="5" class="muted">No team members yet.</td></tr>';
-      } else {
-        for(const x of rows){
-          teamBody.insertAdjacentHTML("beforeend",
-            `<tr>
-              <td>${x.full_name||""}</td>
-              <td>${x.email||""}</td>
-              <td>${x.phone||""}</td>
-              <td>${x.role||""}</td>
-              <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ""}</td>
-            </tr>`
-          );
-        }
-      }
-    }
-
-  await loadAll();
-    }
-  };
-
-
-    const weeks = await api("/api/agent/weekly_breakdown_v4");
-    const wh = document.getElementById("weeklyHistoryBody");
-    if(wh){
-      wh.innerHTML = "";
-      const rows = (weeks && weeks.ok) ? weeks.rows || [] : [];
-      if(rows.length === 0){
-        wh.innerHTML = '<tr><td colspan="3" class="muted">No week history yet.</td></tr>';
-      } else {
-        for(const x of rows){
-          wh.insertAdjacentHTML("beforeend",
-            `<tr><td>${x.week_start} → ${x.week_end}</td><td>${x.drivers}</td><td>${x.clients}</td></tr>`
-          );
-        }
-      }
-    }
-
-    const team = await api("/api/agent/team_v4");
-    const teamBody = document.getElementById("teamBody");
-    const refText = document.getElementById("referralCodeText");
-    if(refText && team && team.ok){
-      refText.textContent = "Referral code: " + (team.referral_code || "-");
-    }
-    if(teamBody){
-      teamBody.innerHTML = "";
-      const rows = (team && team.ok) ? team.rows || [] : [];
-      if(rows.length === 0){
-        teamBody.innerHTML = '<tr><td colspan="5" class="muted">No team members yet.</td></tr>';
-      } else {
-        for(const x of rows){
-          teamBody.insertAdjacentHTML("beforeend",
-            `<tr>
-              <td>${x.full_name||""}</td>
-              <td>${x.email||""}</td>
-              <td>${x.phone||""}</td>
-              <td>${x.role||""}</td>
-              <td>${x.created_at ? new Date(x.created_at).toLocaleString() : ""}</td>
-            </tr>`
-          );
-        }
-      }
-    }
-
-  await loadAll();
+  await loadDashboard();
 })();
 </script>
-</body>
-</html>
+{% endblock %}
