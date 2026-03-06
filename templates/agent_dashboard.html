@@ -162,9 +162,39 @@
   };
 
   async function loadAll(){
-    const me = await api("/api/agent/me_v3");
-    if(me && me.ok){
-      const name = me.profile?.full_name || me.profile?.username || me.email || "Agent";
+    const me = await api("/api/agent/whoami_strict");
+    if(!me || !me.ok){ 
+      document.getElementById("welcome").textContent = "Welcome, Agent";
+      alert("Could not verify your personal agent profile.");
+      return;
+    }
+    if(!me.profile_found){
+      document.getElementById("welcome").textContent = "Welcome, New Agent";
+      document.getElementById("driversWeek").textContent = "0";
+      document.getElementById("clientsWeek").textContent = "0";
+      document.getElementById("driversAll").textContent = "0";
+      document.getElementById("walletBalance").textContent = "0.00";
+      document.getElementById("weekLabel").textContent = "No data yet. Waiting for your first registrations.";
+      const ab = document.getElementById("activityBody");
+      if(ab) ab.innerHTML = '<tr><td colspan="6" class="muted">No registrations yet.</td></tr>';
+      const ib = document.getElementById("invoiceBody");
+      if(ib) ib.innerHTML = '<tr><td colspan="5" class="muted">No invoices yet.</td></tr>';
+      const db = document.getElementById("driversMonitorBody");
+      if(db) db.innerHTML = '<tr><td colspan="6" class="muted">No drivers yet.</td></tr>';
+      return;
+    }
+
+    document.getElementById("welcome").textContent = "Welcome, " + (me.profile?.full_name || me.profile?.username || me.profile?.email || "Agent");
+
+    const profileId = me.profile?.id || "";
+    const profileAuthId = me.profile?.auth_id || "";
+    if(!profileAuthId){
+      console.warn("Profile exists but auth_id missing.");
+    }
+
+    const me2 = await api("/api/agent/me_v3");
+    if(me2 && me2.ok && me.profile_found){
+      const name = me.profile?.full_name || me.profile?.username || me.profile?.email || "Agent";
       document.getElementById("welcome").textContent = "Welcome, " + name;
     }
 

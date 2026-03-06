@@ -1265,7 +1265,7 @@ def api_agent_invoice_pdf_v4():
 
     uid = user.get("id")
     email = user.get("email")
-    prof = _fa_find_profile(uid, email)
+    prof = _strict_find_agent_profile(uid)
     week_start = (request.args.get("week_start") or "").strip()
 
     if not week_start:
@@ -1364,7 +1364,7 @@ def api_agent_team_v4():
 
     uid = user.get("id")
     email = user.get("email")
-    prof = _fa_find_profile(uid, email)
+    prof = _strict_find_agent_profile(uid)
     if not prof:
         return jsonify({"ok": True, "rows": [], "referral_code": None})
 
@@ -1379,6 +1379,22 @@ def api_agent_team_v4():
     )
     rows = r.json() if r.status_code == 200 else []
     return jsonify({"ok": True, "referral_code": referral_code, "rows": rows})
+
+
+
+@app.get("/api/agent/whoami_strict")
+def api_agent_whoami_strict():
+    user = _fa_verify_bearer()
+    if not user:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+    uid = user.get("id")
+    prof = _strict_find_agent_profile(uid)
+    return jsonify({
+        "ok": True,
+        "auth_user_id": uid,
+        "profile_found": True if prof else False,
+        "profile": prof
+    })
 
 
 if __name__ == "__main__":
@@ -1764,6 +1780,17 @@ def _fa_find_profile(uid=None, email=None):
             return r.json()[0]
     return None
 
+
+def _strict_find_agent_profile(uid):
+    if not uid:
+        return None
+    q = f"/agent_profiles?select=*&auth_id=eq.{uid}&limit=1"
+    r = requests.get(_fa_rest(q), headers=_fa_headers(), timeout=10)
+    if r.status_code == 200 and r.json():
+        return r.json()[0]
+    return None
+
+
 def _fa_week_bounds():
     today = datetime.date.today()
     monday = today - datetime.timedelta(days=today.weekday())
@@ -1777,7 +1804,7 @@ def api_agent_me_v3():
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
     uid = user.get("id")
     email = user.get("email")
-    prof = _fa_find_profile(uid, email)
+    prof = _strict_find_agent_profile(uid)
     return jsonify({"ok": True, "user_id": uid, "email": email, "profile": prof})
 
 @app.get("/api/agent/summary_v3")
@@ -1788,7 +1815,7 @@ def api_agent_summary_v3():
 
     uid = user.get("id")
     email = user.get("email")
-    prof = _fa_find_profile(uid, email)
+    prof = _strict_find_agent_profile(uid)
     monday, sunday = _fa_week_bounds()
 
     def _count(path):
@@ -1845,7 +1872,7 @@ def api_agent_activity_v3():
 
     uid = user.get("id")
     email = user.get("email")
-    prof = _fa_find_profile(uid, email)
+    prof = _strict_find_agent_profile(uid)
     rows = []
 
     r = requests.get(
@@ -1901,7 +1928,7 @@ def api_agent_register_driver_v3():
 
     uid = user.get("id")
     email = user.get("email")
-    prof = _fa_find_profile(uid, email)
+    prof = _strict_find_agent_profile(uid)
     if not prof:
         return jsonify({"ok": False, "error": "Agent profile not linked to auth account"}), 400
 
@@ -1950,7 +1977,7 @@ def api_agent_register_client_v3():
 
     uid = user.get("id")
     email = user.get("email")
-    prof = _fa_find_profile(uid, email)
+    prof = _strict_find_agent_profile(uid)
     if not prof:
         return jsonify({"ok": False, "error": "Agent profile not linked to auth account"}), 400
 
@@ -2070,7 +2097,7 @@ def api_agent_drivers_monitor_v3():
 
     uid = user.get("id")
     email = user.get("email")
-    prof = _fa_find_profile(uid, email)
+    prof = _strict_find_agent_profile(uid)
     if not prof:
         return jsonify({"ok": True, "rows": []})
 
