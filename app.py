@@ -1012,3 +1012,219 @@ def api_whoami():
 
     role = (prof or {}).get("role") or "agent"
     return jsonify({"ok": True, "role": role, "user_id": uid, "email": email, "profile": prof})
+
+
+### === CORE AGENT PORTAL API (V1) ===
+import datetime
+import requests
+
+def _env(name, default=""):
+    import os
+    return (os.getenv(name, default) or "").strip()
+
+SUPABASE_URL = _env("SUPABASE_URL")
+SUPABASE_ANON_KEY = _env("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = _env("SUPABASE_SERVICE_ROLE_KEY")
+
+def verify_supabase_bearer():
+    """
+    Validates Supabase JWT by calling Supabase Auth endpoint.
+    Returns dict: { "id": <uuid>, "email": ... }
+    """
+    from flask import request
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth.split(" ", 1)[1].strip()
+    if not token:
+        return None
+
+    # Supabase Auth: GET /auth/v1/user
+    url = f"{SUPABASE_URL}/auth/v1/user"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "apikey": SUPABASE_ANON_KEY,
+    }
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except Exception:
+        return None
+
+def require_supabase_user(fn):
+    from functools import wraps
+    from flask import jsonify
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        u = verify_supabase_bearer()
+        if not u or not u.get("id"):
+            return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        return fn(u, *args, **kwargs)
+    return wrapped
+
+def sr_postgrest(path):
+    # service role PostgREST call helper
+    base = SUPABASE_URL.rstrip("/") + "/rest/v1"
+    return base + path
+
+def sr_headers():
+    return {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+
+def week_bounds_local(today=None):
+    # Mon-Sun
+    if today is None:
+        today = datetime.date.today()
+    monday = today - datetime.timedelta(days=today.weekday())
+    sunday = monday + datetime.timedelta(days=6)
+    return monday, sunday
+
+
+
+
+from flask import request, jsonify
+
+@app.get("/api/agent/me_v1")
+@require_supabase_user
+def api_agent_me_v1(user):
+    uid = user["id"]
+
+    # load profile (service role)
+    q = f"/agent_profiles?select=auth_id,full_name,phone,email,role,town,region,status,referral_code&auth_id=eq.{uid}&limit=1"
+    r = requests.get(sr_postgrest(q), headers=sr_headers(), timeout=10)
+    prof = (r.json()[0] if r.status_code == 200 and r.json() else None)
+
+    # If no profile exists yet, return minimal data (still logged in)
+    return jsonify({
+        "ok": True,
+        "auth_id": uid,
+        "email": user.get("email"),
+        "profile": prof
+    })
+
+@app.get("/api/agent/summary_v1")
+@require_supabase_user
+def api_agent_summary_v1(user):
+    uid = user["id"]
+    monday, sunday = week_bounds_local()
+
+    # count regs this week
+    q = (
+        f"/agent_registrations?select=id,created_at"
+        f"&agent_auth_id=eq.{uid}"
+        f"&created_at=gte.{monday.isoformat()}T00:00:00Z"
+        f"&created_at=lte.{sunday.isoformat()}T23:59:59Z"
+    )
+    r = requests.get(sr_postgrest(q), headers=sr_headers(), timeout=10)
+    rows = r.json() if r.status_code == 200 else []
+    drivers = sum(1 for x in rows if True)  # temp; split below
+
+    # split count by type (more accurate query)
+    def count_type(t):
+        qq = (
+            f"/agent_registrations?select=id"
+            f"&agent_auth_id=eq.{uid}"
+            f"&subject_type=eq.{t}"
+            f"&created_at=gte.{monday.isoformat()}T00:00:00Z"
+            f"&created_at=lte.{sunday.isoformat()}T23:59:59Z"
+        )
+        rr = requests.get(sr_postgrest(qq), headers=sr_headers(), timeout=10)
+        return len(rr.json()) if rr.status_code == 200 else 0
+
+    drivers_week = count_type("driver")
+    clients_week = count_type("client")
+
+    # all-time drivers (type=driver)
+    qq = f"/agent_registrations?select=id&agent_auth_id=eq.{uid}&subject_type=eq.driver"
+    rr = requests.get(sr_postgrest(qq), headers=sr_headers(), timeout=10)
+    drivers_all = len(rr.json()) if rr.status_code == 200 else 0
+
+    return jsonify({
+        "ok": True,
+        "week_start": monday.isoformat(),
+        "week_end": sunday.isoformat(),
+        "drivers_week": drivers_week,
+        "clients_week": clients_week,
+        "drivers_all": drivers_all
+    })
+
+@app.get("/api/agent/activity_v1")
+@require_supabase_user
+def api_agent_activity_v1(user):
+    uid = user["id"]
+    monday, sunday = week_bounds_local()
+    q = (
+        f"/agent_registrations?select=id,created_at,subject_type,full_name,phone,town,external_code"
+        f"&agent_auth_id=eq.{uid}"
+        f"&created_at=gte.{monday.isoformat()}T00:00:00Z"
+        f"&created_at=lte.{sunday.isoformat()}T23:59:59Z"
+        f"&order=created_at.desc&limit=30"
+    )
+    r = requests.get(sr_postgrest(q), headers=sr_headers(), timeout=10)
+    rows = r.json() if r.status_code == 200 else []
+    return jsonify({"ok": True, "rows": rows})
+
+@app.post("/api/agent/register_driver_v1")
+@require_supabase_user
+def api_agent_register_driver_v1(user):
+    uid = user["id"]
+    j = request.get_json(force=True) or {}
+    payload = {
+        "agent_auth_id": uid,
+        "subject_type": "driver",
+        "full_name": (j.get("full_name") or "").strip(),
+        "phone": (j.get("phone") or "").strip(),
+        "town": (j.get("town") or "").strip(),
+        "external_code": (j.get("driver_code") or "").strip(),
+        "notes": (j.get("notes") or "").strip(),
+    }
+    if not payload["full_name"] or not payload["phone"] or not payload["external_code"]:
+        return jsonify({"ok": False, "error": "Missing full_name / phone / driver_code"}), 400
+
+    r = requests.post(sr_postgrest("/agent_registrations"), headers=sr_headers(), json=payload, timeout=10)
+    if r.status_code not in (200, 201):
+        return jsonify({"ok": False, "error": "Insert failed", "detail": r.text}), 500
+    return jsonify({"ok": True, "row": r.json()[0]})
+
+@app.post("/api/agent/register_client_v1")
+@require_supabase_user
+def api_agent_register_client_v1(user):
+    uid = user["id"]
+    j = request.get_json(force=True) or {}
+    payload = {
+        "agent_auth_id": uid,
+        "subject_type": "client",
+        "full_name": (j.get("full_name") or "").strip(),
+        "phone": (j.get("phone") or "").strip(),
+        "town": (j.get("town") or "").strip(),
+        "external_code": (j.get("client_code") or "").strip(),
+        "notes": (j.get("notes") or "").strip(),
+    }
+    if not payload["full_name"] or not payload["phone"] or not payload["external_code"]:
+        return jsonify({"ok": False, "error": "Missing full_name / phone / client_code"}), 400
+
+    r = requests.post(sr_postgrest("/agent_registrations"), headers=sr_headers(), json=payload, timeout=10)
+    if r.status_code not in (200, 201):
+        return jsonify({"ok": False, "error": "Insert failed", "detail": r.text}), 500
+    return jsonify({"ok": True, "row": r.json()[0]})
+
+@app.get("/api/admin/registrations_week_v1")
+def api_admin_registrations_week_v1():
+    # simple admin view (you can protect later)
+    monday, sunday = week_bounds_local()
+    q = (
+        f"/agent_registrations?select=id,created_at,agent_auth_id,subject_type,full_name,phone,town,external_code"
+        f"&created_at=gte.{monday.isoformat()}T00:00:00Z"
+        f"&created_at=lte.{sunday.isoformat()}T23:59:59Z"
+        f"&order=created_at.desc&limit=500"
+    )
+    r = requests.get(sr_postgrest(q), headers=sr_headers(), timeout=10)
+    rows = r.json() if r.status_code == 200 else []
+    return jsonify({"ok": True, "week_start": monday.isoformat(), "week_end": sunday.isoformat(), "rows": rows})
+
