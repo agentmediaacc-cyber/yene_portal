@@ -911,6 +911,261 @@ def debug_session():
             out[k] = {"type": type(v).__name__, "len": len(val), "preview": val[:8]}
     return jsonify({"ok": True, "session": out})
 
+
+
+### === AGENT V2 LIVE ROUTES ===
+
+def _env(name, default=""):
+    import os
+    return (os.getenv(name, default) or "").strip()
+
+SUPABASE_URL = _env("SUPABASE_URL")
+SUPABASE_ANON_KEY = _env("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = _env("SUPABASE_SERVICE_ROLE_KEY")
+
+def _rest_url(path):
+    return SUPABASE_URL.rstrip("/") + "/rest/v1" + path
+
+def _rest_headers():
+    return {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+def _verify_bearer():
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth.split(" ", 1)[1].strip()
+    if not token:
+        return None
+    try:
+        r = requests.get(
+            SUPABASE_URL.rstrip("/") + "/auth/v1/user",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "apikey": SUPABASE_ANON_KEY,
+            },
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except Exception:
+        return None
+
+def _find_agent_profile(uid=None, email=None):
+    if uid:
+        q = f"/agent_profiles?select=*&or=(auth_id.eq.{uid},user_id.eq.{uid})&limit=1"
+        r = requests.get(_rest_url(q), headers=_rest_headers(), timeout=10)
+        if r.status_code == 200 and r.json():
+            return r.json()[0]
+
+    if email:
+        q = f"/agent_profiles?select=*&email=eq.{email}&limit=1"
+        r = requests.get(_rest_url(q), headers=_rest_headers(), timeout=10)
+        if r.status_code == 200 and r.json():
+            return r.json()[0]
+
+    return None
+
+def _week_bounds():
+    today = datetime.date.today()
+    monday = today - datetime.timedelta(days=today.weekday())
+    sunday = monday + datetime.timedelta(days=6)
+    return monday, sunday
+
+@app.get("/api/agent/me_v2")
+def api_agent_me_v2():
+    user = _verify_bearer()
+    if not user:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    uid = user.get("id")
+    email = user.get("email")
+    prof = _find_agent_profile(uid, email)
+
+    return jsonify({
+        "ok": True,
+        "user_id": uid,
+        "email": email,
+        "profile": prof
+    })
+
+@app.get("/api/agent/summary_v2")
+def api_agent_summary_v2():
+    user = _verify_bearer()
+    if not user:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    uid = user.get("id")
+    email = user.get("email")
+    prof = _find_agent_profile(uid, email)
+    if not prof:
+        return jsonify({"ok": True, "drivers_week": 0, "clients_week": 0, "drivers_all": 0, "profile": None})
+
+    agent_id = prof.get("id")
+    monday, sunday = _week_bounds()
+
+    def get_count(path):
+        r = requests.get(_rest_url(path), headers=_rest_headers(), timeout=10)
+        if r.status_code == 200:
+            return len(r.json())
+        return 0
+
+    drivers_week = get_count(
+        f"/drivers?select=id&recruiter_agent_id=eq.{agent_id}"
+        f"&created_at=gte.{monday.isoformat()}T00:00:00Z"
+        f"&created_at=lte.{sunday.isoformat()}T23:59:59Z"
+    )
+
+    clients_week = get_count(
+        f"/clients?select=id&recruiter_agent_id=eq.{agent_id}"
+        f"&created_at=gte.{monday.isoformat()}T00:00:00Z"
+        f"&created_at=lte.{sunday.isoformat()}T23:59:59Z"
+    )
+
+    drivers_all = get_count(
+        f"/drivers?select=id&recruiter_agent_id=eq.{agent_id}"
+    )
+
+    return jsonify({
+        "ok": True,
+        "week_start": monday.isoformat(),
+        "week_end": sunday.isoformat(),
+        "drivers_week": drivers_week,
+        "clients_week": clients_week,
+        "drivers_all": drivers_all,
+        "profile": prof
+    })
+
+@app.get("/api/agent/activity_v2")
+def api_agent_activity_v2():
+    user = _verify_bearer()
+    if not user:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    uid = user.get("id")
+    email = user.get("email")
+    prof = _find_agent_profile(uid, email)
+    if not prof:
+        return jsonify({"ok": True, "rows": [], "profile": None})
+
+    agent_id = prof.get("id")
+    monday, sunday = _week_bounds()
+    rows = []
+
+    r1 = requests.get(
+        _rest_url(
+            f"/drivers?select=full_name,phone,town,created_at"
+            f"&recruiter_agent_id=eq.{agent_id}"
+            f"&created_at=gte.{monday.isoformat()}T00:00:00Z"
+            f"&created_at=lte.{sunday.isoformat()}T23:59:59Z"
+            f"&order=created_at.desc&limit=20"
+        ),
+        headers=_rest_headers(),
+        timeout=10
+    )
+    if r1.status_code == 200:
+        for x in r1.json():
+            rows.append({
+                "subject_type": "driver",
+                "full_name": x.get("full_name"),
+                "phone": x.get("phone"),
+                "town": x.get("town"),
+                "external_code": "",
+                "created_at": x.get("created_at"),
+            })
+
+    r2 = requests.get(
+        _rest_url(
+            f"/clients?select=full_name,phone,created_at"
+            f"&recruiter_agent_id=eq.{agent_id}"
+            f"&created_at=gte.{monday.isoformat()}T00:00:00Z"
+            f"&created_at=lte.{sunday.isoformat()}T23:59:59Z"
+            f"&order=created_at.desc&limit=20"
+        ),
+        headers=_rest_headers(),
+        timeout=10
+    )
+    if r2.status_code == 200:
+        for x in r2.json():
+            rows.append({
+                "subject_type": "client",
+                "full_name": x.get("full_name"),
+                "phone": x.get("phone"),
+                "town": "",
+                "external_code": "",
+                "created_at": x.get("created_at"),
+            })
+
+    rows.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    return jsonify({"ok": True, "rows": rows[:30], "profile": prof})
+
+@app.post("/api/agent/register_driver_v2_working")
+def api_agent_register_driver_v2_working():
+    user = _verify_bearer()
+    if not user:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    uid = user.get("id")
+    email = user.get("email")
+    prof = _find_agent_profile(uid, email)
+    if not prof:
+        return jsonify({"ok": False, "error": "Agent profile not linked"}), 400
+
+    j = request.get_json(force=True) or {}
+    payload = {
+        "recruiter_agent_id": prof["id"],
+        "recruiter_auth_id": uid,
+        "recruiter_name": prof.get("full_name") or prof.get("username") or prof.get("email"),
+        "full_name": (j.get("full_name") or "").strip(),
+        "phone": (j.get("phone") or "").strip(),
+        "town": (j.get("town") or "").strip(),
+    }
+
+    if not payload["full_name"] or not payload["phone"]:
+        return jsonify({"ok": False, "error": "Missing full_name / phone"}), 400
+
+    r = requests.post(_rest_url("/drivers"), headers=_rest_headers(), json=payload, timeout=10)
+    if r.status_code not in (200, 201):
+        return jsonify({"ok": False, "error": "Insert failed", "detail": r.text}), 500
+
+    return jsonify({"ok": True, "row": r.json()[0], "profile": prof})
+
+@app.post("/api/agent/register_client_v2_working")
+def api_agent_register_client_v2_working():
+    user = _verify_bearer()
+    if not user:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    uid = user.get("id")
+    email = user.get("email")
+    prof = _find_agent_profile(uid, email)
+    if not prof:
+        return jsonify({"ok": False, "error": "Agent profile not linked"}), 400
+
+    j = request.get_json(force=True) or {}
+    payload = {
+        "recruiter_agent_id": prof["id"],
+        "recruiter_auth_id": uid,
+        "recruiter_name": prof.get("full_name") or prof.get("username") or prof.get("email"),
+        "full_name": (j.get("full_name") or "").strip(),
+        "phone": (j.get("phone") or "").strip(),
+    }
+
+    if not payload["full_name"] or not payload["phone"]:
+        return jsonify({"ok": False, "error": "Missing full_name / phone"}), 400
+
+    r = requests.post(_rest_url("/clients"), headers=_rest_headers(), json=payload, timeout=10)
+    if r.status_code not in (200, 201):
+        return jsonify({"ok": False, "error": "Insert failed", "detail": r.text}), 500
+
+    return jsonify({"ok": True, "row": r.json()[0], "profile": prof})
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=False)
