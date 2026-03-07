@@ -281,7 +281,20 @@ def register():
             }
 
             # Save to agent_profiles
+            ref_email = request.args.get("ref") or request.form.get("ref") or session.get("agent_ref")
+            if ref_email:
+                try:
+                    parent_rows = sb_admin.table("agent_profiles").select("id,email,full_name").eq("email", ref_email).limit(1).execute().data or []
+                    if parent_rows:
+                        parent = parent_rows[0]
+                        profile_data["parent_agent_id"] = parent.get("id")
+                        profile_data["parent_agent_email"] = parent.get("email")
+                        profile_data["parent_agent_name"] = parent.get("full_name")
+                except Exception:
+                    pass
+
             sb_admin.table("agent_profiles").insert(profile_data).execute()
+            session.pop("agent_ref", None)
 
             # Save to older agents table (best effort)
             try:
@@ -1985,10 +1998,26 @@ def api_agent_register_driver():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+
+
+@app.route("/debug-agent-session")
+def debug_agent_session():
+    return {
+        "session_email": session.get("email"),
+        "session_role": session.get("role"),
+        "session_user_id": session.get("user_id"),
+        "session_auth_id": session.get("auth_id"),
+    }
+
+
+from agent_dashboard_v4 import register_agent_dashboard_v4_routes
+register_agent_dashboard_v4_routes(app, sb_admin, require_login, globals().get("log_system_event"))
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 
 # --- Agent dashboard full routes ---
-from agent_dashboard_full import register_agent_dashboard_routes
+from agent_dashboard_full import register_agent_dashboard_routes, register_agent_dashboard_debug_routes
 register_agent_dashboard_routes(app, sb_admin, require_login, globals().get("log_system_event"))
+register_agent_dashboard_debug_routes(app, sb_admin, require_login)
 
