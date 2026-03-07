@@ -334,6 +334,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         phone = (data.get("phone") or "").strip()
         town = (data.get("town") or "").strip()
         email = (data.get("email") or "").strip()
+        external_code = (data.get("external_code") or "").strip()
 
         if not full_name or not phone or not town:
             return jsonify({"ok": False, "error": "Full name, phone and town are required"}), 400
@@ -351,11 +352,12 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "full_name": full_name,
             "phone": phone,
             "phone_number": phone,
-            "email": email,
             "town": town,
+            "external_code": external_code,
             "status": "pending_approval",
             "recruiter_agent_id": agent.get("id"),
             "recruiter_name": agent.get("full_name") or agent.get("email"),
+            "external_code": external_code,
         }
 
         try:
@@ -376,6 +378,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         full_name = (data.get("full_name") or "").strip()
         phone = (data.get("phone") or "").strip()
         town = (data.get("town") or "").strip()
+        external_code = (data.get("external_code") or "").strip()
 
         if not full_name or not phone:
             return jsonify({"ok": False, "error": "Full name and phone are required"}), 400

@@ -37,6 +37,20 @@
   .flyer{width:100%;max-width:420px;aspect-ratio:4/5;background:linear-gradient(135deg,#0b1220 0%,#1a2a47 100%);border:2px solid var(--yene);border-radius:18px;padding:28px;text-align:center;position:relative;overflow:hidden;margin:0 auto}
   .flyer-title{font-size:30px;font-weight:900}
   .flyer-footer{position:absolute;bottom:18px;left:0;width:100%;font-size:12px;color:var(--muted)}
+
+  @media (max-width: 900px){
+    .shell{display:block}
+    .sidebar{width:100%;border-right:none;border-bottom:1px solid var(--line)}
+    .main{padding:14px}
+    .topbar{display:block}
+    .title{font-size:24px}
+    .grid{grid-template-columns:1fr}
+    .row{display:block}
+    .row > *{min-width:100%;margin-bottom:10px}
+    table{display:block;overflow-x:auto;white-space:nowrap}
+    .flyer{max-width:100%}
+  }
+
 </style>
 
 <div class="shell">
@@ -104,6 +118,7 @@
             <input id="d_phone" class="input" placeholder="Driver Phone / WhatsApp" required>
             <input id="d_town" class="input" placeholder="Town / Region" required>
             <input id="d_email" class="input" placeholder="Driver Email (optional)">
+            <input id="d_code" class="input" placeholder="Driver App Code / Driver Code">
             <button class="btn" type="submit" style="width:100%">Submit Driver</button>
           </form>
         </div>
@@ -113,6 +128,7 @@
             <input id="c_name" class="input" placeholder="Client Full Name" required>
             <input id="c_phone" class="input" placeholder="Client Phone Number" required>
             <input id="c_town" class="input" placeholder="Town / Region">
+            <input id="c_code" class="input" placeholder="Client App Code / Rider Code">
             <button class="btn" type="submit" style="width:100%">Submit Client</button>
           </form>
         </div>
@@ -287,7 +303,8 @@
       full_name: document.getElementById('d_name').value.trim(),
       phone: document.getElementById('d_phone').value.trim(),
       town: document.getElementById('d_town').value.trim(),
-      email: document.getElementById('d_email').value.trim()
+      email: document.getElementById('d_email').value.trim(),
+      external_code: document.getElementById('d_code').value.trim()
     };
     const res = await apiPost('/api/agent/register_driver_v4', payload);
     if(res.ok){
@@ -304,7 +321,8 @@
     const payload = {
       full_name: document.getElementById('c_name').value.trim(),
       phone: document.getElementById('c_phone').value.trim(),
-      town: document.getElementById('c_town').value.trim()
+      town: document.getElementById('c_town').value.trim(),
+      external_code: document.getElementById('c_code').value.trim()
     };
     const res = await apiPost('/api/agent/register_client_v4', payload);
     if(res.ok){

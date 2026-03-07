@@ -282,18 +282,25 @@ def register():
 
             # Save to agent_profiles
             ref_email = request.args.get("ref") or request.form.get("ref") or session.get("agent_ref")
-            if ref_email:
+            insert_res = sb_admin.table("agent_profiles").insert(profile_data).execute()
+            new_agent_rows = insert_res.data or []
+            new_agent = new_agent_rows[0] if new_agent_rows else None
+
+            if ref_email and new_agent:
                 try:
                     parent_rows = sb_admin.table("agent_profiles").select("id,email,full_name").eq("email", ref_email).limit(1).execute().data or []
                     if parent_rows:
                         parent = parent_rows[0]
-                        profile_data["parent_agent_id"] = parent.get("id")
-                        profile_data["parent_agent_email"] = parent.get("email")
-                        profile_data["parent_agent_name"] = parent.get("full_name")
+                        sb_admin.table("agent_referrals").insert({
+                            "parent_agent_id": parent.get("id"),
+                            "parent_agent_email": parent.get("email"),
+                            "child_agent_id": new_agent.get("id"),
+                            "child_agent_email": new_agent.get("email"),
+                            "child_agent_name": new_agent.get("full_name")
+                        }).execute()
                 except Exception:
                     pass
 
-            sb_admin.table("agent_profiles").insert(profile_data).execute()
             session.pop("agent_ref", None)
 
             # Save to older agents table (best effort)
