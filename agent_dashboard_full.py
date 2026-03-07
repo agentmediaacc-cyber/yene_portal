@@ -405,3 +405,98 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
             return jsonify({"ok": True, "success": True})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
+
+def register_agent_dashboard_debug_routes(app, sb_admin, require_login):
+    @app.route("/api/agent/debug_link_v3", methods=["GET"], endpoint="agent_debug_link_v3_full")
+    @require_login("AGENT")
+    def agent_debug_link_v3_full():
+        email = session.get("email")
+        out = {
+            "ok": True,
+            "session_email": email,
+            "agent_profile_found": False,
+            "agent_profile": None,
+            "drivers_count_by_recruiter_agent_id": 0,
+            "clients_count_by_recruiter_agent_id": 0,
+            "sample_drivers": [],
+            "sample_clients": [],
+        }
+
+        if not email:
+            out["ok"] = False
+            out["error"] = "No session email"
+            return jsonify(out), 401
+
+        try:
+            agent_rows = (
+                sb_admin.table("agent_profiles")
+                .select("*")
+                .eq("email", email)
+                .limit(1)
+                .execute()
+                .data or []
+            )
+            if agent_rows:
+                agent = agent_rows[0]
+                out["agent_profile_found"] = True
+                out["agent_profile"] = {
+                    "id": agent.get("id"),
+                    "full_name": agent.get("full_name"),
+                    "email": agent.get("email"),
+                    "phone": agent.get("phone"),
+                    "town": agent.get("town"),
+                    "username": agent.get("username"),
+                    "status": agent.get("status"),
+                }
+
+                aid = agent.get("id")
+
+                try:
+                    d = (
+                        sb_admin.table("drivers")
+                        .select("*")
+                        .eq("recruiter_agent_id", aid)
+                        .order("created_at", desc=True)
+                        .limit(5)
+                        .execute()
+                        .data or []
+                    )
+                    out["drivers_count_by_recruiter_agent_id"] = len(
+                        sb_admin.table("drivers")
+                        .select("id", count="exact")
+                        .eq("recruiter_agent_id", aid)
+                        .execute()
+                        .data or []
+                    )
+                    out["sample_drivers"] = d
+                except Exception as e:
+                    out["drivers_error"] = str(e)
+
+                try:
+                    c = (
+                        sb_admin.table("clients")
+                        .select("*")
+                        .eq("recruiter_agent_id", aid)
+                        .order("created_at", desc=True)
+                        .limit(5)
+                        .execute()
+                        .data or []
+                    )
+                    out["clients_count_by_recruiter_agent_id"] = len(
+                        sb_admin.table("clients")
+                        .select("id", count="exact")
+                        .eq("recruiter_agent_id", aid)
+                        .execute()
+                        .data or []
+                    )
+                    out["sample_clients"] = c
+                except Exception as e:
+                    out["clients_error"] = str(e)
+            else:
+                out["error"] = f"No agent profile found for email: {email}"
+
+        except Exception as e:
+            out["ok"] = False
+            out["error"] = str(e)
+
+        return jsonify(out)
