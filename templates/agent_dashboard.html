@@ -5,348 +5,878 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 <style>
-  :root {
-    --yene: #4aa8ff; --bg: #0b1220; --panel: #0f1a2f; --card: #111b2e; --card2: #0b1427;
-    --text: #eaf2ff; --muted: #a9b7d6; --line: rgba(255,255,255,.10);
-    --ok: #2ed573; --warn: #ffa502; --gold: #f1c40f; --platinum: #e5e4e2;
+  :root{
+    --yene:#4aa8ff;
+    --bg:#0b1220;
+    --panel:#0f1a2f;
+    --card:#111b2e;
+    --card2:#0b1427;
+    --text:#eaf2ff;
+    --muted:#a9b7d6;
+    --line:rgba(255,255,255,.10);
+    --ok:#2ed573;
+    --warn:#ffa502;
+    --gold:#f1c40f;
+    --platinum:#e5e4e2;
+    --danger:#ff6b6b;
   }
-  * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-  body { margin: 0; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
 
-  /* SIDEBAR */
-  .sidebar { width: 260px; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 10; }
-  .brand { padding: 20px; border-bottom: 1px solid var(--line); font-weight: 900; color: var(--yene); font-size: 20px; letter-spacing: 1px;}
-  .nav { padding: 15px 10px; flex-grow: 1; overflow-y: auto; }
-  .item { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 12px; color: var(--muted); cursor: pointer; margin-bottom: 5px; font-weight: 600; font-size: 14px; transition: 0.2s; }
-  .item:hover, .item.active { background: rgba(74,168,255,.15); color: #fff; }
-  .item i { width: 20px; text-align: center; font-size: 16px; }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .shell{display:flex;min-height:100vh}
+  .sidebar{
+    width:260px;
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    position:sticky;
+    top:0;
+    height:100vh;
+  }
+  .brand{
+    padding:20px;
+    border-bottom:1px solid var(--line);
+    font-weight:900;
+    color:var(--yene);
+    font-size:22px;
+    letter-spacing:1px;
+  }
+  .nav{padding:15px 10px;flex:1;overflow-y:auto}
+  .item{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px;
+    border-radius:12px;
+    color:var(--muted);
+    cursor:pointer;
+    margin-bottom:6px;
+    font-weight:700;
+    font-size:14px;
+    transition:.2s;
+  }
+  .item:hover,.item.active{background:rgba(74,168,255,.15);color:#fff}
+  .item i{width:20px;text-align:center}
+  .side-actions{padding:16px;border-top:1px solid var(--line)}
 
-  /* MAIN CONTENT */
-  .main { flex: 1; overflow-y: auto; padding: 30px; position: relative; }
-  .view { display: none; animation: fadeIn 0.3s ease; }
-  .view.active { display: block; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .main{
+    flex:1;
+    padding:24px;
+    overflow-x:hidden;
+  }
 
-  h2 { margin-top: 0; margin-bottom: 25px; color: #fff; font-size: 24px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 25px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; position: relative; }
-  
-  /* METRICS & PROGRESS */
-  .metric-value { font-size: 36px; font-weight: 900; color: var(--yene); margin: 10px 0; }
-  .sub-text { color: var(--muted); font-size: 13px; line-height: 1.5; }
-  
-  progress { width: 100%; height: 10px; border-radius: 5px; appearance: none; margin: 10px 0; }
-  progress::-webkit-progress-bar { background-color: var(--card2); border-radius: 5px; border: 1px solid var(--line); }
-  progress::-webkit-progress-value { background-color: var(--yene); border-radius: 5px; }
-  
-  .tier-card { border-top: 4px solid var(--line); }
-  .tier-gold { border-top-color: var(--gold); }
-  .tier-plat { border-top-color: var(--platinum); }
+  .topbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+  }
 
-  /* BUTTONS & FORMS */
-  .btn { background: var(--yene); color: #041021; padding: 14px 20px; border-radius: 12px; border: none; font-weight: 900; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; font-size: 14px; }
-  .btn:hover { opacity: 0.9; transform: translateY(-2px); }
-  .input-field { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: #fff; margin-bottom: 15px; outline: none; }
-  .input-field:focus { border-color: var(--yene); }
+  .title{font-size:30px;font-weight:900;margin:0 0 6px}
+  .muted{color:var(--muted)}
+  .status{
+    background:rgba(74,168,255,.08);
+    border:1px solid rgba(74,168,255,.25);
+    color:#d8ebff;
+    padding:12px 14px;
+    border-radius:12px;
+    margin-bottom:16px;
+  }
+  .status.error{
+    background:rgba(255,107,107,.08);
+    border-color:rgba(255,107,107,.25);
+    color:#ffd7d7;
+  }
+  .status.ok{
+    background:rgba(46,213,115,.08);
+    border-color:rgba(46,213,115,.22);
+    color:#d8ffe6;
+  }
 
-  /* FLYER GENERATOR */
-  .flyer-canvas { width: 100%; max-width: 400px; aspect-ratio: 4/5; background: linear-gradient(135deg, #0b1220 0%, #1a2a47 100%); border: 2px solid var(--yene); border-radius: 16px; padding: 30px; text-align: center; position: relative; overflow: hidden; margin: 0 auto; }
-  .flyer-title { font-size: 32px; font-weight: 900; color: #fff; margin-bottom: 10px; line-height: 1.1; }
-  .flyer-highlight { color: var(--yene); }
-  .flyer-agent { font-size: 20px; font-weight: bold; color: var(--warn); margin: 20px 0; }
-  .flyer-contact { font-size: 18px; color: #fff; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px; display: inline-block;}
-  .flyer-footer { position: absolute; bottom: 20px; left: 0; width: 100%; font-size: 12px; color: var(--muted); }
+  .view{display:none}
+  .view.active{display:block}
 
-  /* TABLES */
-  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-  th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--line); font-size: 14px; }
-  th { color: var(--yene); text-transform: uppercase; font-size: 12px; }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px;
+    margin-bottom:20px;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:18px;
+  }
+
+  .metric-value{
+    font-size:34px;
+    font-weight:900;
+    color:var(--yene);
+    margin:8px 0;
+  }
+
+  .sub-text{
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.5;
+  }
+
+  .btn{
+    background:var(--yene);
+    color:#041021;
+    padding:12px 16px;
+    border:none;
+    border-radius:12px;
+    font-weight:900;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    font-size:14px;
+    transition:.2s;
+    text-decoration:none;
+  }
+  .btn:hover{opacity:.95;transform:translateY(-1px)}
+  .btn.secondary{background:var(--card2);color:#fff;border:1px solid var(--line)}
+  .btn.success{background:var(--ok);color:#041021}
+  .btn.warn{background:var(--warn);color:#041021}
+  .btn.danger{background:var(--danger);color:#fff}
+
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row > *{flex:1;min-width:180px}
+
+  .input-field, select, textarea{
+    width:100%;
+    padding:13px 14px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:var(--card2);
+    color:#fff;
+    outline:none;
+    margin-bottom:12px;
+  }
+  .input-field:focus, select:focus, textarea:focus{border-color:var(--yene)}
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:8px;
+  }
+  th,td{
+    padding:12px 10px;
+    text-align:left;
+    border-bottom:1px solid var(--line);
+    font-size:14px;
+    vertical-align:top;
+  }
+  th{
+    color:var(--yene);
+    text-transform:uppercase;
+    font-size:12px;
+    letter-spacing:.04em;
+  }
+
+  progress{
+    width:100%;
+    height:12px;
+    border-radius:8px;
+    appearance:none;
+    margin:10px 0 8px;
+  }
+  progress::-webkit-progress-bar{
+    background-color:var(--card2);
+    border-radius:8px;
+    border:1px solid var(--line);
+  }
+  progress::-webkit-progress-value{
+    background-color:var(--yene);
+    border-radius:8px;
+  }
+
+  .tier-card{border-top:4px solid var(--line)}
+  .tier-gold{border-top-color:var(--gold)}
+  .tier-plat{border-top-color:var(--platinum)}
+
+  .pill{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:800;
+    background:rgba(74,168,255,.14);
+    color:#d8ebff;
+    border:1px solid rgba(74,168,255,.22);
+  }
+
+  .flyer-canvas{
+    width:100%;
+    max-width:420px;
+    aspect-ratio:4/5;
+    background:linear-gradient(135deg,#0b1220 0%,#1a2a47 100%);
+    border:2px solid var(--yene);
+    border-radius:18px;
+    padding:28px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+    margin:0 auto;
+  }
+  .flyer-title{
+    font-size:32px;
+    font-weight:900;
+    color:#fff;
+    margin-bottom:10px;
+    line-height:1.1;
+  }
+  .flyer-highlight{color:var(--yene)}
+  .flyer-agent{
+    font-size:20px;
+    font-weight:900;
+    color:var(--warn);
+    margin:18px 0 8px;
+  }
+  .flyer-contact{
+    font-size:16px;
+    color:#fff;
+    background:rgba(0,0,0,.45);
+    padding:10px 12px;
+    border-radius:10px;
+    display:inline-block;
+  }
+  .flyer-footer{
+    position:absolute;
+    bottom:18px;
+    left:0;
+    width:100%;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .listbox{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .lesson{
+    background:var(--card2);
+    padding:14px;
+    border-radius:12px;
+    border-left:3px solid var(--yene);
+  }
+
+  .small{font-size:12px}
+  .hidden{display:none!important}
+
+  @media (max-width: 900px){
+    .shell{display:block}
+    .sidebar{
+      width:100%;
+      height:auto;
+      position:relative;
+      border-right:none;
+      border-bottom:1px solid var(--line);
+    }
+    .main{padding:16px}
+  }
 </style>
 
-<div class="sidebar">
-  <div class="brand"><i class="fa-solid fa-car-side"></i> YENE HUB</div>
-  <div class="nav">
-    <div class="item active" onclick="showView('v-home', this)"><i class="fa-solid fa-chart-simple"></i> Weekly Earnings</div>
-    <div class="item" onclick="showView('v-register', this)"><i class="fa-solid fa-user-plus"></i> Register Network</div>
-    <div class="item" onclick="showView('v-team', this)"><i class="fa-solid fa-trophy"></i> Team & Rewards</div>
-    <div class="item" onclick="showView('v-marketing', this)"><i class="fa-solid fa-bullhorn"></i> Marketing Studio</div>
-    <div class="item" onclick="showView('v-academy', this)"><i class="fa-solid fa-graduation-cap"></i> Yene Academy</div>
-  </div>
-  <div style="padding: 20px;"><button class="btn" style="width: 100%; background: var(--card2); color: #fff;" onclick="window.location.href='/logout'"><i class="fa-solid fa-right-from-bracket"></i> Logout</button></div>
-</div>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><i class="fa-solid fa-car-side"></i> YENE HUB</div>
 
-<div class="main">
-  
-  <div id="v-home" class="view active">
-    <h2><i class="fa-solid fa-calendar-week"></i> Weekly Performance (Mon - Sun)</h2>
-    <div class="grid">
-      <div class="card">
-        <div class="sub-text">Calculated Earnings This Week</div>
-        <div class="metric-value" id="weekly-earnings">N$ 0.00</div>
-        <div class="sub-text" style="color: var(--ok);"><i class="fa-solid fa-arrow-trend-up"></i> Based on active regional rates</div>
+    <div class="nav">
+      <div class="item active" onclick="showView('v-home', this)">
+        <i class="fa-solid fa-chart-simple"></i> Dashboard
       </div>
-      <div class="card">
-        <div class="sub-text">Drivers Registered</div>
-        <div class="metric-value" id="weekly-drivers">0</div>
+      <div class="item" onclick="showView('v-register', this)">
+        <i class="fa-solid fa-user-plus"></i> Register Network
       </div>
-      <div class="card">
-        <div class="sub-text">Clients Registered</div>
-        <div class="metric-value" id="weekly-clients">0</div>
+      <div class="item" onclick="showView('v-team', this)">
+        <i class="fa-solid fa-trophy"></i> Team & Rewards
       </div>
-    </div>
-    <div class="card">
-      <h3>This Week's Registrations</h3>
-      <table>
-        <thead><tr><th>Date</th><th>Type</th><th>Name</th><th>Town</th></tr></thead>
-        <tbody id="weekly-table">
-          <tr><td colspan="4" style="text-align: center; color: var(--muted);">No registrations yet this week.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div id="v-register" class="view">
-    <h2><i class="fa-solid fa-user-plus"></i> Grow Your Network</h2>
-    <div class="grid">
-      <div class="card" style="border-top: 3px solid var(--yene);">
-        <h3>Register a Driver</h3>
-        <form onsubmit="submitDriver(event)">
-          <input type="text" id="d-name" class="input-field" placeholder="Driver Full Name" required>
-          <input type="tel" id="d-phone" class="input-field" placeholder="WhatsApp Number" required>
-          <input type="text" id="d-town" class="input-field" placeholder="Town / Region" required>
-          <button type="submit" class="btn" style="width: 100%;">Submit Driver</button>
-        </form>
+      <div class="item" onclick="showView('v-marketing', this)">
+        <i class="fa-solid fa-bullhorn"></i> Marketing Studio
       </div>
-      <div class="card" style="border-top: 3px solid var(--ok);">
-        <h3>Register a Client</h3>
-        <form onsubmit="submitClient(event)">
-          <input type="text" id="c-name" class="input-field" placeholder="Client Full Name" required>
-          <input type="tel" id="c-phone" class="input-field" placeholder="Phone Number" required>
-          <button type="submit" class="btn" style="background: var(--ok); width: 100%;">Submit Client</button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <div id="v-team" class="view">
-    <h2><i class="fa-solid fa-trophy"></i> Team Milestones & Rewards</h2>
-    
-    <div class="card" style="margin-bottom: 20px; background: rgba(74, 168, 255, 0.05); border-color: var(--yene);">
-      <h3>Your Recruitment Link</h3>
-      <div class="sub-text" style="margin-bottom: 10px;">Share this link to recruit agents under your team. You earn percentages of their network!</div>
-      <div style="display: flex; gap: 10px;">
-        <input type="text" class="input-field" id="ref-link" value="yene.com/join?ref={{ session.get('email', 'agent') }}" readonly style="margin: 0;">
-        <button class="btn" onclick="copyRef()"><i class="fa-solid fa-copy"></i> Copy</button>
+      <div class="item" onclick="showView('v-academy', this)">
+        <i class="fa-solid fa-graduation-cap"></i> Yene Academy
       </div>
     </div>
 
-    <div class="grid">
-      <div class="card tier-card" style="border-top-color: var(--yene);">
-        <h3><i class="fa-solid fa-medal" style="color: var(--yene);"></i> Starter Team Badge</h3>
-        <div class="sub-text"><b>Target:</b> 20 Client Activations + Drivers w/ 2 rides each.</div>
-        <progress value="5" max="20" id="prog-starter"></progress>
-        <div class="sub-text" style="margin-bottom: 15px; text-align: right;" id="text-starter">5 / 20</div>
-        <div style="background: var(--card2); padding: 15px; border-radius: 8px; font-size: 13px;">
-          <b style="color: var(--yene);">Reward Unlocks:</b><br>
-          🍔 Yene Food Combo Platter<br>
-          💄 Cosmetic Voucher<br>
-          🎉 Team Party (N$1000 Drinks, 4kg Meat/Chicken & sides)
-        </div>
-      </div>
-
-      <div class="card tier-card tier-gold">
-        <h3><i class="fa-solid fa-crown" style="color: var(--gold);"></i> Gold Team Badge</h3>
-        <div class="sub-text"><b>Target:</b> 50 Rider Trips + 50 Driver Trips.</div>
-        <progress value="12" max="50" id="prog-gold"></progress>
-        <div class="sub-text" style="margin-bottom: 15px; text-align: right;" id="text-gold">12 / 50</div>
-        <div style="background: var(--card2); padding: 15px; border-radius: 8px; font-size: 13px;">
-          <b style="color: var(--gold);">Reward Unlocks:</b><br>
-          🐐 Whole Goat & N$3000 Drinks<br>
-          🎪 Branded Yene Team Gazebo<br>
-          🚗 2 Weeks Free Rides (Max 4/day)<br>
-          🏅 Official Yene Recognition Badge
-        </div>
-      </div>
-
-      <div class="card tier-card tier-plat">
-        <h3><i class="fa-solid fa-gem" style="color: var(--platinum);"></i> Platinum Elite</h3>
-        <div class="sub-text"><b>Target:</b> 100 Rider Trips + 50 Drivers w/ 5 trips.</div>
-        <progress value="0" max="100" id="prog-plat"></progress>
-        <div class="sub-text" style="margin-bottom: 15px; text-align: right;" id="text-plat">0 / 100</div>
-        <div style="background: var(--card2); padding: 15px; border-radius: 8px; font-size: 13px;">
-          <b style="color: var(--platinum);">Reward Unlocks:</b><br>
-          💰 N$ 5,000 Team Cash Box<br>
-          🍕 Pizza, Goat & N$3000 Drinks<br>
-          🎁 Exclusive VIP Corporate Gifts
-        </div>
+    <div class="side-actions">
+      <div class="row">
+        <button class="btn secondary" type="button" onclick="loadDashboard()">
+          <i class="fa-solid fa-rotate"></i> Refresh
+        </button>
+        <button class="btn danger" type="button" onclick="signOutAgent()">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
       </div>
     </div>
-  </div>
+  </aside>
 
-  <div id="v-marketing" class="view">
-    <h2><i class="fa-solid fa-object-group"></i> Marketing Studio</h2>
-    <div class="grid">
-      <div class="card">
-        <h3>Customize Your Flyer</h3>
-        <div class="sub-text" style="margin-bottom: 15px;">Enter your details below to generate a branded advert for WhatsApp and Facebook.</div>
-        <input type="text" id="flyer-name" class="input-field" placeholder="Your Name or Team Name" oninput="updateFlyer()">
-        <input type="text" id="flyer-phone" class="input-field" placeholder="Your WhatsApp Number" oninput="updateFlyer()">
-        <input type="text" id="flyer-town" class="input-field" placeholder="Your Town / Region" oninput="updateFlyer()">
-        <button class="btn" onclick="downloadFlyer()" style="width: 100%; margin-top: 10px;"><i class="fa-solid fa-download"></i> Download JPEG Image</button>
-      </div>
-
+  <main class="main">
+    <div class="topbar">
       <div>
-        <div id="capture-area" class="flyer-canvas">
-          <div style="font-size: 40px; margin-bottom: 10px; color: var(--yene);"><i class="fa-solid fa-car-side"></i></div>
-          <div class="flyer-title">JOIN MY <span class="flyer-highlight">YENE</span> TEAM</div>
-          <div style="color: #fff; font-size: 14px; margin-bottom: 20px;">Download the Yene App on Play Store & App Store. Order your ride and participate in weekly & monthly incentives!</div>
-          
-          <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
-            <div style="font-size: 12px; color: var(--muted); text-transform: uppercase;">Your Regional Agent</div>
-            <div id="preview-name" class="flyer-agent">Agent Name</div>
-            <div id="preview-town" style="color: #fff; font-size: 14px; margin-bottom: 10px;">Namibia</div>
-            <div id="preview-phone" class="flyer-contact"><i class="fa-brands fa-whatsapp"></i> +264 XX XXX XXXX</div>
+        <div class="muted">YENE AGENT PORTAL</div>
+        <h1 class="title" id="welcomeText">Welcome, Agent</h1>
+        <div class="muted" id="weekLabel">Week: loading...</div>
+      </div>
+      <div>
+        <span class="pill" id="rankBadge">Starter Agent</span>
+      </div>
+    </div>
+
+    <div id="statusBox" class="status">Checking your session...</div>
+
+    <section id="v-home" class="view active">
+      <div class="grid">
+        <div class="card">
+          <div class="sub-text">Calculated Earnings This Week</div>
+          <div class="metric-value" id="weeklyEarnings">N$ 0.00</div>
+          <div class="sub-text">Based on your weekly registrations and live values from the system when available.</div>
+        </div>
+
+        <div class="card">
+          <div class="sub-text">Drivers Registered This Week</div>
+          <div class="metric-value" id="weeklyDrivers">0</div>
+          <div class="sub-text">Monday to Sunday count</div>
+        </div>
+
+        <div class="card">
+          <div class="sub-text">Clients Registered This Week</div>
+          <div class="metric-value" id="weeklyClients">0</div>
+          <div class="sub-text">Monday to Sunday count</div>
+        </div>
+
+        <div class="card">
+          <div class="sub-text">Wallet Balance</div>
+          <div class="metric-value" id="walletBalance">N$ 0.00</div>
+          <div class="sub-text">Current tracked balance</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">This Week's Registrations</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Town</th>
+            </tr>
+          </thead>
+          <tbody id="activityTable">
+            <tr><td colspan="5" class="muted">No registrations yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="v-register" class="view">
+      <div class="grid">
+        <div class="card" style="border-top:3px solid var(--yene)">
+          <h3 style="margin-top:0">Register a Driver</h3>
+          <form id="driverForm">
+            <input type="text" id="d_name" class="input-field" placeholder="Driver Full Name" required>
+            <input type="tel" id="d_phone" class="input-field" placeholder="Driver Phone / WhatsApp" required>
+            <input type="text" id="d_town" class="input-field" placeholder="Town / Region" required>
+            <input type="email" id="d_email" class="input-field" placeholder="Driver Email (optional)">
+            <button type="submit" class="btn" style="width:100%">
+              <i class="fa-solid fa-paper-plane"></i> Submit Driver
+            </button>
+          </form>
+        </div>
+
+        <div class="card" style="border-top:3px solid var(--ok)">
+          <h3 style="margin-top:0">Register a Client</h3>
+          <form id="clientForm">
+            <input type="text" id="c_name" class="input-field" placeholder="Client Full Name" required>
+            <input type="tel" id="c_phone" class="input-field" placeholder="Client Phone Number" required>
+            <input type="text" id="c_town" class="input-field" placeholder="Town / Region">
+            <button type="submit" class="btn success" style="width:100%">
+              <i class="fa-solid fa-paper-plane"></i> Submit Client
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Registration Notes</h3>
+        <div class="sub-text">
+          Driver and client registration will use your live session. If your backend route exists, the form will submit to it.
+          If a route is not ready, the dashboard will show a clear error instead of crashing.
+        </div>
+      </div>
+    </section>
+
+    <section id="v-team" class="view">
+      <div class="card" style="background:rgba(74,168,255,.05);border-color:var(--yene)">
+        <h3 style="margin-top:0">Your Recruitment Link</h3>
+        <div class="sub-text" style="margin-bottom:10px">
+          Share this link to recruit agents under your profile. Use it on WhatsApp, Facebook, and your posters.
+        </div>
+        <div class="row">
+          <input type="text" id="refLink" class="input-field" readonly style="margin:0">
+          <button class="btn" type="button" onclick="copyRef()">
+            <i class="fa-solid fa-copy"></i> Copy Link
+          </button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card tier-card">
+          <h3 style="margin-top:0"><i class="fa-solid fa-medal" style="color:var(--yene)"></i> Starter Team Badge</h3>
+          <div class="sub-text"><b>Target:</b> 20 successful client activations and successful drivers with 2 rides each.</div>
+          <progress id="progStarter" value="0" max="20"></progress>
+          <div class="sub-text" id="txtStarter" style="text-align:right">0 / 20</div>
+          <div class="sub-text">
+            Reward ideas: Yene food combo platter, cosmetic voucher, team party support, 1000 drinks voucher,
+            4kg meat, 4kg chicken, ingredients for the party.
           </div>
-          
-          <div class="flyer-footer">Let's grow together as the company grows.</div>
+        </div>
+
+        <div class="card tier-card tier-gold">
+          <h3 style="margin-top:0"><i class="fa-solid fa-crown" style="color:var(--gold)"></i> Gold Team Badge</h3>
+          <div class="sub-text"><b>Target:</b> 50 rider trips and 50 driver trips completed.</div>
+          <progress id="progGold" value="0" max="50"></progress>
+          <div class="sub-text" id="txtGold" style="text-align:right">0 / 50</div>
+          <div class="sub-text">
+            Reward ideas: food voucher, cosmetic voucher, party drinks budget, goat, side dishes,
+            Yene gazebo, free rides for the team, Yene recognition badge.
+          </div>
+        </div>
+
+        <div class="card tier-card tier-plat">
+          <h3 style="margin-top:0"><i class="fa-solid fa-gem" style="color:var(--platinum)"></i> Platinum Elite</h3>
+          <div class="sub-text"><b>Target:</b> 100 rides and 50 drivers with 5 rides each completed.</div>
+          <progress id="progPlat" value="0" max="100"></progress>
+          <div class="sub-text" id="txtPlat" style="text-align:right">0 / 100</div>
+          <div class="sub-text">
+            Reward ideas: team cash box, goat, party support, pizza, drinks budget, VIP corporate gifts and more.
+          </div>
         </div>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <div id="v-academy" class="view">
-    <h2><i class="fa-solid fa-graduation-cap"></i> Yene Remote Work Academy</h2>
-    <div class="card">
-      <h3>Agent Training Modules</h3>
-      <div class="sub-text" style="margin-bottom: 20px;">Master the platform and maximize your commissions.</div>
-      
-      <div style="display: flex; flex-direction: column; gap: 10px;">
-        <div style="background: var(--card2); padding: 15px; border-radius: 8px; border-left: 3px solid var(--yene);">
-          <h4 style="margin: 0 0 5px 0;">Module 1: How to Register a Driver Effectively</h4>
-          <div class="sub-text">Learn the verification process, document requirements, and how to help drivers go online.</div>
+    <section id="v-marketing" class="view">
+      <div class="grid">
+        <div class="card">
+          <h3 style="margin-top:0">Customize Your Flyer</h3>
+          <div class="sub-text" style="margin-bottom:14px">
+            Create a branded advert for WhatsApp, Facebook, and status posts.
+          </div>
+
+          <input type="text" id="flyerName" class="input-field" placeholder="Your Name or Team Name" oninput="updateFlyer()">
+          <input type="text" id="flyerPhone" class="input-field" placeholder="Your WhatsApp Number" oninput="updateFlyer()">
+          <input type="email" id="flyerEmail" class="input-field" placeholder="Your Email Address" oninput="updateFlyer()">
+          <input type="text" id="flyerTown" class="input-field" placeholder="Your Town / Region" oninput="updateFlyer()">
+
+          <div class="row">
+            <button class="btn" type="button" onclick="downloadFlyer()">
+              <i class="fa-solid fa-download"></i> Download JPEG
+            </button>
+            <button class="btn secondary" type="button" onclick="window.print()">
+              <i class="fa-solid fa-file-pdf"></i> Print / Save PDF
+            </button>
+          </div>
         </div>
-        <div style="background: var(--card2); padding: 15px; border-radius: 8px; border-left: 3px solid var(--ok);">
-          <h4 style="margin: 0 0 5px 0;">Module 2: Client Activation Tactics</h4>
-          <div class="sub-text">Scripting for WhatsApp marketing and how to guide riders to download the Yene App.</div>
-        </div>
-        <div style="background: var(--card2); padding: 15px; border-radius: 8px; border-left: 3px solid var(--gold);">
-          <h4 style="margin: 0 0 5px 0;">Module 3: Building a Downline Team</h4>
-          <div class="sub-text">How to recruit other agents using your referral link to hit the Platinum Tier.</div>
+
+        <div class="card">
+          <div id="captureArea" class="flyer-canvas">
+            <div style="font-size:42px;color:var(--yene);margin-bottom:10px">
+              <i class="fa-solid fa-car-side"></i>
+            </div>
+
+            <div class="flyer-title">
+              JOIN MY <span class="flyer-highlight">YENE</span> TEAM
+            </div>
+
+            <div style="font-size:14px;color:#fff;margin-bottom:18px;line-height:1.5">
+              Download the Yene app on Play Store or App Store, order your ride, and participate in weekly and monthly incentives.
+            </div>
+
+            <div style="background:rgba(255,255,255,.08);padding:16px;border-radius:14px;margin-bottom:16px">
+              <div style="font-size:12px;color:var(--muted);text-transform:uppercase">Your Regional Agent</div>
+              <div id="previewName" class="flyer-agent">Agent Name</div>
+              <div id="previewTown" style="color:#fff;font-size:14px;margin-bottom:8px">Namibia</div>
+              <div id="previewPhone" class="flyer-contact">
+                <i class="fa-brands fa-whatsapp"></i> +264 XX XXX XXXX
+              </div>
+              <div id="previewEmail" style="margin-top:10px;font-size:13px;color:#d8ebff">agent@yene.com</div>
+            </div>
+
+            <div class="flyer-footer">Let's grow together as the company grows.</div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
+    </section>
 
+    <section id="v-academy" class="view">
+      <div class="card">
+        <h3 style="margin-top:0">Yene Remote Work Academy</h3>
+        <div class="sub-text" style="margin-bottom:16px">
+          Learn how to register riders and drivers, help activation, promote the app, and build your team.
+        </div>
+
+        <div class="listbox">
+          <div class="lesson">
+            <h4 style="margin:0 0 6px">Module 1: How to Register a Driver</h4>
+            <div class="sub-text">Collect the correct details, help the driver submit documents, and guide them to start taking rides.</div>
+          </div>
+
+          <div class="lesson" style="border-left-color:var(--ok)">
+            <h4 style="margin:0 0 6px">Module 2: How to Register and Activate Clients</h4>
+            <div class="sub-text">Show clients where to download the app, how to request rides, and how to complete their first trip.</div>
+          </div>
+
+          <div class="lesson" style="border-left-color:var(--gold)">
+            <h4 style="margin:0 0 6px">Module 3: How to Build Your Referral Team</h4>
+            <div class="sub-text">Use your referral profile link to recruit agents and grow a performing team under your structure.</div>
+          </div>
+
+          <div class="lesson" style="border-left-color:var(--platinum)">
+            <h4 style="margin:0 0 6px">Module 4: Promotions and Marketing</h4>
+            <div class="sub-text">Use the flyer generator, WhatsApp status, Facebook posts, and direct outreach to grow Yene usage in your town.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script>
-  // Navigation
-  function showView(id, el) {
+  function showView(id, el){
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     document.querySelectorAll('.item').forEach(i => i.classList.remove('active'));
-    el.classList.add('active');
+    if(el) el.classList.add('active');
   }
 
-  // Copy Referral Link
-  function copyRef() {
-    const el = document.getElementById('ref-link');
-    el.select();
-    document.execCommand('copy');
-    alert("Referral link copied to clipboard!");
+  function setStatus(msg, type=''){
+    const box = document.getElementById('statusBox');
+    box.className = 'status' + (type ? ' ' + type : '');
+    box.innerHTML = msg;
   }
 
-  // Live Flyer Updates
-  function updateFlyer() {
-    document.getElementById('preview-name').innerText = document.getElementById('flyer-name').value || "Agent Name";
-    document.getElementById('preview-phone').innerText = document.getElementById('flyer-phone').value || "+264 XX XXX XXXX";
-    document.getElementById('preview-town').innerText = document.getElementById('flyer-town').value || "Namibia";
+  function money(v){
+    const n = Number(v || 0);
+    return 'N$ ' + n.toFixed(2);
   }
 
-  // Generate Image from HTML Canvas
-  function downloadFlyer() {
-    const capture = document.getElementById('capture-area');
-    html2canvas(capture, { scale: 3, backgroundColor: "#0b1220" }).then(canvas => {
-      const link = document.createElement('a');
-      link.download = 'Yene-Promo-Flyer.jpg';
-      link.href = canvas.toDataURL('image/jpeg', 0.9);
-      link.click();
-    });
+  async function waitForSession(sb, ms=7000){
+    const start = Date.now();
+    while(Date.now() - start < ms){
+      try{
+        const { data } = await sb.auth.getSession();
+        if(data && data.session) return data.session;
+      }catch(e){}
+      await new Promise(r => setTimeout(r, 250));
+    }
+    return null;
   }
 
-  
-  async function loadDashboardData() {
-    try {
-      const res = await fetch("/api/agent/weekly_stats");
-      const data = await res.json();
-      
-      if (data.success) {
-        // Update Weekly Earnings
-        document.getElementById('weekly-earnings').innerText = "N$ " + data.weekly_earnings.toFixed(2);
-        document.getElementById('weekly-drivers').innerText = data.weekly_drivers;
-        document.getElementById('weekly-clients').innerText = data.weekly_clients;
-        
-        // Update Weekly Table
-        const tb = document.getElementById('weekly-table');
-        if (data.recent.length > 0) {
-            tb.innerHTML = data.recent.map(r => `
-                <tr>
-                    <td>${new Date(r.date).toLocaleDateString()}</td>
-                    <td><b style="color:${r.type === 'Driver' ? 'var(--yene)' : 'var(--ok)'}">${r.type}</b></td>
-                    <td>${r.name}</td>
-                    <td>${r.town}</td>
-                </tr>
-            `).join('');
-        }
-        
-        // Update Gamification Progress Bars
-        const t = data.total_clients + data.total_drivers; // Simplified metric for the bars
-        document.getElementById('prog-starter').value = t;
-        document.getElementById('text-starter').innerText = `${t} / 20`;
-        
-        document.getElementById('prog-gold').value = t;
-        document.getElementById('text-gold').innerText = `${t} / 50`;
-        
-        document.getElementById('prog-plat').value = t;
-        document.getElementById('text-plat').innerText = `${t} / 100`;
-      }
-    } catch (err) {
-      console.error("Failed to load dashboard data", err);
+  async function getBearer(){
+    const sb = await window.sbReady;
+    if(!sb) return null;
+    const { data } = await sb.auth.getSession();
+    return data?.session?.access_token ? ('Bearer ' + data.session.access_token) : null;
+  }
+
+  async function apiGet(path){
+    const bearer = await getBearer();
+    const headers = {};
+    if(bearer) headers['Authorization'] = bearer;
+
+    try{
+      const r = await fetch(path, { headers, credentials:'same-origin' });
+      const txt = await r.text();
+      try { return JSON.parse(txt); }
+      catch { return { ok:false, error:'Invalid JSON', raw:txt }; }
+    }catch(e){
+      return { ok:false, error:String(e) };
     }
   }
 
-  async function submitDriver(e) {
-      e.preventDefault();
-      const payload = {
-          full_name: document.getElementById('d-name').value,
-          phone: document.getElementById('d-phone').value,
-          town: document.getElementById('d-town').value
-      };
-      const res = await fetch("/api/agent/register_driver", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (data.success) {
-          alert("Driver successfully registered! Checked Admin logs.");
-          e.target.reset();
-          loadDashboardData(); // Refresh the earnings instantly!
-      } else { alert("Error: " + data.error); }
+  async function apiPost(path, payload){
+    const bearer = await getBearer();
+    const headers = { 'Content-Type':'application/json' };
+    if(bearer) headers['Authorization'] = bearer;
+
+    try{
+      const r = await fetch(path, {
+        method:'POST',
+        headers,
+        credentials:'same-origin',
+        body: JSON.stringify(payload)
+      });
+      const txt = await r.text();
+      try { return JSON.parse(txt); }
+      catch { return { success:false, ok:false, error:'Invalid JSON', raw:txt }; }
+    }catch(e){
+      return { success:false, ok:false, error:String(e) };
+    }
   }
 
-  async function submitClient(e) {
-      e.preventDefault();
-      const payload = {
-          full_name: document.getElementById('c-name').value,
-          phone: document.getElementById('c-phone').value
-      };
-      const res = await fetch("/api/agent/register_client", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (data.success) {
-          alert("Client successfully registered! Checked Admin logs.");
-          e.target.reset();
-          loadDashboardData(); // Refresh the earnings instantly!
-      } else { alert("Error: " + data.error); }
+  function setText(id, val){
+    const el = document.getElementById(id);
+    if(el) el.textContent = val;
   }
 
-  // Load data as soon as the page opens
-  window.onload = loadDashboardData;
+  function buildRefLink(profile){
+    const ref =
+      profile?.email ||
+      profile?.username ||
+      profile?.auth_id ||
+      'agent';
+    return window.location.origin + '/join?ref=' + encodeURIComponent(ref);
+  }
+
+  function renderActivity(rows){
+    const body = document.getElementById('activityTable');
+    body.innerHTML = '';
+
+    if(!rows || rows.length === 0){
+      body.innerHTML = '<tr><td colspan="5" class="muted">No registrations yet.</td></tr>';
+      return;
+    }
+
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td>
+        <td>${r.subject_type || r.type || ''}</td>
+        <td>${r.full_name || r.name || ''}</td>
+        <td>${r.phone || r.phone_number || ''}</td>
+        <td>${r.town || ''}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  function updateProgress(starter, gold, plat){
+    const s = Math.max(0, Number(starter || 0));
+    const g = Math.max(0, Number(gold || 0));
+    const p = Math.max(0, Number(plat || 0));
+
+    document.getElementById('progStarter').value = Math.min(s, 20);
+    document.getElementById('txtStarter').textContent = Math.min(s,20) + ' / 20';
+
+    document.getElementById('progGold').value = Math.min(g, 50);
+    document.getElementById('txtGold').textContent = Math.min(g,50) + ' / 50';
+
+    document.getElementById('progPlat').value = Math.min(p, 100);
+    document.getElementById('txtPlat').textContent = Math.min(p,100) + ' / 100';
+
+    let rank = 'Starter Agent';
+    if(p >= 100) rank = 'Platinum Elite';
+    else if(g >= 50) rank = 'Gold Team Leader';
+    else if(s >= 20) rank = 'Starter Team Badge';
+    document.getElementById('rankBadge').textContent = rank;
+  }
+
+  async function loadDashboard(){
+    setStatus('Checking your session...');
+
+    const sb = await window.sbReady;
+    if(!sb){
+      setStatus('Supabase client not ready. Refresh and try again.', 'error');
+      return;
+    }
+
+    const session = await waitForSession(sb);
+    if(!session){
+      setStatus('No active session found. Please <a href="/login">login again</a>.', 'error');
+      return;
+    }
+
+    let user = null;
+    try{
+      const userRes = await sb.auth.getUser();
+      user = userRes?.data?.user || null;
+    }catch(e){}
+
+    if(!user){
+      setStatus('Could not read your account. Please <a href="/login">login again</a>.', 'error');
+      return;
+    }
+
+    let profile = null;
+    try{
+      const profRes = await sb
+        .from('agent_profiles')
+        .select('*')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+      profile = profRes?.data || null;
+    }catch(e){}
+
+    const welcomeName =
+      profile?.full_name ||
+      profile?.username ||
+      user?.email ||
+      'Agent';
+
+    document.getElementById('welcomeText').textContent = 'Welcome, ' + welcomeName;
+    document.getElementById('refLink').value = buildRefLink({
+      email: profile?.email || user?.email,
+      username: profile?.username,
+      auth_id: user?.id
+    });
+
+    document.getElementById('flyerName').value = profile?.full_name || '';
+    document.getElementById('flyerPhone').value = profile?.phone || '';
+    document.getElementById('flyerEmail').value = profile?.email || user?.email || '';
+    document.getElementById('flyerTown').value = profile?.town || '';
+    updateFlyer();
+
+    const summary = await apiGet('/api/agent/summary_v3');
+    if(summary && (summary.ok || summary.success)){
+      setText('weekLabel', 'Week: ' + (summary.week_start || 'Mon') + ' → ' + (summary.week_end || 'Sun'));
+      setText('weeklyDrivers', summary.drivers_week || 0);
+      setText('weeklyClients', summary.clients_week || 0);
+      document.getElementById('weeklyEarnings').textContent = money(summary.earnings_week || summary.weekly_earnings || 0);
+
+      updateProgress(
+        summary.starter_progress || summary.clients_activated_week || 0,
+        summary.gold_progress || summary.driver_trips_week || 0,
+        summary.platinum_progress || summary.team_total_progress || 0
+      );
+    } else {
+      setText('weekLabel', 'Week: current Monday → Sunday');
+      setText('weeklyDrivers', 0);
+      setText('weeklyClients', 0);
+      document.getElementById('weeklyEarnings').textContent = money(0);
+      updateProgress(0, 0, 0);
+    }
+
+    const wallet = await apiGet('/api/agent/wallet_v3');
+    if(wallet && (wallet.ok || wallet.success)){
+      document.getElementById('walletBalance').textContent = money(wallet.balance || wallet.wallet_balance || 0);
+    } else {
+      document.getElementById('walletBalance').textContent = money(0);
+    }
+
+    const activity = await apiGet('/api/agent/activity_v3');
+    if(activity && (activity.ok || activity.success)){
+      renderActivity(activity.rows || activity.data || []);
+    } else {
+      renderActivity([]);
+    }
+
+    setStatus('Dashboard loaded successfully.', 'ok');
+  }
+
+  async function submitDriver(e){
+    e.preventDefault();
+
+    const payload = {
+      full_name: document.getElementById('d_name').value.trim(),
+      phone: document.getElementById('d_phone').value.trim(),
+      town: document.getElementById('d_town').value.trim(),
+      email: document.getElementById('d_email').value.trim()
+    };
+
+    if(!payload.full_name || !payload.phone || !payload.town){
+      setStatus('Please fill in the required driver fields.', 'error');
+      return;
+    }
+
+    setStatus('Submitting driver registration...');
+    const res =
+      await apiPost('/api/agent/register_driver', payload);
+
+    if(res && (res.success || res.ok)){
+      document.getElementById('driverForm').reset();
+      setStatus('Driver registered successfully.', 'ok');
+      await loadDashboard();
+    } else {
+      setStatus('Driver registration failed: ' + (res?.error || 'Unknown error'), 'error');
+    }
+  }
+
+  async function submitClient(e){
+    e.preventDefault();
+
+    const payload = {
+      full_name: document.getElementById('c_name').value.trim(),
+      phone: document.getElementById('c_phone').value.trim(),
+      town: document.getElementById('c_town').value.trim()
+    };
+
+    if(!payload.full_name || !payload.phone){
+      setStatus('Please fill in the required client fields.', 'error');
+      return;
+    }
+
+    setStatus('Submitting client registration...');
+    const res =
+      await apiPost('/api/agent/register_client', payload);
+
+    if(res && (res.success || res.ok)){
+      document.getElementById('clientForm').reset();
+      setStatus('Client registered successfully.', 'ok');
+      await loadDashboard();
+    } else {
+      setStatus('Client registration failed: ' + (res?.error || 'Unknown error'), 'error');
+    }
+  }
+
+  async function signOutAgent(){
+    const sb = await window.sbReady;
+    if(sb){
+      try { await sb.auth.signOut(); } catch(e){}
+    }
+    window.location.href = '/login';
+  }
+
+  async function copyRef(){
+    const val = document.getElementById('refLink').value;
+    try{
+      await navigator.clipboard.writeText(val);
+      setStatus('Referral link copied to clipboard.', 'ok');
+    }catch(e){
+      setStatus('Could not copy referral link automatically. Copy it manually.', 'error');
+    }
+  }
+
+  function updateFlyer(){
+    const name = document.getElementById('flyerName').value || 'Agent Name';
+    const phone = document.getElementById('flyerPhone').value || '+264 XX XXX XXXX';
+    const email = document.getElementById('flyerEmail').value || 'agent@yene.com';
+    const town = document.getElementById('flyerTown').value || 'Namibia';
+
+    document.getElementById('previewName').textContent = name;
+    document.getElementById('previewTown').textContent = town;
+    document.getElementById('previewEmail').textContent = email;
+    document.getElementById('previewPhone').innerHTML = '<i class="fa-brands fa-whatsapp"></i> ' + phone;
+  }
+
+  function downloadFlyer(){
+    const capture = document.getElementById('captureArea');
+    html2canvas(capture, { scale: 3, backgroundColor: '#0b1220' }).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'YENE-Agent-Flyer.jpg';
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+      setStatus('Flyer image downloaded successfully.', 'ok');
+    }).catch(err => {
+      setStatus('Flyer download failed: ' + err, 'error');
+    });
+  }
+
+  document.getElementById('driverForm').addEventListener('submit', submitDriver);
+  document.getElementById('clientForm').addEventListener('submit', submitClient);
+
+  loadDashboard();
 </script>
+
 {% endblock %}
