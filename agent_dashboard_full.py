@@ -24,39 +24,33 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
     def iso(dt):
         return dt.astimezone(UTC).isoformat()
 
+    def safe_float(v, default=0.0):
+        try:
+            return float(v or 0)
+        except Exception:
+            return default
+
     def get_agent_profile():
         email = session.get("email")
         if not email:
-            return None, "Missing agent session email"
+            return None, "Missing session email"
 
         try:
-            res = (
+            rows = (
                 sb_admin.table("agent_profiles")
                 .select("*")
                 .eq("email", email)
                 .limit(1)
                 .execute()
+                .data or []
             )
-            rows = res.data or []
             if not rows:
-                return None, "Agent profile not found"
+                return None, f"Agent profile not found for {email}"
             return rows[0], None
         except Exception as e:
             return None, str(e)
 
-    def first_row(table, select="*"):
-        try:
-            res = sb_admin.table(table).select(select).limit(1).execute()
-            rows = res.data or []
-            return rows[0] if rows else None
-        except Exception:
-            return None
-
     def get_rate_settings():
-        """
-        Tries multiple places for admin-configured rates.
-        Edit this function only if your table names differ.
-        """
         defaults = {
             "client_register_amount": 10,
             "client_activate_amount": 10,
@@ -64,171 +58,141 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
             "driver_activate_amount": 10,
         }
 
-        row = first_row("agent_rate_settings")
-        if row:
-            return {
-                "client_register_amount": float(row.get("client_register_amount", 10) or 10),
-                "client_activate_amount": float(row.get("client_activate_amount", 10) or 10),
-                "driver_register_amount": float(row.get("driver_register_amount", 10) or 10),
-                "driver_activate_amount": float(row.get("driver_activate_amount", 10) or 10),
-            }
-
-        row = first_row("admin_settings")
-        if row:
-            return {
-                "client_register_amount": float(row.get("client_register_amount", 10) or 10),
-                "client_activate_amount": float(row.get("client_activate_amount", 10) or 10),
-                "driver_register_amount": float(row.get("driver_register_amount", 10) or 10),
-                "driver_activate_amount": float(row.get("driver_activate_amount", 10) or 10),
-            }
+        for table_name in ["agent_rate_settings", "admin_settings", "settings"]:
+            try:
+                rows = sb_admin.table(table_name).select("*").limit(1).execute().data or []
+                if rows:
+                    row = rows[0]
+                    return {
+                        "client_register_amount": safe_float(row.get("client_register_amount", 10), 10),
+                        "client_activate_amount": safe_float(row.get("client_activate_amount", 10), 10),
+                        "driver_register_amount": safe_float(row.get("driver_register_amount", 10), 10),
+                        "driver_activate_amount": safe_float(row.get("driver_activate_amount", 10), 10),
+                    }
+            except Exception:
+                continue
 
         return defaults
 
-    def get_wallet_balance(agent_profile):
-        agent_id = agent_profile.get("id")
-        if not agent_id:
-            return 0.0
-
-        # 1) direct wallet table
+    def get_wallet_balance(agent):
+        aid = agent.get("id")
         try:
-            res = (
+            rows = (
                 sb_admin.table("agent_wallets")
                 .select("*")
-                .eq("agent_id", agent_id)
+                .eq("agent_id", aid)
                 .limit(1)
                 .execute()
+                .data or []
             )
-            rows = res.data or []
             if rows:
-                row = rows[0]
-                return float(row.get("balance", 0) or 0)
+                return safe_float(rows[0].get("balance", 0), 0)
         except Exception:
             pass
 
-        # 2) agent profile balance field
         try:
-            return float(agent_profile.get("wallet_balance", 0) or 0)
-        except Exception:
-            pass
-
-        # 3) ledger sum fallback
-        try:
-            res = (
-                sb_admin.table("agent_wallet_ledger")
-                .select("amount")
-                .eq("agent_id", agent_id)
-                .execute()
-            )
-            rows = res.data or []
-            total = 0.0
-            for r in rows:
-                total += float(r.get("amount", 0) or 0)
-            return total
+            return safe_float(agent.get("wallet_balance", 0), 0)
         except Exception:
             return 0.0
 
-    def query_rows(table, filters=None, select="*"):
-        filters = filters or []
-        q = sb_admin.table(table).select(select)
-        for kind, a, b in filters:
-            if kind == "eq":
-                q = q.eq(a, b)
-            elif kind == "gte":
-                q = q.gte(a, b)
-            elif kind == "lte":
-                q = q.lte(a, b)
-            elif kind == "order":
-                q = q.order(a, desc=bool(b))
-            elif kind == "limit":
-                q = q.limit(a)
-        return q.execute().data or []
+    def weekly_clients(agent, monday, sunday):
+        aid = agent.get("id")
+        try:
+            return (
+                sb_admin.table("clients")
+                .select("*")
+                .eq("recruiter_agent_id", aid)
+                .gte("created_at", iso(monday))
+                .lte("created_at", iso(sunday))
+                .order("created_at", desc=True)
+                .execute()
+                .data or []
+            )
+        except Exception:
+            return []
 
-    def count_weekly_clients(agent_profile, monday, sunday):
-        agent_id = agent_profile.get("id")
-        auth_id = agent_profile.get("auth_id")
-        email = agent_profile.get("email")
+    def weekly_drivers(agent, monday, sunday):
+        aid = agent.get("id")
+        try:
+            return (
+                sb_admin.table("drivers")
+                .select("*")
+                .eq("recruiter_agent_id", aid)
+                .gte("created_at", iso(monday))
+                .lte("created_at", iso(sunday))
+                .order("created_at", desc=True)
+                .execute()
+                .data or []
+            )
+        except Exception:
+            return []
 
-        filters_base = [
-            ("gte", "created_at", iso(monday)),
-            ("lte", "created_at", iso(sunday)),
-        ]
+    def all_clients(agent):
+        aid = agent.get("id")
+        try:
+            return (
+                sb_admin.table("clients")
+                .select("*")
+                .eq("recruiter_agent_id", aid)
+                .order("created_at", desc=True)
+                .limit(5000)
+                .execute()
+                .data or []
+            )
+        except Exception:
+            return []
 
-        attempts = [
-            [("eq", "recruiter_agent_id", agent_id)] + filters_base,
-            [("eq", "agent_id", agent_id)] + filters_base,
-            [("eq", "created_by_agent_id", agent_id)] + filters_base,
-            [("eq", "recruiter_email", email)] + filters_base,
-            [("eq", "created_by_auth_id", auth_id)] + filters_base,
-        ]
+    def all_drivers(agent):
+        aid = agent.get("id")
+        try:
+            return (
+                sb_admin.table("drivers")
+                .select("*")
+                .eq("recruiter_agent_id", aid)
+                .order("created_at", desc=True)
+                .limit(5000)
+                .execute()
+                .data or []
+            )
+        except Exception:
+            return []
 
-        for filters in attempts:
-            try:
-                rows = query_rows("clients", filters)
-                return rows
-            except Exception:
-                continue
-        return []
+    def activity_rows(agent, period="week"):
+        monday, sunday = week_range()
+        if period == "all":
+            client_rows = all_clients(agent)
+            driver_rows = all_drivers(agent)
+        else:
+            client_rows = weekly_clients(agent, monday, sunday)
+            driver_rows = weekly_drivers(agent, monday, sunday)
 
-    def count_weekly_drivers(agent_profile, monday, sunday):
-        agent_id = agent_profile.get("id")
-        auth_id = agent_profile.get("auth_id")
-        email = agent_profile.get("email")
-
-        filters_base = [
-            ("gte", "created_at", iso(monday)),
-            ("lte", "created_at", iso(sunday)),
-        ]
-
-        attempts = [
-            [("eq", "recruiter_agent_id", agent_id)] + filters_base,
-            [("eq", "agent_id", agent_id)] + filters_base,
-            [("eq", "created_by_agent_id", agent_id)] + filters_base,
-            [("eq", "recruiter_email", email)] + filters_base,
-            [("eq", "created_by_auth_id", auth_id)] + filters_base,
-        ]
-
-        for filters in attempts:
-            try:
-                rows = query_rows("drivers", filters)
-                return rows
-            except Exception:
-                continue
-        return []
-
-    def list_activity(agent_profile, monday, sunday):
-        items = []
-
-        for r in count_weekly_clients(agent_profile, monday, sunday):
-            items.append({
+        rows = []
+        for r in client_rows:
+            rows.append({
                 "subject_type": "client",
-                "full_name": r.get("full_name") or r.get("name") or "",
+                "full_name": r.get("full_name") or "",
                 "phone": r.get("phone") or r.get("phone_number") or "",
-                "town": r.get("town") or r.get("region") or "",
+                "town": r.get("town") or "",
                 "created_at": r.get("created_at"),
+                "status": r.get("status") or "",
             })
 
-        for r in count_weekly_drivers(agent_profile, monday, sunday):
-            items.append({
+        for r in driver_rows:
+            rows.append({
                 "subject_type": "driver",
-                "full_name": r.get("full_name") or r.get("name") or "",
+                "full_name": r.get("full_name") or "",
                 "phone": r.get("phone") or r.get("phone_number") or "",
-                "town": r.get("town") or r.get("region") or "",
+                "town": r.get("town") or "",
                 "created_at": r.get("created_at"),
+                "status": r.get("status") or "",
             })
 
-        def sort_key(x):
-            return x.get("created_at") or ""
+        rows.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        return rows
 
-        items.sort(key=sort_key, reverse=True)
-        return items[:100]
-
-    def try_team_trip_counts(agent_profile):
-        """
-        Best-effort support for ride/trip progress.
-        If your trip table uses different names, update only this function.
-        """
-        agent_id = agent_profile.get("id")
-        counters = {
+    def get_trip_stats(agent):
+        aid = agent.get("id")
+        stats = {
             "team_driver_trips": 0,
             "team_rider_trips": 0,
             "drivers_with_5_trips": 0,
@@ -239,24 +203,49 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
                 rows = (
                     sb_admin.table(table_name)
                     .select("*")
-                    .eq("recruiter_agent_id", agent_id)
+                    .eq("recruiter_agent_id", aid)
                     .execute()
                     .data or []
                 )
-                counters["team_driver_trips"] = len(rows)
-                counters["team_rider_trips"] = len(rows)
+
+                if not rows:
+                    continue
+
+                stats["team_driver_trips"] = len(rows)
+                stats["team_rider_trips"] = len(rows)
 
                 per_driver = {}
                 for r in rows:
-                    did = r.get("driver_id") or r.get("driver_uuid") or r.get("driver_phone")
+                    did = r.get("driver_id") or r.get("driver_uuid") or r.get("driver_phone") or r.get("driver")
                     if did:
                         per_driver[did] = per_driver.get(did, 0) + 1
-                counters["drivers_with_5_trips"] = sum(1 for _, n in per_driver.items() if n >= 5)
-                return counters
+
+                stats["drivers_with_5_trips"] = sum(1 for _, n in per_driver.items() if n >= 5)
+                return stats
             except Exception:
                 continue
 
-        return counters
+        return stats
+
+    @app.route("/api/agent/profile_v3", methods=["GET"], endpoint="agent_profile_v3_full")
+    @require_login("AGENT")
+    def agent_profile_v3_full():
+        agent, err = get_agent_profile()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+
+        return jsonify({
+            "ok": True,
+            "profile": {
+                "id": agent.get("id"),
+                "full_name": agent.get("full_name"),
+                "email": agent.get("email"),
+                "phone": agent.get("phone"),
+                "town": agent.get("town"),
+                "username": agent.get("username"),
+                "wallet_balance": safe_float(agent.get("wallet_balance", 0), 0),
+            }
+        })
 
     @app.route("/api/agent/summary_v3", methods=["GET"], endpoint="agent_summary_v3_full")
     @require_login("AGENT")
@@ -267,21 +256,22 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
 
         monday, sunday = week_range()
         rates = get_rate_settings()
-        weekly_clients = count_weekly_clients(agent, monday, sunday)
-        weekly_drivers = count_weekly_drivers(agent, monday, sunday)
-        trip_stats = try_team_trip_counts(agent)
 
-        clients_week = len(weekly_clients)
-        drivers_week = len(weekly_drivers)
+        wk_c = weekly_clients(agent, monday, sunday)
+        wk_d = weekly_drivers(agent, monday, sunday)
+        all_c = all_clients(agent)
+        all_d = all_drivers(agent)
+        trip_stats = get_trip_stats(agent)
+
+        clients_week = len(wk_c)
+        drivers_week = len(wk_d)
+        clients_all = len(all_c)
+        drivers_all = len(all_d)
 
         earnings_week = (
-            clients_week * float(rates["client_register_amount"]) +
-            drivers_week * float(rates["driver_register_amount"])
+            clients_week * safe_float(rates["client_register_amount"], 10) +
+            drivers_week * safe_float(rates["driver_register_amount"], 10)
         )
-
-        starter_progress = clients_week
-        gold_progress = min(trip_stats["team_driver_trips"], trip_stats["team_rider_trips"])
-        platinum_progress = max(trip_stats["team_driver_trips"], trip_stats["drivers_with_5_trips"])
 
         return jsonify({
             "ok": True,
@@ -289,11 +279,18 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
             "week_end": sunday.date().isoformat(),
             "clients_week": clients_week,
             "drivers_week": drivers_week,
+            "clients_all": clients_all,
+            "drivers_all": drivers_all,
             "earnings_week": round(earnings_week, 2),
-            "starter_progress": starter_progress,
-            "gold_progress": gold_progress,
-            "platinum_progress": platinum_progress,
+            "starter_progress": clients_week,
+            "gold_progress": min(trip_stats["team_driver_trips"], 50),
+            "platinum_progress": min(max(trip_stats["team_driver_trips"], trip_stats["drivers_with_5_trips"]), 100),
             "rates": rates,
+            "matched_agent": {
+                "id": agent.get("id"),
+                "full_name": agent.get("full_name"),
+                "email": agent.get("email"),
+            }
         })
 
     @app.route("/api/agent/wallet_v3", methods=["GET"], endpoint="agent_wallet_v3_full")
@@ -315,9 +312,15 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
         if err:
             return jsonify({"ok": False, "error": err}), 401
 
-        monday, sunday = week_range()
-        rows = list_activity(agent, monday, sunday)
-        return jsonify({"ok": True, "rows": rows})
+        period = (request.args.get("period") or "week").strip().lower()
+        if period not in {"week", "all"}:
+            period = "week"
+
+        return jsonify({
+            "ok": True,
+            "period": period,
+            "rows": activity_rows(agent, period)
+        })
 
     @app.route("/api/agent/register_client_v3", methods=["POST"], endpoint="agent_register_client_v3_full")
     @require_login("AGENT")
@@ -335,8 +338,10 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
             return jsonify({"ok": False, "error": "Full name and phone are required"}), 400
 
         try:
-            dup = sb_admin.table("clients").select("id").eq("phone", phone).limit(1).execute()
-            if dup.data:
+            dup = sb_admin.table("clients").select("id").eq("phone_number", phone).execute().data or []
+            if not dup:
+                dup = sb_admin.table("clients").select("id").eq("phone", phone).execute().data or []
+            if dup:
                 return jsonify({"ok": False, "error": "Phone number already exists"}), 400
         except Exception:
             pass
@@ -349,9 +354,6 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
             "status": "pending_approval",
             "recruiter_agent_id": agent.get("id"),
             "recruiter_name": agent.get("full_name") or agent.get("email"),
-            "recruiter_email": agent.get("email"),
-            "created_by_agent_id": agent.get("id"),
-            "created_by_auth_id": agent.get("auth_id"),
         }
 
         try:
@@ -378,8 +380,10 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
             return jsonify({"ok": False, "error": "Full name, phone, and town are required"}), 400
 
         try:
-            dup = sb_admin.table("drivers").select("id").eq("phone", phone).limit(1).execute()
-            if dup.data:
+            dup = sb_admin.table("drivers").select("id").eq("phone_number", phone).execute().data or []
+            if not dup:
+                dup = sb_admin.table("drivers").select("id").eq("phone", phone).execute().data or []
+            if dup:
                 return jsonify({"ok": False, "error": "Driver phone number already exists"}), 400
         except Exception:
             pass
@@ -390,13 +394,9 @@ def register_agent_dashboard_routes(app, sb_admin, require_login, log_system_eve
             "phone_number": phone,
             "email": email,
             "town": town,
-            "region": town,
             "status": "pending_approval",
             "recruiter_agent_id": agent.get("id"),
             "recruiter_name": agent.get("full_name") or agent.get("email"),
-            "recruiter_email": agent.get("email"),
-            "created_by_agent_id": agent.get("id"),
-            "created_by_auth_id": agent.get("auth_id"),
         }
 
         try:

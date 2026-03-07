@@ -107,6 +107,18 @@
     </div>
 
     <div id="statusBox" class="status">Checking your session...</div>
+    <div class="card" id="debugCard" style="display:none">
+      <h3 style="margin-top:0">Agent Match Debug</h3>
+      <div class="sub-text" id="debugText">Loading debug info...</div>
+    </div>
+    <div class="card" id="debugCard" style="display:none">
+      <h3 style="margin-top:0">Agent Match Debug</h3>
+      <div class="sub-text" id="debugText">Loading debug info...</div>
+    </div>
+    <div class="card" id="debugCard" style="display:none">
+      <h3 style="margin-top:0">Agent Match Debug</h3>
+      <div class="sub-text" id="debugText">Loading debug info...</div>
+    </div>
 
     <section id="v-home" class="view active">
       <div class="grid">
@@ -130,10 +142,20 @@
           <div class="metric-value" id="walletBalance">N$ 0.00</div>
           <div class="sub-text">Current tracked balance</div>
         </div>
+        <div class="card">
+          <div class="sub-text">Drivers Registered All Time</div>
+          <div class="metric-value" id="driversAll">0</div>
+          <div class="sub-text">All records linked to your profile</div>
+        </div>
+        <div class="card">
+          <div class="sub-text">Clients Registered All Time</div>
+          <div class="metric-value" id="clientsAll">0</div>
+          <div class="sub-text">All records linked to your profile</div>
+        </div>
       </div>
 
       <div class="card">
-        <h3 style="margin-top:0">This Week's Registrations</h3>
+        <div class="row" style="align-items:center;margin-bottom:8px"><h3 style="margin:0;flex:1">Registrations</h3><select id="activityPeriod" class="input-field" style="max-width:220px;margin:0"><option value="week">This Week</option><option value="all">All Previous Data</option></select></div>
         <table>
           <thead>
             <tr><th>Date</th><th>Type</th><th>Name</th><th>Phone</th><th>Town</th></tr>
@@ -417,13 +439,52 @@
     document.getElementById('flyerTown').value = profile?.town || '';
     updateFlyer();
 
+    const profileRes = await apiGet('/api/agent/profile_v3');
+    if(profileRes && profileRes.ok && profileRes.profile){
+      const p = profileRes.profile;
+      const welcomeName = p.full_name || p.username || p.email || 'Agent';
+      document.getElementById('welcomeText').textContent = 'Welcome, ' + welcomeName;
+      document.getElementById('refLink').value = buildRefLink({email:p.email, username:p.username, auth_id:p.auth_id});
+      document.getElementById('flyerName').value = p.full_name || '';
+      document.getElementById('flyerPhone').value = p.phone || '';
+      document.getElementById('flyerEmail').value = p.email || '';
+      document.getElementById('flyerTown').value = p.town || '';
+      updateFlyer();
+    }
+
     const summary = await apiGet('/api/agent/summary_v3');
     if(summary && summary.ok){
       document.getElementById('weekLabel').textContent = 'Week: ' + (summary.week_start || 'Mon') + ' → ' + (summary.week_end || 'Sun');
       document.getElementById('weeklyDrivers').textContent = summary.drivers_week || 0;
       document.getElementById('weeklyClients').textContent = summary.clients_week || 0;
       document.getElementById('weeklyEarnings').textContent = money(summary.earnings_week || 0);
+      document.getElementById('driversAll').textContent = summary.drivers_all || 0;
+      document.getElementById('clientsAll').textContent = summary.clients_all || 0;
       updateProgress(summary.starter_progress || 0, summary.gold_progress || 0, summary.platinum_progress || 0);
+
+      if(summary.matched_agent){
+        document.getElementById('debugCard').style.display = 'block';
+        document.getElementById('debugText').innerHTML =
+          'Matched agent ID: <b>' + (summary.matched_agent.id || '') + '</b><br>' +
+          'Matched name: <b>' + (summary.matched_agent.full_name || '') + '</b><br>' +
+          'Matched email: <b>' + (summary.matched_agent.email || '') + '</b>';
+      }
+
+      if(summary.matched_agent){
+        document.getElementById('debugCard').style.display = 'block';
+        document.getElementById('debugText').innerHTML =
+          'Matched agent ID: <b>' + (summary.matched_agent.id || '') + '</b><br>' +
+          'Matched name: <b>' + (summary.matched_agent.full_name || '') + '</b><br>' +
+          'Matched email: <b>' + (summary.matched_agent.email || '') + '</b>';
+      }
+
+      if(summary.matched_agent){
+        document.getElementById('debugCard').style.display = 'block';
+        document.getElementById('debugText').innerHTML =
+          'Matched agent ID: <b>' + (summary.matched_agent.id || '') + '</b><br>' +
+          'Matched name: <b>' + (summary.matched_agent.full_name || '') + '</b><br>' +
+          'Matched email: <b>' + (summary.matched_agent.email || '') + '</b>';
+      }
     } else {
       document.getElementById('weekLabel').textContent = 'Week: current Monday → Sunday';
       updateProgress(0, 0, 0);
@@ -432,7 +493,8 @@
     const wallet = await apiGet('/api/agent/wallet_v3');
     document.getElementById('walletBalance').textContent = money(wallet && wallet.ok ? wallet.balance : 0);
 
-    const activity = await apiGet('/api/agent/activity_v3');
+    const period = (document.getElementById('activityPeriod') || {}).value || 'week';
+    const activity = await apiGet('/api/agent/activity_v3?period=' + encodeURIComponent(period));
     renderActivity(activity && activity.ok ? activity.rows : []);
 
     setStatus('Dashboard loaded successfully.', 'ok');
@@ -528,6 +590,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('driverForm').addEventListener('submit', submitDriver);
     document.getElementById('clientForm').addEventListener('submit', submitClient);
+    const ap = document.getElementById('activityPeriod');
+    if(ap){ ap.addEventListener('change', loadDashboard); }
     loadDashboard();
   });
 </script>
