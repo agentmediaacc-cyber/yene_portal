@@ -1987,3 +1987,8 @@ def api_agent_register_driver():
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
+
+# --- Agent dashboard full routes ---
+from agent_dashboard_full import register_agent_dashboard_routes
+register_agent_dashboard_routes(app, sb_admin, require_login, globals().get("log_system_event"))
+
