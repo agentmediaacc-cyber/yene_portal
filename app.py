@@ -1985,29 +1985,5 @@ def api_agent_register_driver():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
-@app.route("/api/agent/register_client", methods=["POST"])
-@require_login("AGENT")
-def api_agent_register_client():
-    data = request.json
-    email = session.get("email")
-    agent = sb_admin.table("agent_profiles").select("id, full_name").eq("email", email).execute().data
-    if not agent: return jsonify({"success": False, "error": "Agent not found"})
-    
-    phone = data.get("phone")
-    dup = sb_admin.table("clients").select("id").eq("phone", phone).execute()
-    if dup.data: return jsonify({"success": False, "error": "Phone number already in system!"})
-    
-    try:
-        sb_admin.table("clients").insert({
-            "full_name": data.get("full_name"), "phone": phone, "phone_number": phone,
-            "yene_code": "PENDING", "recruiter_agent_id": agent[0]["id"],
-            "recruiter_name": agent[0]["full_name"], "status": "pending_approval"
-        }).execute()
-        # Log to Admin Command Center
-        log_system_event("REGISTER", f"Agent {agent[0]['full_name']} registered client {data.get('full_name')}")
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
-
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
