@@ -2020,6 +2020,10 @@ def debug_agent_session():
 from agent_dashboard_v4 import register_agent_dashboard_v4_routes
 register_agent_dashboard_v4_routes(app, sb_admin, require_login, globals().get("log_system_event"))
 
+
+from agent_academy_v1 import register_agent_academy_v1_routes
+register_agent_academy_v1_routes(app, sb_admin, require_login)
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 

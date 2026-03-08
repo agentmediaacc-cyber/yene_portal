@@ -1,7 +1,55 @@
 {% extends 'base.html' %}
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">
+async function loadAcademyBadges(){
+  const r = await apiGet('/api/agent/academy_status_v1');
+  const box = document.getElementById('academyBadges');
+  if(!box) return;
+
+  if(!r.ok){
+    box.innerHTML = 'Academy setup needed. Run academy_schema.sql in Supabase.';
+    return;
+  }
+
+  const badges = r.badges || [];
+  if(badges.length === 0){
+    box.innerHTML = 'No badges yet. Pass a test to earn one.';
+    return;
+  }
+
+  box.innerHTML = badges.map(b => '🏅 ' + b).join('<br>');
+}
+
+async function submitAcademyTest(moduleKey, formId, resultId){
+  const form = document.getElementById(formId);
+  const result = document.getElementById(resultId);
+  if(!form || !result) return;
+
+  let score = 0;
+  form.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+    score += parseInt(el.value || '0', 10);
+  });
+
+  if(score < 3){
+    result.innerHTML = '❌ You did not pass. Please study again and retry.';
+    return;
+  }
+
+  const r = await apiPost('/api/agent/academy_pass_v1', {
+    module_key: moduleKey,
+    score: score
+  });
+
+  if(r.ok){
+    result.innerHTML = '🏅 Congratulations! You passed and earned a badge.';
+    await loadAcademyBadges();
+  }else{
+    result.innerHTML = '❌ Could not save result: ' + (r.error || 'Unknown error');
+  }
+}
+
+</script>
 
 <style>
   :root{--yene:#4aa8ff;--bg:#0b1220;--panel:#0f1a2f;--card:#111b2e;--card2:#0b1427;--text:#eaf2ff;--muted:#a9b7d6;--line:rgba(255,255,255,.10);--ok:#2ed573;--danger:#ff6b6b}
@@ -131,7 +179,143 @@
 
     <section id="v-team" class="view"><div class="card"><h3 style="margin-top:0">Team</h3><div class="sub">Team features active.</div></div></section>
     <section id="v-marketing" class="view"><div class="card"><h3 style="margin-top:0">Marketing</h3><div class="sub">Marketing studio active.</div></div></section>
-    <section id="v-academy" class="view"><div class="card"><h3 style="margin-top:0">Academy</h3><div class="sub">Yene Academy active.</div></div></section>
+    
+    <section id="v-academy" class="view">
+      <div class="card">
+        <h3 style="margin-top:0">🎓 Yene Academy</h3>
+        <div class="sub">Train, test yourself, and earn certification badges.</div>
+      </div>
+
+      <div id="academyBadgesCard" class="card">
+        <h3 style="margin-top:0">My Academy Badges</h3>
+        <div id="academyBadges" class="sub">No badges yet.</div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Level 1 — Driver Registration Training</h3>
+        <div class="sub">
+          1. Help driver download <b>YENE Driver App</b>.<br>
+          2. Click <b>Sign Up</b> and enter driver cellphone number.<br>
+          3. Wait for OTP and insert it.<br>
+          4. Enter full name, email, and create password.<br><br>
+
+          <b>Documents to prepare:</b><br>
+          • Driver licence front and back<br>
+          • ID front and back (if available)<br>
+          • Vehicle front and back images<br>
+          • Vehicle disc / registration / insurance<br><br>
+
+          <b>Important:</b><br>
+          • Yene charges <b>7%</b> per ride as service fee<br>
+          • New drivers get <b>14 day trial</b><br>
+          • Agent must copy driver code like <b>PAR....</b> from profile and use it in network registration
+        </div>
+        <hr>
+        <form id="driverQuizForm">
+          <p>1. Which app must the driver install first?</p>
+          <label><input type="radio" name="driver_q1" value="1"> YENE Driver App</label><br>
+          <label><input type="radio" name="driver_q1" value="0"> YENE Rider App</label>
+
+          <p>2. What is the Yene service fee per ride?</p>
+          <label><input type="radio" name="driver_q2" value="1"> 7%</label><br>
+          <label><input type="radio" name="driver_q2" value="0"> 15%</label>
+
+          <p>3. How many days trial do new drivers get?</p>
+          <label><input type="radio" name="driver_q3" value="1"> 14 days</label><br>
+          <label><input type="radio" name="driver_q3" value="0"> 2 days</label>
+
+          <br><button class="btn" type="button" onclick="submitAcademyTest('driver_registration','driverQuizForm','driverQuizResult')">Submit Driver Test</button>
+          <div id="driverQuizResult" class="sub" style="margin-top:10px"></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Level 2 — Client Registration Training</h3>
+        <div class="sub">
+          1. Help client download the Yene rider app.<br>
+          2. Sign up with cellphone number and OTP.<br>
+          3. Enter full name, gender, email, and password.<br>
+          4. Client can use the app immediately without approval.<br>
+          5. Open client profile, go to <b>Invite a Friend</b>, copy the code, and use that when registering the client in your network.
+        </div>
+        <hr>
+        <form id="clientQuizForm">
+          <p>1. Does a client need approval before requesting a ride?</p>
+          <label><input type="radio" name="client_q1" value="1"> No</label><br>
+          <label><input type="radio" name="client_q1" value="0"> Yes</label>
+
+          <p>2. Where do you get the client code for your network entry?</p>
+          <label><input type="radio" name="client_q2" value="1"> Invite a Friend section</label><br>
+          <label><input type="radio" name="client_q2" value="0"> Driver profile page</label>
+
+          <p>3. What is the first step for client registration?</p>
+          <label><input type="radio" name="client_q3" value="1"> Download the rider app</label><br>
+          <label><input type="radio" name="client_q3" value="0"> Upload car documents</label>
+
+          <br><button class="btn" type="button" onclick="submitAcademyTest('client_registration','clientQuizForm','clientQuizResult')">Submit Client Test</button>
+          <div id="clientQuizResult" class="sub" style="margin-top:10px"></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Level 3 — Activation & Driver Management</h3>
+        <div class="sub">
+          • Follow up with drivers daily and motivate them to stay online.<br>
+          • Help drivers solve app problems quickly.<br>
+          • Identify clients who can request rides immediately or the next day.<br>
+          • Visit malls, universities, offices, and busy places to find riders.<br>
+          • Keep drivers on standby when you know a client may request a ride.
+        </div>
+        <hr>
+        <form id="activationQuizForm">
+          <p>1. What should an agent do after registering a driver?</p>
+          <label><input type="radio" name="act_q1" value="1"> Follow up and support the driver</label><br>
+          <label><input type="radio" name="act_q1" value="0"> Ignore the driver</label>
+
+          <p>2. Where can agents find possible riders?</p>
+          <label><input type="radio" name="act_q2" value="1"> Malls and universities</label><br>
+          <label><input type="radio" name="act_q2" value="0"> Only at home</label>
+
+          <p>3. Why keep drivers on standby?</p>
+          <label><input type="radio" name="act_q3" value="1"> To serve possible ride requests fast</label><br>
+          <label><input type="radio" name="act_q3" value="0"> To log them out</label>
+
+          <br><button class="btn" type="button" onclick="submitAcademyTest('activation','activationQuizForm','activationQuizResult')">Submit Activation Test</button>
+          <div id="activationQuizResult" class="sub" style="margin-top:10px"></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Level 4 — Marketing & Growth</h3>
+        <div class="sub">
+          <b>Marketing ideas for agents:</b><br>
+          • Post flyer on WhatsApp status every day<br>
+          • Share referral link on Facebook groups<br>
+          • Visit taxi ranks and car wash points to recruit drivers<br>
+          • Visit malls, offices, and campuses to recruit riders<br>
+          • Ask satisfied clients and drivers to refer others<br>
+          • Follow up daily with your network
+        </div>
+        <hr>
+        <form id="marketingQuizForm">
+          <p>1. Which is a good place to recruit drivers?</p>
+          <label><input type="radio" name="mark_q1" value="1"> Car wash points</label><br>
+          <label><input type="radio" name="mark_q1" value="0"> Swimming pool only</label>
+
+          <p>2. Which is a good place to recruit riders?</p>
+          <label><input type="radio" name="mark_q2" value="1"> Malls and campuses</label><br>
+          <label><input type="radio" name="mark_q2" value="0"> Empty fields</label>
+
+          <p>3. What should agents share online?</p>
+          <label><input type="radio" name="mark_q3" value="1"> Flyer and referral link</label><br>
+          <label><input type="radio" name="mark_q3" value="0"> Nothing</label>
+
+          <br><button class="btn" type="button" onclick="submitAcademyTest('marketing_growth','marketingQuizForm','marketingQuizResult')">Submit Marketing Test</button>
+          <div id="marketingQuizResult" class="sub" style="margin-top:10px"></div>
+        </form>
+      </div>
+    </section>
+
     <section id="v-settings" class="view"><div class="card"><h3 style="margin-top:0">Settings</h3><div class="sub">Settings active.</div></div></section>
   </main>
 </div>
@@ -250,6 +434,55 @@
     document.getElementById('clientForm').addEventListener('submit', submitClient);
     document.getElementById('activityPeriod').addEventListener('change', loadDashboard);
     loadDashboard();
+    loadAcademyBadges();
   });
+
+async function loadAcademyBadges(){
+  const r = await apiGet('/api/agent/academy_status_v1');
+  const box = document.getElementById('academyBadges');
+  if(!box) return;
+
+  if(!r.ok){
+    box.innerHTML = 'Academy setup needed. Run academy_schema.sql in Supabase.';
+    return;
+  }
+
+  const badges = r.badges || [];
+  if(badges.length === 0){
+    box.innerHTML = 'No badges yet. Pass a test to earn one.';
+    return;
+  }
+
+  box.innerHTML = badges.map(b => '🏅 ' + b).join('<br>');
+}
+
+async function submitAcademyTest(moduleKey, formId, resultId){
+  const form = document.getElementById(formId);
+  const result = document.getElementById(resultId);
+  if(!form || !result) return;
+
+  let score = 0;
+  form.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+    score += parseInt(el.value || '0', 10);
+  });
+
+  if(score < 3){
+    result.innerHTML = '❌ You did not pass. Please study again and retry.';
+    return;
+  }
+
+  const r = await apiPost('/api/agent/academy_pass_v1', {
+    module_key: moduleKey,
+    score: score
+  });
+
+  if(r.ok){
+    result.innerHTML = '🏅 Congratulations! You passed and earned a badge.';
+    await loadAcademyBadges();
+  }else{
+    result.innerHTML = '❌ Could not save result: ' + (r.error || 'Unknown error');
+  }
+}
+
 </script>
 {% endblock %}
