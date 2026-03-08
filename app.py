@@ -2025,6 +2025,6 @@ if __name__ == "__main__":
 
 # --- Agent dashboard full routes ---
 from agent_dashboard_full import register_agent_dashboard_routes, register_agent_dashboard_debug_routes
-register_agent_dashboard_routes(app, sb_admin, require_login, globals().get("log_system_event"))
-register_agent_dashboard_debug_routes(app, sb_admin, require_login)
+# register_agent_dashboard_routes(app, sb_admin, require_login, globals().get("log_system_event"))
+# register_agent_dashboard_debug_routes(app, sb_admin, require_login)
 
