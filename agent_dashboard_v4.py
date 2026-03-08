@@ -89,7 +89,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         return safe_float(agent.get("wallet_balance", 0), 0)
 
     def driver_rows(agent_id, start=None, end=None):
-        q = sb_admin.table("drivers").select("*").eq("recruiter_agent_id", agent_id)
+        q = sb_admin.table("drivers").select("*").eq("recruiter_agent_id", str(agent_id))
         if start:
             q = q.gte("created_at", iso(start))
         if end:
@@ -100,7 +100,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             return []
 
     def client_rows(agent_id, start=None, end=None):
-        q = sb_admin.table("clients").select("*").eq("recruiter_agent_id", agent_id)
+        q = sb_admin.table("clients").select("*").eq("recruiter_agent_id", str(agent_id))
         if start:
             q = q.gte("created_at", iso(start))
         if end:
@@ -130,7 +130,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 "subject_type": "client",
                 "full_name": r.get("full_name") or "",
                 "phone": r.get("phone") or r.get("phone_number") or "",
-                "town": r.get("town") or "",
+                "town": "",
                 "external_code": r.get("external_code") or r.get("yene_code") or "",
                 "created_at": r.get("created_at"),
                 "status": r.get("status") or "",
@@ -271,10 +271,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         if period not in {"day", "week", "all"}:
             period = "week"
 
-        return jsonify({
-            "ok": True,
-            "rows": activity(agent, period),
-        })
+        return jsonify({"ok": True, "rows": activity(agent, period)})
 
     @app.route("/api/agent/team_v4", methods=["GET"], endpoint="agent_team_v4")
     @require_login("AGENT")
@@ -283,10 +280,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         if err:
             return jsonify({"ok": False, "error": err}), 401
 
-        return jsonify({
-            "ok": True,
-            "rows": team_agents(agent),
-        })
+        return jsonify({"ok": True, "rows": team_agents(agent)})
 
     @app.route("/api/agent/settings_v4", methods=["POST"], endpoint="agent_settings_v4")
     @require_login("AGENT")
@@ -325,10 +319,11 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         phone = (data.get("phone") or "").strip()
         town = (data.get("town") or "").strip()
         license_number = (data.get("license_number") or "").strip()
+        car_details = (data.get("car_details") or "").strip()
         external_code = (data.get("external_code") or "").strip()
 
-        if not full_name or not phone or not license_number:
-            return jsonify({"ok": False, "error": "Full name, phone and license number are required"}), 400
+        if not full_name or not phone or not license_number or not car_details:
+            return jsonify({"ok": False, "error": "Full name, phone, license number and car details are required"}), 400
 
         try:
             dup = sb_admin.table("drivers").select("id").eq("phone_number", phone).execute().data or []
@@ -341,16 +336,18 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
 
         payload = {
             "full_name": full_name,
-            "phone": phone,
             "phone_number": phone,
-            "town": town,
+            "phone": phone,
             "license_number": license_number,
+            "car_details": car_details,
+            "town": town,
             "status": "pending_approval",
-            "recruiter_agent_id": agent.get("id"),
+            "trips_completed": 0,
+            "verified_trips": 0,
+            "recruiter_agent_id": str(agent.get("id") or ""),
             "recruiter_name": agent.get("full_name") or agent.get("email"),
         }
 
-        # only include external_code if the table supports it
         if external_code:
             payload["external_code"] = external_code
 
@@ -359,15 +356,6 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             safe_log("REGISTER_DRIVER", f"Agent {agent.get('email')} registered driver {full_name}")
             return jsonify({"ok": True, "success": True})
         except Exception as e:
-            # retry without external_code if schema does not support it
-            if "external_code" in str(e):
-                payload.pop("external_code", None)
-                try:
-                    sb_admin.table("drivers").insert(payload).execute()
-                    safe_log("REGISTER_DRIVER", f"Agent {agent.get('email')} registered driver {full_name}")
-                    return jsonify({"ok": True, "success": True})
-                except Exception as e2:
-                    return jsonify({"ok": False, "error": str(e2)}), 500
             return jsonify({"ok": False, "error": str(e)}), 500
 
     @app.route("/api/agent/register_client_v4", methods=["POST"], endpoint="agent_register_client_v4")
@@ -380,11 +368,10 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         data = request.get_json(silent=True) or {}
         full_name = (data.get("full_name") or "").strip()
         phone = (data.get("phone") or "").strip()
-        town = (data.get("town") or "").strip()
         external_code = (data.get("external_code") or "").strip()
 
-        if not full_name or not phone:
-            return jsonify({"ok": False, "error": "Full name and phone are required"}), 400
+        if not phone:
+            return jsonify({"ok": False, "error": "Phone number is required"}), 400
 
         try:
             dup = sb_admin.table("clients").select("id").eq("phone_number", phone).execute().data or []
@@ -396,19 +383,23 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             pass
 
         payload = {
-            "full_name": full_name,
-            "phone": phone,
             "phone_number": phone,
-            "town": town,
+            "phone": phone,
             "yene_code": external_code or "PENDING",
             "status": "pending_approval",
-            "recruiter_agent_id": agent.get("id"),
+            "trips_completed": 0,
+            "recruiter_agent_id": str(agent.get("id") or ""),
             "recruiter_name": agent.get("full_name") or agent.get("email"),
         }
 
+        if full_name:
+            payload["full_name"] = full_name
+        if external_code:
+            payload["external_code"] = external_code
+
         try:
             sb_admin.table("clients").insert(payload).execute()
-            safe_log("REGISTER_CLIENT", f"Agent {agent.get('email')} registered client {full_name}")
+            safe_log("REGISTER_CLIENT", f"Agent {agent.get('email')} registered client {phone}")
             return jsonify({"ok": True, "success": True})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
