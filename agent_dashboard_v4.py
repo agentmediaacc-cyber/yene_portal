@@ -24,6 +24,12 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         sunday = monday + timedelta(days=6, hours=23, minutes=59, seconds=59)
         return monday, sunday
 
+    def day_range():
+        now = datetime.now(UTC)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1, seconds=-1)
+        return start, end
+
     def iso(dt):
         return dt.astimezone(UTC).isoformat()
 
@@ -82,72 +88,41 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             pass
         return safe_float(agent.get("wallet_balance", 0), 0)
 
-    def drivers_week(agent, monday, sunday):
-        aid = agent.get("id")
+    def driver_rows(agent_id, start=None, end=None):
+        q = sb_admin.table("drivers").select("*").eq("recruiter_agent_id", agent_id)
+        if start:
+            q = q.gte("created_at", iso(start))
+        if end:
+            q = q.lte("created_at", iso(end))
         try:
-            return (
-                sb_admin.table("drivers")
-                .select("*")
-                .eq("recruiter_agent_id", aid)
-                .gte("created_at", iso(monday))
-                .lte("created_at", iso(sunday))
-                .order("created_at", desc=True)
-                .execute()
-                .data or []
-            )
+            return q.order("created_at", desc=True).limit(5000).execute().data or []
         except Exception:
             return []
 
-    def clients_week(agent, monday, sunday):
-        aid = agent.get("id")
+    def client_rows(agent_id, start=None, end=None):
+        q = sb_admin.table("clients").select("*").eq("recruiter_agent_id", agent_id)
+        if start:
+            q = q.gte("created_at", iso(start))
+        if end:
+            q = q.lte("created_at", iso(end))
         try:
-            return (
-                sb_admin.table("clients")
-                .select("*")
-                .eq("recruiter_agent_id", aid)
-                .gte("created_at", iso(monday))
-                .lte("created_at", iso(sunday))
-                .order("created_at", desc=True)
-                .execute()
-                .data or []
-            )
-        except Exception:
-            return []
-
-    def drivers_all(agent):
-        aid = agent.get("id")
-        try:
-            return (
-                sb_admin.table("drivers")
-                .select("*")
-                .eq("recruiter_agent_id", aid)
-                .order("created_at", desc=True)
-                .limit(5000)
-                .execute()
-                .data or []
-            )
-        except Exception:
-            return []
-
-    def clients_all(agent):
-        aid = agent.get("id")
-        try:
-            return (
-                sb_admin.table("clients")
-                .select("*")
-                .eq("recruiter_agent_id", aid)
-                .order("created_at", desc=True)
-                .limit(5000)
-                .execute()
-                .data or []
-            )
+            return q.order("created_at", desc=True).limit(5000).execute().data or []
         except Exception:
             return []
 
     def activity(agent, period="week"):
-        monday, sunday = week_range()
-        drows = drivers_week(agent, monday, sunday) if period == "week" else drivers_all(agent)
-        crows = clients_week(agent, monday, sunday) if period == "week" else clients_all(agent)
+        aid = agent.get("id")
+        if period == "all":
+            drows = driver_rows(aid)
+            crows = client_rows(aid)
+        elif period == "day":
+            ds, de = day_range()
+            drows = driver_rows(aid, ds, de)
+            crows = client_rows(aid, ds, de)
+        else:
+            ws, we = week_range()
+            drows = driver_rows(aid, ws, we)
+            crows = client_rows(aid, ws, we)
 
         rows = []
         for r in crows:
@@ -156,6 +131,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 "full_name": r.get("full_name") or "",
                 "phone": r.get("phone") or r.get("phone_number") or "",
                 "town": r.get("town") or "",
+                "external_code": r.get("external_code") or r.get("yene_code") or "",
                 "created_at": r.get("created_at"),
                 "status": r.get("status") or "",
             })
@@ -165,6 +141,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 "full_name": r.get("full_name") or "",
                 "phone": r.get("phone") or r.get("phone_number") or "",
                 "town": r.get("town") or "",
+                "external_code": r.get("external_code") or "",
                 "created_at": r.get("created_at"),
                 "status": r.get("status") or "",
             })
@@ -174,10 +151,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
 
     def team_agents(agent):
         aid = agent.get("id")
-        email = agent.get("email")
-        agents = []
-
-        # Preferred: agent_referrals table
+        rows = []
         try:
             refs = (
                 sb_admin.table("agent_referrals")
@@ -188,50 +162,39 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 .execute()
                 .data or []
             )
-            if refs:
-                for r in refs:
-                    agents.append({
-                        "full_name": r.get("child_agent_name") or "",
-                        "email": r.get("child_agent_email") or "",
-                        "joined_at": r.get("created_at"),
-                    })
-                return agents
+            for r in refs:
+                child_id = r.get("child_agent_id")
+                ds, de = day_range()
+                ws, we = week_range()
+
+                d_day = len(driver_rows(child_id, ds, de)) if child_id else 0
+                c_day = len(client_rows(child_id, ds, de)) if child_id else 0
+                d_week = len(driver_rows(child_id, ws, we)) if child_id else 0
+                c_week = len(client_rows(child_id, ws, we)) if child_id else 0
+                d_all = len(driver_rows(child_id)) if child_id else 0
+                c_all = len(client_rows(child_id)) if child_id else 0
+
+                rows.append({
+                    "child_agent_id": child_id,
+                    "full_name": r.get("child_agent_name") or "",
+                    "email": r.get("child_agent_email") or "",
+                    "joined_at": r.get("created_at"),
+                    "drivers_day": d_day,
+                    "clients_day": c_day,
+                    "drivers_week": d_week,
+                    "clients_week": c_week,
+                    "drivers_all": d_all,
+                    "clients_all": c_all,
+                })
         except Exception:
             pass
-
-        # Fallback if agent_profiles already has parent fields
-        for col, value in [("parent_agent_id", aid), ("parent_agent_email", email)]:
-            if not value:
-                continue
-            try:
-                rows = (
-                    sb_admin.table("agent_profiles")
-                    .select("*")
-                    .eq(col, value)
-                    .order("created_at", desc=True)
-                    .limit(5000)
-                    .execute()
-                    .data or []
-                )
-                if rows:
-                    for r in rows:
-                        agents.append({
-                            "full_name": r.get("full_name") or "",
-                            "email": r.get("email") or "",
-                            "joined_at": r.get("created_at"),
-                        })
-                    return agents
-            except Exception:
-                pass
-
-        return agents
+        return rows
 
     @app.route("/join")
     def join_agent_team():
         ref = (request.args.get("ref") or "").strip()
         if ref:
             session["agent_ref"] = ref
-        # change this if your signup page URL is different
         return redirect("/register")
 
     @app.route("/api/agent/me_v4", methods=["GET"], endpoint="agent_me_v4")
@@ -250,6 +213,10 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 "phone": agent.get("phone"),
                 "town": agent.get("town"),
                 "username": agent.get("username"),
+                "profile_picture_url": agent.get("profile_picture_url"),
+                "residential_address": agent.get("residential_address"),
+                "operation_region": agent.get("operation_region"),
+                "pin": agent.get("pin"),
             }
         })
 
@@ -260,13 +227,13 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         if err:
             return jsonify({"ok": False, "error": err}), 401
 
-        monday, sunday = week_range()
+        ws, we = week_range()
         rates = get_rates()
 
-        wk_d = drivers_week(agent, monday, sunday)
-        wk_c = clients_week(agent, monday, sunday)
-        all_d = drivers_all(agent)
-        all_c = clients_all(agent)
+        wk_d = driver_rows(agent.get("id"), ws, we)
+        wk_c = client_rows(agent.get("id"), ws, we)
+        all_d = driver_rows(agent.get("id"))
+        all_c = client_rows(agent.get("id"))
         team = team_agents(agent)
 
         earnings_week = (
@@ -276,8 +243,8 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
 
         return jsonify({
             "ok": True,
-            "week_start": monday.date().isoformat(),
-            "week_end": sunday.date().isoformat(),
+            "week_start": ws.date().isoformat(),
+            "week_end": we.date().isoformat(),
             "drivers_week": len(wk_d),
             "clients_week": len(wk_c),
             "drivers_all": len(all_d),
@@ -301,7 +268,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             return jsonify({"ok": False, "error": err}), 401
 
         period = (request.args.get("period") or "week").strip().lower()
-        if period not in {"week", "all"}:
+        if period not in {"day", "week", "all"}:
             period = "week"
 
         return jsonify({
@@ -316,11 +283,35 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         if err:
             return jsonify({"ok": False, "error": err}), 401
 
-        rows = team_agents(agent)
         return jsonify({
             "ok": True,
-            "rows": rows,
+            "rows": team_agents(agent),
         })
+
+    @app.route("/api/agent/settings_v4", methods=["POST"], endpoint="agent_settings_v4")
+    @require_login("AGENT")
+    def agent_settings_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+
+        data = request.get_json(silent=True) or {}
+        updates = {
+            "full_name": (data.get("full_name") or "").strip() or agent.get("full_name"),
+            "phone": (data.get("phone") or "").strip(),
+            "email": (data.get("email") or "").strip() or agent.get("email"),
+            "profile_picture_url": (data.get("profile_picture_url") or "").strip(),
+            "residential_address": (data.get("residential_address") or "").strip(),
+            "operation_region": (data.get("operation_region") or "").strip(),
+            "pin": (data.get("pin") or "").strip(),
+        }
+
+        try:
+            sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
+            session["email"] = updates["email"]
+            return jsonify({"ok": True, "success": True})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
 
     @app.route("/api/agent/register_driver_v4", methods=["POST"], endpoint="agent_register_driver_v4")
     @require_login("AGENT")
@@ -333,11 +324,11 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         full_name = (data.get("full_name") or "").strip()
         phone = (data.get("phone") or "").strip()
         town = (data.get("town") or "").strip()
-        email = (data.get("email") or "").strip()
+        license_number = (data.get("license_number") or "").strip()
         external_code = (data.get("external_code") or "").strip()
 
-        if not full_name or not phone or not town:
-            return jsonify({"ok": False, "error": "Full name, phone and town are required"}), 400
+        if not full_name or not phone or not license_number:
+            return jsonify({"ok": False, "error": "Full name, phone and license number are required"}), 400
 
         try:
             dup = sb_admin.table("drivers").select("id").eq("phone_number", phone).execute().data or []
@@ -353,18 +344,30 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "phone": phone,
             "phone_number": phone,
             "town": town,
-            "external_code": external_code,
+            "license_number": license_number,
             "status": "pending_approval",
             "recruiter_agent_id": agent.get("id"),
             "recruiter_name": agent.get("full_name") or agent.get("email"),
-            "external_code": external_code,
         }
+
+        # only include external_code if the table supports it
+        if external_code:
+            payload["external_code"] = external_code
 
         try:
             sb_admin.table("drivers").insert(payload).execute()
             safe_log("REGISTER_DRIVER", f"Agent {agent.get('email')} registered driver {full_name}")
             return jsonify({"ok": True, "success": True})
         except Exception as e:
+            # retry without external_code if schema does not support it
+            if "external_code" in str(e):
+                payload.pop("external_code", None)
+                try:
+                    sb_admin.table("drivers").insert(payload).execute()
+                    safe_log("REGISTER_DRIVER", f"Agent {agent.get('email')} registered driver {full_name}")
+                    return jsonify({"ok": True, "success": True})
+                except Exception as e2:
+                    return jsonify({"ok": False, "error": str(e2)}), 500
             return jsonify({"ok": False, "error": str(e)}), 500
 
     @app.route("/api/agent/register_client_v4", methods=["POST"], endpoint="agent_register_client_v4")
@@ -397,6 +400,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "phone": phone,
             "phone_number": phone,
             "town": town,
+            "yene_code": external_code or "PENDING",
             "status": "pending_approval",
             "recruiter_agent_id": agent.get("id"),
             "recruiter_name": agent.get("full_name") or agent.get("email"),
