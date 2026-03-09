@@ -2250,6 +2250,28 @@ def api_admin_all_clients_for_approval():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+
+@app.route("/api/admin/reset_agent_pin/<agent_id>", methods=["POST"])
+def api_admin_reset_agent_pin(agent_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json(silent=True) or {}
+        new_pin = (data.get("new_pin") or "").strip()
+
+        if not new_pin:
+            return jsonify({"success": False, "error": "New PIN is required"}), 400
+
+        sb_admin.table("agent_profiles").update({
+            "pin": new_pin
+        }).eq("id", agent_id).execute()
+
+        return jsonify({"success": True, "message": "PIN reset successfully"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 

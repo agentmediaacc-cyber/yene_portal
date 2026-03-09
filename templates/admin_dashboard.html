@@ -270,7 +270,7 @@
         <div class="row">
           <span class="pill"><span class="dot warn"></span>Pending</span>
           <span class="pill"><span class="dot"></span>Active</span>
-          <span class="pill"><span class="dot bad"></span>Blocked</span>
+          <span class="pill"><span class="dot bad"></span>Block</button> <button onclick="resetAgentPinAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset PINed</span>
         </div>
       </div>
       <div class="hr"></div>
@@ -656,7 +656,7 @@
 
     document.getElementById("k_agents_total").textContent = safe(d.agents_total, "0");
     document.getElementById("k_agents_meta").textContent =
-      `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Blocked ${safe(d.agents_blocked,0)}`;
+      `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Block</button> <button onclick="resetAgentPinAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset PINed ${safe(d.agents_blocked,0)}`;
 
     document.getElementById("k_drivers_total").textContent = safe(d.drivers_total, "0");
     document.getElementById("k_clients_total").textContent = safe(d.clients_total, "0");
@@ -744,7 +744,7 @@
         <td>
           <div class="row">
             <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')">Approve</button>
-            <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button>
+            <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button> <button onclick="resetAgentPinAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset PIN</button>
             <button class="btn ghost" onclick="setAgentStatus('${a.id}','PENDING_APPROVAL')">Set Pending</button>
           </div>
         </td>
@@ -775,7 +775,7 @@
           <td>
             <div class="row">
               <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')">Active</button>
-              <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button>
+              <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button> <button onclick="resetAgentPinAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset PIN</button>
             </div>
           </td>
         </tr>
@@ -1209,6 +1209,37 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 });
+</script>
+
+
+<script>
+async function adminJson(url, options = {}){
+  const res = await fetch(url, { credentials: 'same-origin', ...options });
+  const txt = await res.text();
+  try { return JSON.parse(txt); } catch(e) { return { success:false, error: txt }; }
+}
+
+async function resetAgentPinAdmin(agentId, agentName){
+  const newPin = prompt("Enter new PIN for " + (agentName || "agent"));
+  if(newPin === null) return;
+  if(!newPin.trim()){
+    alert("PIN is required.");
+    return;
+  }
+
+  const res = await adminJson('/api/admin/reset_agent_pin/' + encodeURIComponent(agentId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ new_pin: newPin.trim() })
+  });
+
+  if(res.success){
+    alert("PIN reset successful. Share the new PIN with the agent.");
+    location.reload();
+  }else{
+    alert("PIN reset failed: " + (res.error || "Unknown error"));
+  }
+}
 </script>
 
 </body>
