@@ -1075,5 +1075,141 @@ async function rejectClientAdmin(id){
 }
 </script>
 
+
+<script>
+async function adminGetJson(url, options = {}){
+  const res = await fetch(url, { credentials: 'same-origin', ...options });
+  const txt = await res.text();
+  try { return JSON.parse(txt); } catch(e) { return { success:false, error: txt }; }
+}
+function fmtDate(v){
+  if(!v) return '';
+  try { return new Date(v).toLocaleString(); } catch(e){ return v; }
+}
+function renderApprovalButtons(kind, id, status){
+  const s = (status || '').toLowerCase();
+  if (s === 'approved') return '<span style="color:#22c55e;font-weight:700">Approved</span>';
+  if (s === 'rejected') return '<span style="color:#ef4444;font-weight:700">Rejected</span>';
+  if (kind === 'driver') {
+    return `
+      <button onclick="approveDriverAdmin('${id}')" style="padding:8px 10px;border:none;border-radius:8px;background:#16a34a;color:white;font-weight:700;cursor:pointer;margin-right:6px">Approve</button>
+      <button onclick="rejectDriverAdmin('${id}')" style="padding:8px 10px;border:none;border-radius:8px;background:#dc2626;color:white;font-weight:700;cursor:pointer">Reject</button>
+    `;
+  }
+  return `
+    <button onclick="approveClientAdmin('${id}')" style="padding:8px 10px;border:none;border-radius:8px;background:#16a34a;color:white;font-weight:700;cursor:pointer;margin-right:6px">Approve</button>
+    <button onclick="rejectClientAdmin('${id}')" style="padding:8px 10px;border:none;border-radius:8px;background:#dc2626;color:white;font-weight:700;cursor:pointer">Reject</button>
+  `;
+}
+function renderDriverRows(targetId, rows){
+  const body = document.getElementById(targetId);
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="7" style="padding:10px">No driver records</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.status || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.full_name || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.phone || r.phone_number || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.town || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.recruiter_name || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${fmtDate(r.created_at)}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${renderApprovalButtons('driver', r.id, r.status)}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+function renderClientRows(targetId, rows){
+  const body = document.getElementById(targetId);
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="6" style="padding:10px">No client records</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.status || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.full_name || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.phone || r.phone_number || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.recruiter_name || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${fmtDate(r.created_at)}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${renderApprovalButtons('client', r.id, r.status)}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+async function loadPendingApprovals(){
+  const d = await adminGetJson('/api/admin/pending_drivers');
+  renderDriverRows('pendingDriversBody', d.success ? d.rows : []);
+  const c = await adminGetJson('/api/admin/pending_clients');
+  renderClientRows('pendingClientsBody', c.success ? c.rows : []);
+}
+async function loadAllApprovalRecords(){
+  const q = encodeURIComponent((document.getElementById('approvalSearch')?.value || '').trim());
+  const d = await adminGetJson('/api/admin/all_drivers_for_approval?q=' + q);
+  renderDriverRows('allDriversBody', d.success ? d.rows : []);
+  const c = await adminGetJson('/api/admin/all_clients_for_approval?q=' + q);
+  renderClientRows('allClientsBody', c.success ? c.rows : []);
+}
+async function approveDriverAdmin(id){
+  const res = await adminGetJson('/api/admin/approve_driver/' + encodeURIComponent(id), { method: 'POST' });
+  if(res.success){
+    alert('Driver approved and agent activation bonus processed.');
+    await loadPendingApprovals();
+    await loadAllApprovalRecords();
+  } else {
+    alert('Driver approval failed: ' + (res.error || 'Unknown error'));
+  }
+}
+async function rejectDriverAdmin(id){
+  const res = await adminGetJson('/api/admin/reject_driver/' + encodeURIComponent(id), { method: 'POST' });
+  if(res.success){
+    alert('Driver rejected.');
+    await loadPendingApprovals();
+    await loadAllApprovalRecords();
+  } else {
+    alert('Driver rejection failed: ' + (res.error || 'Unknown error'));
+  }
+}
+async function approveClientAdmin(id){
+  const res = await adminGetJson('/api/admin/approve_client/' + encodeURIComponent(id), { method: 'POST' });
+  if(res.success){
+    alert('Client approved and agent activation bonus processed.');
+    await loadPendingApprovals();
+    await loadAllApprovalRecords();
+  } else {
+    alert('Client approval failed: ' + (res.error || 'Unknown error'));
+  }
+}
+async function rejectClientAdmin(id){
+  const res = await adminGetJson('/api/admin/reject_client/' + encodeURIComponent(id), { method: 'POST' });
+  if(res.success){
+    alert('Client rejected.');
+    await loadPendingApprovals();
+    await loadAllApprovalRecords();
+  } else {
+    alert('Client rejection failed: ' + (res.error || 'Unknown error'));
+  }
+}
+document.addEventListener('DOMContentLoaded', function(){
+  loadPendingApprovals();
+  const s = document.getElementById('approvalSearch');
+  if(s){
+    s.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        loadAllApprovalRecords();
+      }
+    });
+  }
+});
+</script>
+
 </body>
 </html>

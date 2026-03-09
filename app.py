@@ -2152,13 +2152,18 @@ def api_admin_pending_drivers():
         rows = (
             sb_admin.table("drivers")
             .select("*")
-            .eq("status", "pending_approval")
             .order("created_at", desc=True)
-            .limit(500)
+            .limit(5000)
             .execute()
             .data or []
         )
-        return jsonify({"success": True, "rows": rows})
+        approvable = []
+        for r in rows:
+            status = (r.get("status") or "").strip().lower()
+            if status in {"approved", "rejected", "blocked"}:
+                continue
+            approvable.append(r)
+        return jsonify({"success": True, "rows": approvable})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -2171,16 +2176,79 @@ def api_admin_pending_clients():
         rows = (
             sb_admin.table("clients")
             .select("*")
-            .eq("status", "pending_approval")
             .order("created_at", desc=True)
-            .limit(500)
+            .limit(5000)
             .execute()
             .data or []
         )
+        approvable = []
+        for r in rows:
+            status = (r.get("status") or "").strip().lower()
+            if status in {"approved", "rejected", "blocked"}:
+                continue
+            approvable.append(r)
+        return jsonify({"success": True, "rows": approvable})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+
+
+@app.route("/api/admin/all_drivers_for_approval", methods=["GET"])
+def api_admin_all_drivers_for_approval():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        q = (request.args.get("q") or "").strip().lower()
+        rows = (
+            sb_admin.table("drivers")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(5000)
+            .execute()
+            .data or []
+        )
+        if q:
+            rows = [
+                r for r in rows
+                if q in ((r.get("full_name") or "").lower())
+                or q in ((r.get("phone") or "").lower())
+                or q in ((r.get("phone_number") or "").lower())
+                or q in ((r.get("town") or "").lower())
+                or q in ((r.get("recruiter_name") or "").lower())
+                or q in ((r.get("status") or "").lower())
+            ]
         return jsonify({"success": True, "rows": rows})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+@app.route("/api/admin/all_clients_for_approval", methods=["GET"])
+def api_admin_all_clients_for_approval():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        q = (request.args.get("q") or "").strip().lower()
+        rows = (
+            sb_admin.table("clients")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(5000)
+            .execute()
+            .data or []
+        )
+        if q:
+            rows = [
+                r for r in rows
+                if q in ((r.get("full_name") or "").lower())
+                or q in ((r.get("phone") or "").lower())
+                or q in ((r.get("phone_number") or "").lower())
+                or q in ((r.get("recruiter_name") or "").lower())
+                or q in ((r.get("status") or "").lower())
+            ]
+        return jsonify({"success": True, "rows": rows})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
