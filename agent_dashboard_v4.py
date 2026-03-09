@@ -286,11 +286,20 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
     @app.route("/api/agent/leaderboard_v4", methods=["GET"], endpoint="agent_leaderboard_v4")
     @require_login("AGENT")
     def agent_leaderboard_v4():
-        ws, we = week_range()
+        period = (request.args.get("period") or "week").strip().lower()
+
+        now = datetime.now(UTC)
+        if period == "month":
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = now
+        else:
+            start, end = week_range()
+            period = "week"
+
         try:
             agents = (
                 sb_admin.table("agent_profiles")
-                .select("id,full_name,email")
+                .select("id,full_name,email,town,operation_region")
                 .limit(5000)
                 .execute()
                 .data or []
@@ -298,29 +307,59 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
 
-        rows = []
-        rates = get_rates()
+        driver_rows_rank = []
+        client_rows_rank = []
 
         for a in agents:
             aid = a.get("id")
-            d_week = len(driver_rows(aid, ws, we))
-            c_week = len(client_rows(aid, ws, we))
-            score = d_week + c_week
-            earnings = (
-                c_week * safe_float(rates["client_register_amount"], 10) +
-                d_week * safe_float(rates["driver_register_amount"], 10)
-            )
-            rows.append({
-                "full_name": a.get("full_name") or a.get("email") or "Agent",
+            agent_name = a.get("full_name") or a.get("email") or "Agent"
+            base_town = a.get("operation_region") or a.get("town") or ""
+
+            drows = driver_rows(aid, start, end)
+            crows = client_rows(aid, start, end)
+
+            driver_count = len(drows)
+            client_count = len(crows)
+
+            towns_d = {}
+            for r in drows:
+                town = (r.get("town") or "").strip() or base_town or "Unknown"
+                towns_d[town] = towns_d.get(town, 0) + 1
+
+            towns_c = {}
+            for r in crows:
+                town = (r.get("town") or "").strip() or base_town or "Unknown"
+                towns_c[town] = towns_c.get(town, 0) + 1
+
+            best_driver_town = max(towns_d, key=towns_d.get) if towns_d else (base_town or "Unknown")
+            best_client_town = max(towns_c, key=towns_c.get) if towns_c else (base_town or "Unknown")
+
+            driver_rows_rank.append({
+                "agent_name": agent_name,
                 "email": a.get("email") or "",
-                "drivers_week": d_week,
-                "clients_week": c_week,
-                "score": score,
-                "earnings_week": round(earnings, 2),
+                "count": driver_count,
+                "town": best_driver_town,
             })
 
-        rows.sort(key=lambda x: (x["score"], x["earnings_week"]), reverse=True)
-        return jsonify({"ok": True, "rows": rows[:20]})
+            client_rows_rank.append({
+                "agent_name": agent_name,
+                "email": a.get("email") or "",
+                "count": client_count,
+                "town": best_client_town,
+            })
+
+        driver_rows_rank.sort(key=lambda x: x["count"], reverse=True)
+        client_rows_rank.sort(key=lambda x: x["count"], reverse=True)
+
+        driver_rows_rank = [r for r in driver_rows_rank if r["count"] > 0][:20]
+        client_rows_rank = [r for r in client_rows_rank if r["count"] > 0][:20]
+
+        return jsonify({
+            "ok": True,
+            "period": period,
+            "top_driver_recruiters": driver_rows_rank,
+            "top_client_recruiters": client_rows_rank
+        })
 
     @app.route("/api/agent/wallet_history_v4", methods=["GET"], endpoint="agent_wallet_history_v4")
     @require_login("AGENT")

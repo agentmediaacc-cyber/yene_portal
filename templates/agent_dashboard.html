@@ -185,10 +185,28 @@
 
     <section id="v-leaderboard" class="view">
       <div class="card">
-        <h3 style="margin-top:0">Top Agents This Week</h3>
+        <div class="row" style="align-items:center">
+          <h3 style="margin:0;flex:1">Recruitment Leaderboard</h3>
+          <select id="leaderboardPeriod" class="select" style="max-width:220px;margin:0">
+            <option value="week" selected>This Week</option>
+            <option value="month">This Month</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Top Driver Recruiters</h3>
         <table>
-          <thead><tr><th>Rank</th><th>Name</th><th>Drivers</th><th>Clients</th><th>Score</th><th>Earnings</th></tr></thead>
-          <tbody id="leaderboardTable"><tr><td colspan="6">No leaderboard data yet.</td></tr></tbody>
+          <thead><tr><th>Rank</th><th>Agent</th><th>Drivers Registered</th><th>Top Town</th></tr></thead>
+          <tbody id="driverLeaderboardTable"><tr><td colspan="4">No driver leaderboard data yet.</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Top Client Recruiters</h3>
+        <table>
+          <thead><tr><th>Rank</th><th>Agent</th><th>Clients Registered</th><th>Top Town</th></tr></thead>
+          <tbody id="clientLeaderboardTable"><tr><td colspan="4">No client leaderboard data yet.</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -289,16 +307,30 @@
     });
   }
 
-  function renderLeaderboard(rows){
-    const body = document.getElementById('leaderboardTable');
+  function renderLeaderboardDrivers(rows){
+    const body = document.getElementById('driverLeaderboardTable');
     body.innerHTML = '';
     if(!rows || rows.length === 0){
-      body.innerHTML = '<tr><td colspan="6">No leaderboard data yet.</td></tr>';
+      body.innerHTML = '<tr><td colspan="4">No driver leaderboard data yet.</td></tr>';
       return;
     }
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${i + 1}</td><td>${r.full_name || ''}</td><td>${r.drivers_week || 0}</td><td>${r.clients_week || 0}</td><td>${r.score || 0}</td><td>${money(r.earnings_week || 0)}</td>`;
+      tr.innerHTML = `<td>${i + 1}</td><td>${r.agent_name || ''}</td><td>${r.count || 0}</td><td>${r.town || ''}</td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  function renderLeaderboardClients(rows){
+    const body = document.getElementById('clientLeaderboardTable');
+    body.innerHTML = '';
+    if(!rows || rows.length === 0){
+      body.innerHTML = '<tr><td colspan="4">No client leaderboard data yet.</td></tr>';
+      return;
+    }
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i + 1}</td><td>${r.agent_name || ''}</td><td>${r.count || 0}</td><td>${r.town || ''}</td>`;
       body.appendChild(tr);
     });
   }
@@ -363,8 +395,10 @@
       document.getElementById('teamClientsWeek').textContent = teamSummary.summary.clients_week || 0;
     }
 
-    const leaderboard = await apiGet('/api/agent/leaderboard_v4');
-    renderLeaderboard(leaderboard.ok ? leaderboard.rows : []);
+    const leaderboardPeriod = document.getElementById('leaderboardPeriod') ? document.getElementById('leaderboardPeriod').value : 'week';
+    const leaderboard = await apiGet('/api/agent/leaderboard_v4?period=' + encodeURIComponent(leaderboardPeriod));
+    renderLeaderboardDrivers(leaderboard.ok ? leaderboard.top_driver_recruiters : []);
+    renderLeaderboardClients(leaderboard.ok ? leaderboard.top_client_recruiters : []);
 
     const wallet = await apiGet('/api/agent/wallet_history_v4');
     renderWallet(wallet.ok ? wallet.rows : []);
@@ -443,6 +477,9 @@
     document.getElementById('clientForm').addEventListener('submit', submitClient);
     document.getElementById('settingsForm').addEventListener('submit', saveSettings);
     document.getElementById('activityPeriod').addEventListener('change', loadDashboard);
+    if(document.getElementById('leaderboardPeriod')){
+      document.getElementById('leaderboardPeriod').addEventListener('change', loadDashboard);
+    }
     loadDashboard();
   });
 </script>
