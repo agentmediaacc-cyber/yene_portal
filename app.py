@@ -2028,6 +2028,120 @@ register_agent_academy_v1_routes(app, sb_admin, require_login)
 from agent_wallet_v1 import register_agent_wallet_v1_routes
 register_agent_wallet_v1_routes(app, sb_admin, require_login)
 
+
+
+def _admin_credit_activation_bonus(agent_id, bonus_key, description, reference_no):
+    try:
+        if not agent_id:
+            return
+
+        bonus_rows = sb_admin.table("agent_bonus_settings").select("*").eq("bonus_key", bonus_key).limit(1).execute().data or []
+        if not bonus_rows:
+            return
+
+        row = bonus_rows[0]
+        if not row.get("is_enabled", True):
+            return
+
+        amount = float(row.get("amount") or 0)
+        if amount <= 0:
+            return
+
+        dup = sb_admin.table("agent_wallet_ledger").select("id").eq("reference_no", reference_no).limit(1).execute().data or []
+        if dup:
+            return
+
+        prof = sb_admin.table("agent_profiles").select("email").eq("id", agent_id).limit(1).execute().data or []
+        agent_email = prof[0].get("email") if prof else None
+
+        sb_admin.table("agent_wallet_ledger").insert({
+            "agent_id": str(agent_id),
+            "agent_email": agent_email,
+            "txn_type": "credit",
+            "amount": amount,
+            "description": description,
+            "reference_no": reference_no,
+            "status": "approved"
+        }).execute()
+    except Exception as e:
+        print("Activation bonus credit failed:", e)
+
+
+@app.route("/api/admin/approve_driver/<driver_id>", methods=["POST"])
+def api_admin_approve_driver(driver_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        rows = sb_admin.table("drivers").select("*").eq("id", driver_id).limit(1).execute().data or []
+        if not rows:
+            return jsonify({"success": False, "error": "Driver not found"}), 404
+
+        driver = rows[0]
+        sb_admin.table("drivers").update({"status": "approved"}).eq("id", driver_id).execute()
+
+        recruiter_agent_id = driver.get("recruiter_agent_id")
+        _admin_credit_activation_bonus(
+            recruiter_agent_id,
+            "driver_activation",
+            f"Driver activation bonus for {driver.get('full_name') or 'driver'}",
+            f"driver-activation-{driver_id}"
+        )
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/reject_driver/<driver_id>", methods=["POST"])
+def api_admin_reject_driver(driver_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        sb_admin.table("drivers").update({"status": "rejected"}).eq("id", driver_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/approve_client/<client_id>", methods=["POST"])
+def api_admin_approve_client(client_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        rows = sb_admin.table("clients").select("*").eq("id", client_id).limit(1).execute().data or []
+        if not rows:
+            return jsonify({"success": False, "error": "Client not found"}), 404
+
+        client = rows[0]
+        sb_admin.table("clients").update({"status": "approved"}).eq("id", client_id).execute()
+
+        recruiter_agent_id = client.get("recruiter_agent_id")
+        _admin_credit_activation_bonus(
+            recruiter_agent_id,
+            "client_activation",
+            f"Client activation bonus for {client.get('full_name') or client.get('phone_number') or 'client'}",
+            f"client-activation-{client_id}"
+        )
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/reject_client/<client_id>", methods=["POST"])
+def api_admin_reject_client(client_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        sb_admin.table("clients").update({"status": "rejected"}).eq("id", client_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 

@@ -232,7 +232,7 @@
               <th>Email</th>
               <th>Phone</th>
               <th>Town</th>
-              <th>Created</th>
+              <th>Created</th><th>Actions</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -267,7 +267,7 @@
               <th>Phone</th>
               <th>Drivers</th>
               <th>Clients</th>
-              <th>Created</th>
+              <th>Created</th><th>Actions</th>
               <th>Quick Actions</th>
             </tr>
           </thead>
@@ -301,7 +301,7 @@
               <th>Phone</th>
               <th>Town</th>
               <th>Recruiter</th>
-              <th>Created</th>
+              <th>Created</th><th>Actions</th>
             </tr>
           </thead>
           <tbody id="driversTable">
@@ -333,7 +333,7 @@
               <th>Name</th>
               <th>Phone</th>
               <th>Recruiter</th>
-              <th>Created</th>
+              <th>Created</th><th>Actions</th>
             </tr>
           </thead>
           <tbody id="clientsTable">
@@ -485,7 +485,7 @@
           <table class="table">
             <thead>
               <tr>
-                <th>Created</th>
+                <th>Created</th><th>Actions</th>
                 <th>Message</th>
                 <th>Target</th>
                 <th>ID</th>
@@ -972,5 +972,57 @@
   // initial load
   refreshAll();
 </script>
+
+<script>
+async function postAdminAction(url){
+  const r = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin'
+  });
+  const txt = await r.text();
+  try { return JSON.parse(txt); } catch { return { success:false, error: txt }; }
+}
+
+async function approveDriverAdmin(id){
+  const res = await postAdminAction('/api/admin/approve_driver/' + encodeURIComponent(id));
+  if(res.success){
+    alert('Driver approved and activation bonus processed.');
+    location.reload();
+  }else{
+    alert('Driver approval failed: ' + (res.error || 'Unknown error'));
+  }
+}
+
+async function rejectDriverAdmin(id){
+  const res = await postAdminAction('/api/admin/reject_driver/' + encodeURIComponent(id));
+  if(res.success){
+    alert('Driver rejected.');
+    location.reload();
+  }else{
+    alert('Driver rejection failed: ' + (res.error || 'Unknown error'));
+  }
+}
+
+async function approveClientAdmin(id){
+  const res = await postAdminAction('/api/admin/approve_client/' + encodeURIComponent(id));
+  if(res.success){
+    alert('Client approved and activation bonus processed.');
+    location.reload();
+  }else{
+    alert('Client approval failed: ' + (res.error || 'Unknown error'));
+  }
+}
+
+async function rejectClientAdmin(id){
+  const res = await postAdminAction('/api/admin/reject_client/' + encodeURIComponent(id));
+  if(res.success){
+    alert('Client rejected.');
+    location.reload();
+  }else{
+    alert('Client rejection failed: ' + (res.error || 'Unknown error'));
+  }
+}
+</script>
+
 </body>
 </html>
