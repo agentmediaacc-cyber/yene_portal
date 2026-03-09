@@ -2024,6 +2024,10 @@ register_agent_dashboard_v4_routes(app, sb_admin, require_login, globals().get("
 from agent_academy_v1 import register_agent_academy_v1_routes
 register_agent_academy_v1_routes(app, sb_admin, require_login)
 
+
+from agent_wallet_v1 import register_agent_wallet_v1_routes
+register_agent_wallet_v1_routes(app, sb_admin, require_login)
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 

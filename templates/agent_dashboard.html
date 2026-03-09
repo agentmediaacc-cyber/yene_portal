@@ -1,7 +1,80 @@
 {% extends 'base.html' %}
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">
+function renderWalletHistory(rows){
+  const body = document.getElementById('walletHistoryTable');
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="6">No wallet records yet.</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const btn = r.id ? `<a class="btn dark" style="padding:8px 10px;display:inline-block;text-decoration:none" href="/api/agent/wallet_invoice_v1/${r.id}">Invoice</a>` : '';
+    tr.innerHTML = `<td>${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td><td>${r.txn_type || ''}</td><td>${money(r.amount || 0)}</td><td>${r.description || ''}</td><td>${r.status || ''}</td><td>${btn}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function renderWithdrawals(rows){
+  const body = document.getElementById('withdrawTable');
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="4">No withdrawal requests yet.</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const status = (r.status || '').toLowerCase();
+    let shown = r.status || '';
+    if(status === 'approved'){
+      shown = 'Approved - waiting for admin / finance to send money';
+    }else if(status === 'sent'){
+      shown = '✅ Money sent by admin';
+    }else if(status === 'pending'){
+      shown = 'Pending admin approval';
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td><td>${money(r.request_amount || 0)}</td><td>${shown}</td><td>${r.admin_note || ''}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+async function loadWalletData(){
+  const sum = await apiGet('/api/agent/wallet_summary_v1');
+  if(sum.ok){
+    document.getElementById('walletBalanceMain').textContent = money(sum.balance || 0);
+    document.getElementById('walletPendingCount').textContent = sum.pending_requests || 0;
+    document.getElementById('walletApprovedCount').textContent = sum.approved_requests || 0;
+    document.getElementById('walletSentCount').textContent = sum.sent_requests || 0;
+  }
+
+  const hist = await apiGet('/api/agent/wallet_history_v1');
+  renderWalletHistory(hist.ok ? hist.rows : []);
+
+  const reqs = await apiGet('/api/agent/withdraw_requests_v1');
+  renderWithdrawals(reqs.ok ? reqs.rows : []);
+}
+
+async function submitWithdrawRequest(e){
+  e.preventDefault();
+  const payload = {
+    amount: document.getElementById('withdrawAmount').value.trim(),
+    note: document.getElementById('withdrawNote').value.trim()
+  };
+  const r = await apiPost('/api/agent/request_withdraw_v1', payload);
+  if(r.ok){
+    document.getElementById('withdrawForm').reset();
+    setStatus('Withdrawal request submitted successfully.', 'ok');
+    await loadWalletData();
+  }else{
+    setStatus('Withdraw request failed: ' + (r.error || 'Unknown error'), 'error');
+  }
+}
+
+</script>
 
 <style>
   :root{
@@ -211,15 +284,44 @@
       </div>
     </section>
 
+    
     <section id="v-wallet" class="view">
+      <div class="grid">
+        <div class="card"><div class="sub">Available Balance</div><div class="metric" id="walletBalanceMain">N$ 0.00</div></div>
+        <div class="card"><div class="sub">Pending Requests</div><div class="metric" id="walletPendingCount">0</div></div>
+        <div class="card"><div class="sub">Approved Requests</div><div class="metric" id="walletApprovedCount">0</div></div>
+        <div class="card"><div class="sub">Money Sent</div><div class="metric" id="walletSentCount">0</div></div>
+      </div>
+
       <div class="card">
-        <h3 style="margin-top:0">Wallet Transactions</h3>
+        <h3 style="margin-top:0">Request Withdrawal</h3>
+        <form id="withdrawForm">
+          <input id="withdrawAmount" class="input" placeholder="Amount in Namibia Dollar (N$)" required>
+          <input id="withdrawNote" class="input" placeholder="Message to admin / finance">
+          <button class="btn" type="submit">Request Withdraw</button>
+        </form>
+        <div class="sub" style="margin-top:8px">
+          Status flow: Pending → Approved → Sent
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Withdrawal Requests</h3>
         <table>
-          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
-          <tbody id="walletTable"><tr><td colspan="4">No wallet transactions yet.</td></tr></tbody>
+          <thead><tr><th>Date</th><th>Amount</th><th>Status</th><th>Admin Note</th></tr></thead>
+          <tbody id="withdrawTable"><tr><td colspan="4">No withdrawal requests yet.</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Wallet Ledger / Receipts</h3>
+        <table>
+          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th><th>Status</th><th>Invoice</th></tr></thead>
+          <tbody id="walletHistoryTable"><tr><td colspan="6">No wallet records yet.</td></tr></tbody>
         </table>
       </div>
     </section>
+
 
     <section id="v-marketing" class="view">
       <div class="card">
@@ -400,8 +502,7 @@
     renderLeaderboardDrivers(leaderboard.ok ? leaderboard.top_driver_recruiters : []);
     renderLeaderboardClients(leaderboard.ok ? leaderboard.top_client_recruiters : []);
 
-    const wallet = await apiGet('/api/agent/wallet_history_v4');
-    renderWallet(wallet.ok ? wallet.rows : []);
+    await loadWalletData();
 
     setStatus('Dashboard loaded successfully.', 'ok');
   }
@@ -476,11 +577,85 @@
     document.getElementById('driverForm').addEventListener('submit', submitDriver);
     document.getElementById('clientForm').addEventListener('submit', submitClient);
     document.getElementById('settingsForm').addEventListener('submit', saveSettings);
+    if(document.getElementById('withdrawForm')){ document.getElementById('withdrawForm').addEventListener('submit', submitWithdrawRequest); }
     document.getElementById('activityPeriod').addEventListener('change', loadDashboard);
     if(document.getElementById('leaderboardPeriod')){
       document.getElementById('leaderboardPeriod').addEventListener('change', loadDashboard);
     }
     loadDashboard();
   });
+
+function renderWalletHistory(rows){
+  const body = document.getElementById('walletHistoryTable');
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="6">No wallet records yet.</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    const btn = r.id ? `<a class="btn dark" style="padding:8px 10px;display:inline-block;text-decoration:none" href="/api/agent/wallet_invoice_v1/${r.id}">Invoice</a>` : '';
+    tr.innerHTML = `<td>${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td><td>${r.txn_type || ''}</td><td>${money(r.amount || 0)}</td><td>${r.description || ''}</td><td>${r.status || ''}</td><td>${btn}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function renderWithdrawals(rows){
+  const body = document.getElementById('withdrawTable');
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="4">No withdrawal requests yet.</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const status = (r.status || '').toLowerCase();
+    let shown = r.status || '';
+    if(status === 'approved'){
+      shown = 'Approved - waiting for admin / finance to send money';
+    }else if(status === 'sent'){
+      shown = '✅ Money sent by admin';
+    }else if(status === 'pending'){
+      shown = 'Pending admin approval';
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td><td>${money(r.request_amount || 0)}</td><td>${shown}</td><td>${r.admin_note || ''}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+async function loadWalletData(){
+  const sum = await apiGet('/api/agent/wallet_summary_v1');
+  if(sum.ok){
+    document.getElementById('walletBalanceMain').textContent = money(sum.balance || 0);
+    document.getElementById('walletPendingCount').textContent = sum.pending_requests || 0;
+    document.getElementById('walletApprovedCount').textContent = sum.approved_requests || 0;
+    document.getElementById('walletSentCount').textContent = sum.sent_requests || 0;
+  }
+
+  const hist = await apiGet('/api/agent/wallet_history_v1');
+  renderWalletHistory(hist.ok ? hist.rows : []);
+
+  const reqs = await apiGet('/api/agent/withdraw_requests_v1');
+  renderWithdrawals(reqs.ok ? reqs.rows : []);
+}
+
+async function submitWithdrawRequest(e){
+  e.preventDefault();
+  const payload = {
+    amount: document.getElementById('withdrawAmount').value.trim(),
+    note: document.getElementById('withdrawNote').value.trim()
+  };
+  const r = await apiPost('/api/agent/request_withdraw_v1', payload);
+  if(r.ok){
+    document.getElementById('withdrawForm').reset();
+    setStatus('Withdrawal request submitted successfully.', 'ok');
+    await loadWalletData();
+  }else{
+    setStatus('Withdraw request failed: ' + (r.error || 'Unknown error'), 'error');
+  }
+}
+
 </script>
 {% endblock %}
