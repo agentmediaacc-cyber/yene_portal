@@ -2264,15 +2264,86 @@ def api_admin_reset_agent_pin(agent_id):
         if not new_pin:
             return jsonify({"success": False, "error": "New PIN is required"}), 400
 
+        agent_rows = sb_admin.table("agent_profiles").select("*").eq("id", agent_id).limit(1).execute().data or []
+        if not agent_rows:
+            return jsonify({"success": False, "error": "Agent not found"}), 404
+
         sb_admin.table("agent_profiles").update({
             "pin": new_pin
         }).eq("id", agent_id).execute()
 
-        return jsonify({"success": True, "message": "PIN reset successfully"})
+        return jsonify({
+            "success": True,
+            "message": "PIN reset successfully",
+            "agent_id": agent_id,
+            "agent_name": agent_rows[0].get("full_name") or "",
+            "agent_email": agent_rows[0].get("email") or "",
+            "temporary_pin": new_pin
+        })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/agent/presence_ping", methods=["POST"])
+@require_login("AGENT")
+def api_agent_presence_ping():
+    try:
+        email = session.get("email")
+        if not email:
+            return jsonify({"ok": False, "error": "Missing session email"}), 401
+
+        agent_rows = sb_admin.table("agent_profiles").select("*").eq("email", email).limit(1).execute().data or []
+        if not agent_rows:
+            return jsonify({"ok": False, "error": "Agent not found"}), 404
+
+        agent = agent_rows[0]
+        data = request.get_json(silent=True) or {}
+
+        payload = {
+            "agent_id": str(agent.get("id") or ""),
+            "agent_email": agent.get("email"),
+            "agent_name": agent.get("full_name") or agent.get("email"),
+            "page_name": (data.get("page_name") or "agent_dashboard").strip(),
+            "operation_region": agent.get("operation_region") or "",
+            "town": agent.get("town") or "",
+            "is_online": True,
+            "last_seen": datetime.utcnow().isoformat() + "Z"
+        }
+
+        sb_admin.table("agent_presence").upsert(payload, on_conflict="agent_id").execute()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/online_agents", methods=["GET"])
+def api_admin_online_agents():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        rows = sb_admin.table("agent_presence").select("*").order("last_seen", desc=True).limit(500).execute().data or []
+
+        online_rows = []
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+
+        for r in rows:
+            last_seen_raw = r.get("last_seen")
+            is_online = False
+            if last_seen_raw:
+                try:
+                    dt = datetime.fromisoformat(str(last_seen_raw).replace("Z", "+00:00"))
+                    if now - dt <= timedelta(minutes=3):
+                        is_online = True
+                except Exception:
+                    pass
+            if is_online:
+                online_rows.append(r)
+
+        return jsonify({"success": True, "rows": online_rows})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/admin/delete_agent/<agent_id>", methods=["POST"])
 def api_admin_delete_agent(agent_id):
