@@ -1407,5 +1407,184 @@ async function loadFinanceSummary(){
 }
 </script>
 
+
+<div class="card" style="margin-top:20px">
+  <h3 style="margin-top:0">Regional Admin Tools</h3>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <select id="regionSelect" style="padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:#fff;min-width:260px">
+      <option value="">Select Namibia region / town</option>
+    </select>
+    <button onclick="loadRegionFinance()" style="padding:10px 14px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer">Load Region Finance</button>
+    <button onclick="exportFinanceCsv()" style="padding:10px 14px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:700;cursor:pointer">Export Finance CSV</button>
+    <button onclick="exportDueCsv()" style="padding:10px 14px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-weight:700;cursor:pointer">Export Due CSV</button>
+  </div>
+
+  <div style="margin-bottom:14px">
+    <textarea id="regionBroadcastMessage" placeholder="Write message to agents in selected region..." style="width:100%;min-height:100px;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:#fff"></textarea>
+    <div style="margin-top:10px">
+      <button onclick="broadcastByRegion()" style="padding:10px 14px;border:none;border-radius:10px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer">Broadcast to Selected Region</button>
+    </div>
+  </div>
+
+  <h4 style="margin:16px 0 10px 0">Selected Region Payment Due</h4>
+  <div style="overflow:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Agent</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Email</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Phone</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Region</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Amount Due</th>
+        </tr>
+      </thead>
+      <tbody id="regionDueBody">
+        <tr><td colspan="5" style="padding:10px">No regional data loaded yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 style="margin:16px 0 10px 0">Broadcast Preview</h4>
+  <div style="overflow:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Name</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Email</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Phone</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Region</th>
+        </tr>
+      </thead>
+      <tbody id="broadcastPreviewBody">
+        <tr><td colspan="4" style="padding:10px">No broadcast preview yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<script>
+async function adminGetJson(url, options = {}){
+  const res = await fetch(url, { credentials: 'same-origin', ...options });
+  const txt = await res.text();
+  try { return JSON.parse(txt); } catch(e) { return { success:false, error: txt }; }
+}
+
+function fmtMoney(v){
+  return 'N$ ' + Number(v || 0).toFixed(2);
+}
+
+async function loadNamibiaRegions(){
+  const res = await adminGetJson('/api/admin/namibia_regions');
+  const sel = document.getElementById('regionSelect');
+  if(!sel) return;
+  if(!res.success) return;
+  sel.innerHTML = '<option value="">Select Namibia region / town</option>';
+  (res.rows || []).forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = r;
+    sel.appendChild(opt);
+  });
+}
+
+function renderRegionDue(rows){
+  const body = document.getElementById('regionDueBody');
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="5" style="padding:10px">No agents found for selected region.</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.full_name || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.email || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.phone || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.region || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${fmtMoney(r.amount_due || 0)}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function renderBroadcastPreview(rows){
+  const body = document.getElementById('broadcastPreviewBody');
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="4" style="padding:10px">No recipients for selected region.</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.full_name || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.email || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.phone || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.region || ''}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+async function loadRegionFinance(){
+  const region = (document.getElementById('regionSelect')?.value || '').trim();
+  if(!region){
+    alert('Select a region first.');
+    return;
+  }
+  const res = await adminGetJson('/api/admin/agent_payment_due?town=' + encodeURIComponent(region));
+  if(!res.success){
+    alert('Could not load region finance: ' + (res.error || 'Unknown error'));
+    return;
+  }
+  renderRegionDue(res.rows || []);
+}
+
+function exportFinanceCsv(){
+  window.location.href = '/api/admin/export_finance_summary_csv';
+}
+
+function exportDueCsv(){
+  const region = (document.getElementById('regionSelect')?.value || '').trim();
+  const url = '/api/admin/export_agent_due_csv' + (region ? ('?town=' + encodeURIComponent(region)) : '');
+  window.location.href = url;
+}
+
+async function broadcastByRegion(){
+  const region = (document.getElementById('regionSelect')?.value || '').trim();
+  const message = (document.getElementById('regionBroadcastMessage')?.value || '').trim();
+  if(!region){
+    alert('Select a region first.');
+    return;
+  }
+  if(!message){
+    alert('Write a broadcast message first.');
+    return;
+  }
+
+  const res = await adminGetJson('/api/admin/broadcast_by_region', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ region, message })
+  });
+
+  if(!res.success){
+    alert('Broadcast failed: ' + (res.error || 'Unknown error'));
+    return;
+  }
+
+  alert('Broadcast prepared for ' + (res.sent_count || 0) + ' agents in ' + region + '.');
+  renderBroadcastPreview(res.rows || []);
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  loadNamibiaRegions();
+});
+</script>
+
 </body>
 </html>

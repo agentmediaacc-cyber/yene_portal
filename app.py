@@ -2444,6 +2444,197 @@ def api_admin_agent_payment_due():
         "rows": out
     })
 
+
+
+import csv
+from io import StringIO, BytesIO
+from flask import Response
+
+NAMIBIA_REGIONS = [
+    "Erongo",
+    "Hardap",
+    "Karas",
+    "Kavango East",
+    "Kavango West",
+    "Khomas",
+    "Kunene",
+    "Ohangwena",
+    "Omaheke",
+    "Omusati",
+    "Oshana",
+    "Oshikoto",
+    "Otjozondjupa",
+    "Zambezi"
+]
+
+@app.route("/api/admin/namibia_regions", methods=["GET"])
+def api_admin_namibia_regions():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    return jsonify({"success": True, "rows": NAMIBIA_REGIONS})
+
+
+@app.route("/api/admin/export_finance_summary_csv", methods=["GET"])
+def api_admin_export_finance_summary_csv():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        agents = sb_admin.table("agent_profiles").select("*").limit(5000).execute().data or []
+        ledger = sb_admin.table("agent_wallet_ledger").select("*").limit(10000).execute().data or []
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    by_agent = {}
+    for row in ledger:
+        aid = str(row.get("agent_id") or "")
+        if not aid:
+            continue
+        amt = float(row.get("amount") or 0)
+        typ = (row.get("txn_type") or "").lower()
+        status = (row.get("status") or "approved").lower()
+        if status != "approved":
+            continue
+        by_agent.setdefault(aid, 0.0)
+        if typ == "debit":
+            by_agent[aid] -= amt
+        else:
+            by_agent[aid] += amt
+
+    regions = {}
+    for a in agents:
+        region = a.get("operation_region") or a.get("town") or "Unknown"
+        aid = str(a.get("id") or "")
+        bal = by_agent.get(aid, 0.0)
+        if region not in regions:
+            regions[region] = {"region": region, "agents": 0, "total_due": 0.0}
+        regions[region]["agents"] += 1
+        regions[region]["total_due"] += bal
+
+    rows = list(regions.values())
+    rows.sort(key=lambda x: x["total_due"], reverse=True)
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Region", "Agents", "Total Due (N$)"])
+    for r in rows:
+        writer.writerow([r["region"], r["agents"], round(r["total_due"], 2)])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=finance_summary_by_region.csv"}
+    )
+
+
+@app.route("/api/admin/export_agent_due_csv", methods=["GET"])
+def api_admin_export_agent_due_csv():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    town = (request.args.get("town") or "").strip().lower()
+
+    try:
+        agents = sb_admin.table("agent_profiles").select("*").limit(5000).execute().data or []
+        ledger = sb_admin.table("agent_wallet_ledger").select("*").limit(10000).execute().data or []
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    balances = {}
+    for row in ledger:
+        aid = str(row.get("agent_id") or "")
+        if not aid:
+            continue
+        amt = float(row.get("amount") or 0)
+        typ = (row.get("txn_type") or "").lower()
+        status = (row.get("status") or "approved").lower()
+        if status != "approved":
+            continue
+        balances.setdefault(aid, 0.0)
+        if typ == "debit":
+            balances[aid] -= amt
+        else:
+            balances[aid] += amt
+
+    out = []
+    for a in agents:
+        region = (a.get("operation_region") or a.get("town") or "").strip()
+        if town and town not in region.lower():
+            continue
+        aid = str(a.get("id") or "")
+        out.append([
+            aid,
+            a.get("full_name") or "",
+            a.get("email") or "",
+            a.get("phone") or "",
+            region or "Unknown",
+            round(balances.get(aid, 0.0), 2)
+        ])
+
+    out.sort(key=lambda x: x[5], reverse=True)
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Agent ID", "Full Name", "Email", "Phone", "Region", "Amount Due (N$)"])
+    for row in out:
+        writer.writerow(row)
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=agent_payment_due.csv"}
+    )
+
+
+@app.route("/api/admin/broadcast_by_region", methods=["POST"])
+def api_admin_broadcast_by_region():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json(silent=True) or {}
+        region = (data.get("region") or "").strip()
+        message = (data.get("message") or "").strip()
+
+        if not region:
+            return jsonify({"success": False, "error": "Region is required"}), 400
+        if not message:
+            return jsonify({"success": False, "error": "Message is required"}), 400
+
+        agents = sb_admin.table("agent_profiles").select("*").limit(5000).execute().data or []
+        targets = [
+            a for a in agents
+            if region.lower() in ((a.get("operation_region") or a.get("town") or "").lower())
+        ]
+
+        if "broadcast_logs" not in t if False else False:
+            pass
+
+        try:
+            sb_admin.table("broadcast_logs").insert({
+                "target_scope": "region",
+                "target_value": region,
+                "message": message,
+                "sent_count": len(targets),
+                "created_by": session.get("email") or "admin"
+            }).execute()
+        except Exception:
+            pass
+
+        return jsonify({
+            "success": True,
+            "region": region,
+            "sent_count": len(targets),
+            "rows": [{
+                "full_name": a.get("full_name"),
+                "email": a.get("email"),
+                "phone": a.get("phone"),
+                "region": a.get("operation_region") or a.get("town") or ""
+            } for a in targets]
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 
