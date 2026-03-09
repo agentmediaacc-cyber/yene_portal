@@ -2142,6 +2142,46 @@ def api_admin_reject_client(client_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+
+@app.route("/api/admin/pending_drivers", methods=["GET"])
+def api_admin_pending_drivers():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        rows = (
+            sb_admin.table("drivers")
+            .select("*")
+            .eq("status", "pending_approval")
+            .order("created_at", desc=True)
+            .limit(500)
+            .execute()
+            .data or []
+        )
+        return jsonify({"success": True, "rows": rows})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/pending_clients", methods=["GET"])
+def api_admin_pending_clients():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        rows = (
+            sb_admin.table("clients")
+            .select("*")
+            .eq("status", "pending_approval")
+            .order("created_at", desc=True)
+            .limit(500)
+            .execute()
+            .data or []
+        )
+        return jsonify({"success": True, "rows": rows})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 

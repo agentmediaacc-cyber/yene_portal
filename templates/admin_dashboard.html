@@ -204,7 +204,58 @@
           </tbody>
         </table>
       </div>
-      <div class="muted" style="margin-top:10px">Tip: your overview endpoint currently returns empty activity. If you want, I can show you how to populate it using your existing tables.</div>
+      <div class="muted" style="margin-top:10px">Tip: your overview endpoint currently returns empty activity. If you want, I can show you how to populate it using your existing tables.
+
+<div class="card" id="admin-approvals-center" style="margin-top:20px">
+  <h3 style="margin-top:0">Admin Approvals Center</h3>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <button onclick="loadPendingApprovals()" style="padding:10px 14px;border:none;border-radius:10px;background:#2c6cff;color:white;font-weight:700;cursor:pointer">Refresh Approvals</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr;gap:18px">
+    <div>
+      <h4 style="margin:0 0 10px 0">Pending Drivers</h4>
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Name</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Phone</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Town</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Recruiter</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Created</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingDriversBody">
+            <tr><td colspan="6" style="padding:10px">No pending drivers</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h4 style="margin:0 0 10px 0">Pending Clients</h4>
+      <div style="overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Name</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Phone</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Recruiter</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Created</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingClientsBody">
+            <tr><td colspan="5" style="padding:10px">No pending clients</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
     </div>
   </section>
 
