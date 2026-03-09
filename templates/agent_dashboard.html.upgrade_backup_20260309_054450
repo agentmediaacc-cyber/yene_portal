@@ -1,0 +1,488 @@
+{% extends 'base.html' %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">
+async function loadAcademyBadges(){
+  const r = await apiGet('/api/agent/academy_status_v1');
+  const box = document.getElementById('academyBadges');
+  if(!box) return;
+
+  if(!r.ok){
+    box.innerHTML = 'Academy setup needed. Run academy_schema.sql in Supabase.';
+    return;
+  }
+
+  const badges = r.badges || [];
+  if(badges.length === 0){
+    box.innerHTML = 'No badges yet. Pass a test to earn one.';
+    return;
+  }
+
+  box.innerHTML = badges.map(b => '🏅 ' + b).join('<br>');
+}
+
+async function submitAcademyTest(moduleKey, formId, resultId){
+  const form = document.getElementById(formId);
+  const result = document.getElementById(resultId);
+  if(!form || !result) return;
+
+  let score = 0;
+  form.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+    score += parseInt(el.value || '0', 10);
+  });
+
+  if(score < 3){
+    result.innerHTML = '❌ You did not pass. Please study again and retry.';
+    return;
+  }
+
+  const r = await apiPost('/api/agent/academy_pass_v1', {
+    module_key: moduleKey,
+    score: score
+  });
+
+  if(r.ok){
+    result.innerHTML = '🏅 Congratulations! You passed and earned a badge.';
+    await loadAcademyBadges();
+  }else{
+    result.innerHTML = '❌ Could not save result: ' + (r.error || 'Unknown error');
+  }
+}
+
+</script>
+
+<style>
+  :root{--yene:#4aa8ff;--bg:#0b1220;--panel:#0f1a2f;--card:#111b2e;--card2:#0b1427;--text:#eaf2ff;--muted:#a9b7d6;--line:rgba(255,255,255,.10);--ok:#2ed573;--danger:#ff6b6b}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  .shell{display:flex;min-height:100vh}
+  .sidebar{width:260px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column}
+  .brand{padding:20px;border-bottom:1px solid var(--line);font-weight:900;color:var(--yene);font-size:22px}
+  .nav{padding:15px 10px;flex:1}
+  .item{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;color:var(--muted);cursor:pointer;margin-bottom:6px;font-weight:700}
+  .item:hover,.item.active{background:rgba(74,168,255,.15);color:#fff}
+  .main{flex:1;padding:24px}
+  .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  .title{font-size:30px;font-weight:900;margin:0 0 6px}
+  .status{padding:12px 14px;border-radius:12px;margin-bottom:16px;background:rgba(74,168,255,.08);border:1px solid rgba(74,168,255,.25)}
+  .status.error{background:rgba(255,107,107,.08);border-color:rgba(255,107,107,.25)}
+  .status.ok{background:rgba(46,213,115,.08);border-color:rgba(46,213,115,.22)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:18px}
+  .metric{font-size:34px;font-weight:900;color:var(--yene);margin:8px 0}
+  .sub{color:var(--muted);font-size:13px}
+  .btn{background:var(--yene);color:#041021;padding:12px 16px;border:none;border-radius:12px;font-weight:900;cursor:pointer}
+  .btn.dark{background:var(--card2);color:#fff;border:1px solid var(--line)}
+  .btn.red{background:var(--danger);color:#fff}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>*{flex:1;min-width:180px}
+  .input{width:100%;padding:13px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:#fff;outline:none;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+  th{color:var(--yene);text-transform:uppercase;font-size:12px}
+  .view{display:none}.view.active{display:block}
+  .pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800;background:rgba(74,168,255,.14);border:1px solid rgba(74,168,255,.22)}
+  @media (max-width: 900px){
+    .shell{display:block}
+    .sidebar{width:100%;border-right:none;border-bottom:1px solid var(--line)}
+    .main{padding:14px}
+    .topbar{display:block}
+    .title{font-size:24px}
+    .grid{grid-template-columns:1fr}
+  }
+</style>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><i class="fa-solid fa-car-side"></i> YENE HUB</div>
+    <div class="nav">
+      <div class="item active" onclick="showView('v-home', this)">Dashboard</div>
+      <div class="item" onclick="showView('v-register', this)">Register Network</div>
+      <div class="item" onclick="showView('v-team', this)">Team & Rewards</div>
+      <div class="item" onclick="showView('v-marketing', this)">Marketing Studio</div>
+      <div class="item" onclick="showView('v-academy', this)">Yene Academy</div>
+      <div class="item" onclick="showView('v-settings', this)">Settings</div>
+    </div>
+    <div style="padding:16px;border-top:1px solid var(--line)">
+      <div class="row">
+        <button class="btn dark" onclick="window.location.href='/'">Return Home</button>
+        <button class="btn dark" onclick="loadDashboard()">Refresh</button>
+        <button class="btn red" onclick="window.location.href='/logout'">Logout</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="sub">YENE AGENT PORTAL</div>
+        <h1 class="title" id="welcomeText">Welcome, Agent</h1>
+        <div class="sub" id="weekLabel">Week: loading...</div>
+      </div>
+      <div><span class="pill" id="rankBadge">Starter Agent</span></div>
+    </div>
+
+    <div id="statusBox" class="status">Loading dashboard...</div>
+
+    <section id="v-home" class="view active">
+      <div class="grid">
+        <div class="card"><div class="sub">Calculated Earnings This Week</div><div class="metric" id="weeklyEarnings">N$ 0.00</div></div>
+        <div class="card"><div class="sub">Drivers Registered This Week</div><div class="metric" id="weeklyDrivers">0</div></div>
+        <div class="card"><div class="sub">Clients Registered This Week</div><div class="metric" id="weeklyClients">0</div></div>
+        <div class="card"><div class="sub">Wallet Balance</div><div class="metric" id="walletBalance">N$ 0.00</div></div>
+        <div class="card"><div class="sub">Drivers Registered All Time</div><div class="metric" id="driversAll">0</div></div>
+        <div class="card"><div class="sub">Clients Registered All Time</div><div class="metric" id="clientsAll">0</div></div>
+        <div class="card"><div class="sub">Team Agents</div><div class="metric" id="teamCount">0</div></div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="align-items:center;margin-bottom:10px">
+          <h3 style="margin:0;flex:1">Registrations</h3>
+          <select id="activityPeriod" class="input" style="max-width:220px;margin:0">
+            <option value="day">Today</option>
+            <option value="week" selected>This Week</option>
+            <option value="all">All Previous Data</option>
+          </select>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Type</th><th>Name</th><th>Phone</th><th>Town</th><th>Code</th></tr></thead>
+          <tbody id="activityTable"><tr><td colspan="6">No registrations yet.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="v-register" class="view">
+      <div class="grid">
+        <div class="card">
+          <h3 style="margin-top:0">Register a Driver</h3>
+          <form id="driverForm">
+            <input id="d_name" class="input" placeholder="Driver Full Name" required>
+            <input id="d_phone" class="input" placeholder="Driver WhatsApp Number" required>
+            <input id="d_town" class="input" placeholder="Town / Region">
+            <input id="d_license" class="input" placeholder="Driver License Number" required>
+            <input id="d_car" class="input" placeholder="Car Details (e.g. Toyota Corolla Silver N1234)" required>
+            <input id="d_code" class="input" placeholder="Driver App Code / Driver Code">
+            <button class="btn" type="submit" style="width:100%">Submit Driver</button>
+          </form>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Register a Client</h3>
+          <form id="clientForm">
+            <input id="c_name" class="input" placeholder="Client Full Name">
+            <input id="c_phone" class="input" placeholder="Client Phone Number" required>
+            <input id="c_code" class="input" placeholder="Client App Code / Rider Code">
+            <button class="btn" type="submit" style="width:100%">Submit Client</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="v-team" class="view"><div class="card"><h3 style="margin-top:0">Team</h3><div class="sub">Team features active.</div></div></section>
+    <section id="v-marketing" class="view"><div class="card"><h3 style="margin-top:0">Marketing</h3><div class="sub">Marketing studio active.</div></div></section>
+    
+    <section id="v-academy" class="view">
+      <div class="card">
+        <h3 style="margin-top:0">🎓 Yene Academy</h3>
+        <div class="sub">Train, test yourself, and earn certification badges.</div>
+      </div>
+
+      <div id="academyBadgesCard" class="card">
+        <h3 style="margin-top:0">My Academy Badges</h3>
+        <div id="academyBadges" class="sub">No badges yet.</div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Level 1 — Driver Registration Training</h3>
+        <div class="sub">
+          1. Help driver download <b>YENE Driver App</b>.<br>
+          2. Click <b>Sign Up</b> and enter driver cellphone number.<br>
+          3. Wait for OTP and insert it.<br>
+          4. Enter full name, email, and create password.<br><br>
+
+          <b>Documents to prepare:</b><br>
+          • Driver licence front and back<br>
+          • ID front and back (if available)<br>
+          • Vehicle front and back images<br>
+          • Vehicle disc / registration / insurance<br><br>
+
+          <b>Important:</b><br>
+          • Yene charges <b>7%</b> per ride as service fee<br>
+          • New drivers get <b>14 day trial</b><br>
+          • Agent must copy driver code like <b>PAR....</b> from profile and use it in network registration
+        </div>
+        <hr>
+        <form id="driverQuizForm">
+          <p>1. Which app must the driver install first?</p>
+          <label><input type="radio" name="driver_q1" value="1"> YENE Driver App</label><br>
+          <label><input type="radio" name="driver_q1" value="0"> YENE Rider App</label>
+
+          <p>2. What is the Yene service fee per ride?</p>
+          <label><input type="radio" name="driver_q2" value="1"> 7%</label><br>
+          <label><input type="radio" name="driver_q2" value="0"> 15%</label>
+
+          <p>3. How many days trial do new drivers get?</p>
+          <label><input type="radio" name="driver_q3" value="1"> 14 days</label><br>
+          <label><input type="radio" name="driver_q3" value="0"> 2 days</label>
+
+          <br><button class="btn" type="button" onclick="submitAcademyTest('driver_registration','driverQuizForm','driverQuizResult')">Submit Driver Test</button>
+          <div id="driverQuizResult" class="sub" style="margin-top:10px"></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Level 2 — Client Registration Training</h3>
+        <div class="sub">
+          1. Help client download the Yene rider app.<br>
+          2. Sign up with cellphone number and OTP.<br>
+          3. Enter full name, gender, email, and password.<br>
+          4. Client can use the app immediately without approval.<br>
+          5. Open client profile, go to <b>Invite a Friend</b>, copy the code, and use that when registering the client in your network.
+        </div>
+        <hr>
+        <form id="clientQuizForm">
+          <p>1. Does a client need approval before requesting a ride?</p>
+          <label><input type="radio" name="client_q1" value="1"> No</label><br>
+          <label><input type="radio" name="client_q1" value="0"> Yes</label>
+
+          <p>2. Where do you get the client code for your network entry?</p>
+          <label><input type="radio" name="client_q2" value="1"> Invite a Friend section</label><br>
+          <label><input type="radio" name="client_q2" value="0"> Driver profile page</label>
+
+          <p>3. What is the first step for client registration?</p>
+          <label><input type="radio" name="client_q3" value="1"> Download the rider app</label><br>
+          <label><input type="radio" name="client_q3" value="0"> Upload car documents</label>
+
+          <br><button class="btn" type="button" onclick="submitAcademyTest('client_registration','clientQuizForm','clientQuizResult')">Submit Client Test</button>
+          <div id="clientQuizResult" class="sub" style="margin-top:10px"></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Level 3 — Activation & Driver Management</h3>
+        <div class="sub">
+          • Follow up with drivers daily and motivate them to stay online.<br>
+          • Help drivers solve app problems quickly.<br>
+          • Identify clients who can request rides immediately or the next day.<br>
+          • Visit malls, universities, offices, and busy places to find riders.<br>
+          • Keep drivers on standby when you know a client may request a ride.
+        </div>
+        <hr>
+        <form id="activationQuizForm">
+          <p>1. What should an agent do after registering a driver?</p>
+          <label><input type="radio" name="act_q1" value="1"> Follow up and support the driver</label><br>
+          <label><input type="radio" name="act_q1" value="0"> Ignore the driver</label>
+
+          <p>2. Where can agents find possible riders?</p>
+          <label><input type="radio" name="act_q2" value="1"> Malls and universities</label><br>
+          <label><input type="radio" name="act_q2" value="0"> Only at home</label>
+
+          <p>3. Why keep drivers on standby?</p>
+          <label><input type="radio" name="act_q3" value="1"> To serve possible ride requests fast</label><br>
+          <label><input type="radio" name="act_q3" value="0"> To log them out</label>
+
+          <br><button class="btn" type="button" onclick="submitAcademyTest('activation','activationQuizForm','activationQuizResult')">Submit Activation Test</button>
+          <div id="activationQuizResult" class="sub" style="margin-top:10px"></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Level 4 — Marketing & Growth</h3>
+        <div class="sub">
+          <b>Marketing ideas for agents:</b><br>
+          • Post flyer on WhatsApp status every day<br>
+          • Share referral link on Facebook groups<br>
+          • Visit taxi ranks and car wash points to recruit drivers<br>
+          • Visit malls, offices, and campuses to recruit riders<br>
+          • Ask satisfied clients and drivers to refer others<br>
+          • Follow up daily with your network
+        </div>
+        <hr>
+        <form id="marketingQuizForm">
+          <p>1. Which is a good place to recruit drivers?</p>
+          <label><input type="radio" name="mark_q1" value="1"> Car wash points</label><br>
+          <label><input type="radio" name="mark_q1" value="0"> Swimming pool only</label>
+
+          <p>2. Which is a good place to recruit riders?</p>
+          <label><input type="radio" name="mark_q2" value="1"> Malls and campuses</label><br>
+          <label><input type="radio" name="mark_q2" value="0"> Empty fields</label>
+
+          <p>3. What should agents share online?</p>
+          <label><input type="radio" name="mark_q3" value="1"> Flyer and referral link</label><br>
+          <label><input type="radio" name="mark_q3" value="0"> Nothing</label>
+
+          <br><button class="btn" type="button" onclick="submitAcademyTest('marketing_growth','marketingQuizForm','marketingQuizResult')">Submit Marketing Test</button>
+          <div id="marketingQuizResult" class="sub" style="margin-top:10px"></div>
+        </form>
+      </div>
+    </section>
+
+    <section id="v-settings" class="view"><div class="card"><h3 style="margin-top:0">Settings</h3><div class="sub">Settings active.</div></div></section>
+  </main>
+</div>
+
+<script>
+  function showView(id, el){
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.item').forEach(i => i.classList.remove('active'));
+    if(el) el.classList.add('active');
+  }
+  function goHome(){ showView('v-home', document.querySelectorAll('.item')[0]); }
+  function setStatus(msg, type=''){
+    const box = document.getElementById('statusBox');
+    box.className = 'status' + (type ? ' ' + type : '');
+    box.innerHTML = msg;
+  }
+  function money(v){ return 'N$ ' + Number(v || 0).toFixed(2); }
+
+  async function apiGet(path){
+    const r = await fetch(path, { credentials:'same-origin' });
+    const txt = await r.text();
+    try { return JSON.parse(txt); } catch { return { ok:false, error:txt }; }
+  }
+  async function apiPost(path, payload){
+    const r = await fetch(path, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body: JSON.stringify(payload)
+    });
+    const txt = await r.text();
+    try { return JSON.parse(txt); } catch { return { ok:false, error:txt }; }
+  }
+
+  function renderActivity(rows){
+    const body = document.getElementById('activityTable');
+    body.innerHTML = '';
+    if(!rows || rows.length === 0){
+      body.innerHTML = '<tr><td colspan="6">No registrations yet.</td></tr>';
+      return;
+    }
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</td><td>${r.subject_type || ''}</td><td>${r.full_name || ''}</td><td>${r.phone || ''}</td><td>${r.town || ''}</td><td>${r.external_code || ''}</td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  async function loadDashboard(){
+    setStatus('Loading dashboard...');
+    const me = await apiGet('/api/agent/me_v4');
+    if(!me.ok){
+      setStatus('Your server login session is missing. Please login again.', 'error');
+      return;
+    }
+    const p = me.profile || {};
+    document.getElementById('welcomeText').textContent = 'Welcome, ' + (p.full_name || p.email || 'Agent');
+
+    const summary = await apiGet('/api/agent/summary_v4');
+    if(summary.ok){
+      document.getElementById('weekLabel').textContent = 'Week: ' + (summary.week_start || '') + ' → ' + (summary.week_end || '');
+      document.getElementById('weeklyEarnings').textContent = money(summary.earnings_week);
+      document.getElementById('weeklyDrivers').textContent = summary.drivers_week || 0;
+      document.getElementById('weeklyClients').textContent = summary.clients_week || 0;
+      document.getElementById('walletBalance').textContent = money(summary.wallet_balance);
+      document.getElementById('driversAll').textContent = summary.drivers_all || 0;
+      document.getElementById('clientsAll').textContent = summary.clients_all || 0;
+      document.getElementById('teamCount').textContent = summary.team_agents_count || 0;
+    }
+
+    const act = await apiGet('/api/agent/activity_v4?period=' + encodeURIComponent(document.getElementById('activityPeriod').value));
+    renderActivity(act.ok ? act.rows : []);
+    setStatus('Dashboard loaded successfully.', 'ok');
+  }
+
+  async function submitDriver(e){
+    e.preventDefault();
+    const payload = {
+      full_name: document.getElementById('d_name').value.trim(),
+      phone: document.getElementById('d_phone').value.trim(),
+      town: document.getElementById('d_town').value.trim(),
+      license_number: document.getElementById('d_license').value.trim(),
+      car_details: document.getElementById('d_car').value.trim(),
+      external_code: document.getElementById('d_code').value.trim()
+    };
+    const res = await apiPost('/api/agent/register_driver_v4', payload);
+    if(res.ok){
+      document.getElementById('driverForm').reset();
+      setStatus('Driver registered successfully.', 'ok');
+      await loadDashboard();
+    } else {
+      setStatus('Driver registration failed: ' + (res.error || 'Unknown error'), 'error');
+    }
+  }
+
+  async function submitClient(e){
+    e.preventDefault();
+    const payload = {
+      full_name: document.getElementById('c_name').value.trim(),
+      phone: document.getElementById('c_phone').value.trim(),
+      external_code: document.getElementById('c_code').value.trim()
+    };
+    const res = await apiPost('/api/agent/register_client_v4', payload);
+    if(res.ok){
+      document.getElementById('clientForm').reset();
+      setStatus('Client registered successfully.', 'ok');
+      await loadDashboard();
+    } else {
+      setStatus('Client registration failed: ' + (res.error || 'Unknown error'), 'error');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('driverForm').addEventListener('submit', submitDriver);
+    document.getElementById('clientForm').addEventListener('submit', submitClient);
+    document.getElementById('activityPeriod').addEventListener('change', loadDashboard);
+    loadDashboard();
+    loadAcademyBadges();
+  });
+
+async function loadAcademyBadges(){
+  const r = await apiGet('/api/agent/academy_status_v1');
+  const box = document.getElementById('academyBadges');
+  if(!box) return;
+
+  if(!r.ok){
+    box.innerHTML = 'Academy setup needed. Run academy_schema.sql in Supabase.';
+    return;
+  }
+
+  const badges = r.badges || [];
+  if(badges.length === 0){
+    box.innerHTML = 'No badges yet. Pass a test to earn one.';
+    return;
+  }
+
+  box.innerHTML = badges.map(b => '🏅 ' + b).join('<br>');
+}
+
+async function submitAcademyTest(moduleKey, formId, resultId){
+  const form = document.getElementById(formId);
+  const result = document.getElementById(resultId);
+  if(!form || !result) return;
+
+  let score = 0;
+  form.querySelectorAll('input[type="radio"]:checked').forEach(el => {
+    score += parseInt(el.value || '0', 10);
+  });
+
+  if(score < 3){
+    result.innerHTML = '❌ You did not pass. Please study again and retry.';
+    return;
+  }
+
+  const r = await apiPost('/api/agent/academy_pass_v1', {
+    module_key: moduleKey,
+    score: score
+  });
+
+  if(r.ok){
+    result.innerHTML = '🏅 Congratulations! You passed and earned a badge.';
+    await loadAcademyBadges();
+  }else{
+    result.innerHTML = '❌ Could not save result: ' + (r.error || 'Unknown error');
+  }
+}
+
+</script>
+{% endblock %}
