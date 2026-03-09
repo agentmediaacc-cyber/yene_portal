@@ -1242,5 +1242,170 @@ async function resetAgentPinAdmin(agentId, agentName){
 }
 </script>
 
+
+<div class="card" style="margin-top:20px">
+  <h3 style="margin-top:0">Admin Data Tools</h3>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <input id="townFilterInput" placeholder="Filter by town / region..." style="padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:#fff;min-width:280px">
+    <button onclick="loadTownFilteredData()" style="padding:10px 14px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer">Load Town Data</button>
+    <button onclick="loadFinanceSummary()" style="padding:10px 14px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:700;cursor:pointer">Load Finance Summary</button>
+  </div>
+
+  <h4 style="margin:12px 0">Financial Statement by Region</h4>
+  <div style="overflow:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Region</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Agents</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Total Due (N$)</th>
+        </tr>
+      </thead>
+      <tbody id="financeRegionBody">
+        <tr><td colspan="3" style="padding:10px">No finance summary loaded yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 style="margin:18px 0 10px 0">Agent Payment Due</h4>
+  <div style="overflow:auto">
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Agent</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Email</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Region</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Amount Due</th>
+          <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(255,255,255,.1)">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="agentDueBody">
+        <tr><td colspan="5" style="padding:10px">No payment due list loaded yet.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<script>
+async function adminGetJson(url, options = {}){
+  const res = await fetch(url, { credentials: 'same-origin', ...options });
+  const txt = await res.text();
+  try { return JSON.parse(txt); } catch(e) { return { success:false, error: txt }; }
+}
+
+function fmtMoney(v){
+  return 'N$ ' + Number(v || 0).toFixed(2);
+}
+
+async function deleteAgentAdmin(agentId, name){
+  if(!confirm('Delete agent profile for ' + (name || 'this agent') + '?')) return;
+  const res = await adminGetJson('/api/admin/delete_agent/' + encodeURIComponent(agentId), { method:'POST' });
+  if(res.success){
+    alert('Agent deleted successfully.');
+    location.reload();
+  }else{
+    alert('Delete failed: ' + (res.error || 'Unknown error'));
+  }
+}
+
+async function deleteDriverAdmin(driverId, name){
+  if(!confirm('Delete driver ' + (name || 'this record') + '?')) return;
+  const res = await adminGetJson('/api/admin/delete_driver/' + encodeURIComponent(driverId), { method:'POST' });
+  if(res.success){
+    alert('Driver deleted successfully.');
+    location.reload();
+  }else{
+    alert('Delete failed: ' + (res.error || 'Unknown error'));
+  }
+}
+
+async function deleteClientAdmin(clientId, name){
+  if(!confirm('Delete client ' + (name || 'this record') + '?')) return;
+  const res = await adminGetJson('/api/admin/delete_client/' + encodeURIComponent(clientId), { method:'POST' });
+  if(res.success){
+    alert('Client deleted successfully.');
+    location.reload();
+  }else{
+    alert('Delete failed: ' + (res.error || 'Unknown error'));
+  }
+}
+
+async function loadTownFilteredData(){
+  const town = encodeURIComponent((document.getElementById('townFilterInput')?.value || '').trim());
+  const res = await adminGetJson('/api/admin/town_filter_data?town=' + town);
+  if(!res.success){
+    alert('Town filter failed: ' + (res.error || 'Unknown error'));
+    return;
+  }
+  alert(
+    'Town filter loaded\n\n' +
+    'Agents: ' + (res.agents?.length || 0) + '\n' +
+    'Drivers: ' + (res.drivers?.length || 0) + '\n' +
+    'Clients: ' + (res.clients?.length || 0)
+  );
+}
+
+function renderFinanceSummary(rows){
+  const body = document.getElementById('financeRegionBody');
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="3" style="padding:10px">No finance data found.</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.region || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.agents || 0}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${fmtMoney(r.total_due || 0)}</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+function renderAgentDue(rows){
+  const body = document.getElementById('agentDueBody');
+  if(!body) return;
+  body.innerHTML = '';
+  if(!rows || rows.length === 0){
+    body.innerHTML = '<tr><td colspan="5" style="padding:10px">No agents found.</td></tr>';
+    return;
+  }
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.full_name || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.email || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${r.region || ''}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">${fmtMoney(r.amount_due || 0)}</td>
+      <td style="padding:10px;border-bottom:1px solid rgba(255,255,255,.08)">
+        <button onclick="deleteAgentAdmin('${r.agent_id}','${(r.full_name || '').replace(/'/g, "\'")}')" style="padding:8px 10px;border:none;border-radius:8px;background:#dc2626;color:white;font-weight:700;cursor:pointer">Delete Agent</button>
+      </td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+async function loadFinanceSummary(){
+  const town = encodeURIComponent((document.getElementById('townFilterInput')?.value || '').trim());
+
+  const sum = await adminGetJson('/api/admin/finance_summary_by_region');
+  if(sum.success){
+    renderFinanceSummary(sum.rows || []);
+  }else{
+    alert('Finance summary failed: ' + (sum.error || 'Unknown error'));
+  }
+
+  const due = await adminGetJson('/api/admin/agent_payment_due?town=' + town);
+  if(due.success){
+    renderAgentDue(due.rows || []);
+  }else{
+    alert('Payment due load failed: ' + (due.error || 'Unknown error'));
+  }
+}
+</script>
+
 </body>
 </html>

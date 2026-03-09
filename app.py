@@ -2272,6 +2272,178 @@ def api_admin_reset_agent_pin(agent_id):
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+
+@app.route("/api/admin/delete_agent/<agent_id>", methods=["POST"])
+def api_admin_delete_agent(agent_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        sb_admin.table("agent_profiles").delete().eq("id", agent_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/delete_driver/<driver_id>", methods=["POST"])
+def api_admin_delete_driver(driver_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        sb_admin.table("drivers").delete().eq("id", driver_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/delete_client/<client_id>", methods=["POST"])
+def api_admin_delete_client(client_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+    try:
+        sb_admin.table("clients").delete().eq("id", client_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/town_filter_data", methods=["GET"])
+def api_admin_town_filter_data():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    town = (request.args.get("town") or "").strip().lower()
+
+    try:
+        agents = sb_admin.table("agent_profiles").select("*").limit(5000).execute().data or []
+        drivers = sb_admin.table("drivers").select("*").limit(5000).execute().data or []
+        clients = sb_admin.table("clients").select("*").limit(5000).execute().data or []
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    def match_town(v):
+        return town in ((v or "").strip().lower())
+
+    if town:
+        agents = [a for a in agents if match_town(a.get("town")) or match_town(a.get("operation_region"))]
+        drivers = [d for d in drivers if match_town(d.get("town"))]
+        clients = [c for c in clients if match_town(c.get("town"))]
+    else:
+        town = "all"
+
+    return jsonify({
+        "success": True,
+        "town": town,
+        "agents": agents,
+        "drivers": drivers,
+        "clients": clients
+    })
+
+
+@app.route("/api/admin/finance_summary_by_region", methods=["GET"])
+def api_admin_finance_summary_by_region():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        agents = sb_admin.table("agent_profiles").select("*").limit(5000).execute().data or []
+        ledger = sb_admin.table("agent_wallet_ledger").select("*").limit(10000).execute().data or []
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    by_agent = {}
+    for row in ledger:
+        aid = str(row.get("agent_id") or "")
+        if not aid:
+            continue
+        amt = float(row.get("amount") or 0)
+        typ = (row.get("txn_type") or "").lower()
+        status = (row.get("status") or "approved").lower()
+        if status != "approved":
+            continue
+        by_agent.setdefault(aid, 0.0)
+        if typ == "debit":
+            by_agent[aid] -= amt
+        else:
+            by_agent[aid] += amt
+
+    regions = {}
+    for a in agents:
+        region = a.get("operation_region") or a.get("town") or "Unknown"
+        aid = str(a.get("id") or "")
+        bal = by_agent.get(aid, 0.0)
+        if region not in regions:
+            regions[region] = {
+                "region": region,
+                "agents": 0,
+                "total_due": 0.0
+            }
+        regions[region]["agents"] += 1
+        regions[region]["total_due"] += bal
+
+    rows = list(regions.values())
+    rows.sort(key=lambda x: x["total_due"], reverse=True)
+
+    total_due_all = round(sum(r["total_due"] for r in rows), 2)
+
+    return jsonify({
+        "success": True,
+        "total_due_all": total_due_all,
+        "rows": rows
+    })
+
+
+@app.route("/api/admin/agent_payment_due", methods=["GET"])
+def api_admin_agent_payment_due():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    town = (request.args.get("town") or "").strip().lower()
+
+    try:
+        agents = sb_admin.table("agent_profiles").select("*").limit(5000).execute().data or []
+        ledger = sb_admin.table("agent_wallet_ledger").select("*").limit(10000).execute().data or []
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    balances = {}
+    for row in ledger:
+        aid = str(row.get("agent_id") or "")
+        if not aid:
+            continue
+        amt = float(row.get("amount") or 0)
+        typ = (row.get("txn_type") or "").lower()
+        status = (row.get("status") or "approved").lower()
+        if status != "approved":
+            continue
+        balances.setdefault(aid, 0.0)
+        if typ == "debit":
+            balances[aid] -= amt
+        else:
+            balances[aid] += amt
+
+    out = []
+    for a in agents:
+        region = (a.get("operation_region") or a.get("town") or "").strip()
+        if town and town not in region.lower():
+            continue
+        aid = str(a.get("id") or "")
+        out.append({
+            "agent_id": aid,
+            "full_name": a.get("full_name") or "",
+            "email": a.get("email") or "",
+            "phone": a.get("phone") or "",
+            "region": region or "Unknown",
+            "amount_due": round(balances.get(aid, 0.0), 2)
+        })
+
+    out.sort(key=lambda x: x["amount_due"], reverse=True)
+
+    return jsonify({
+        "success": True,
+        "rows": out
+    })
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
 
