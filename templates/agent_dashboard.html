@@ -517,7 +517,7 @@ async function submitWithdrawRequest(e){
       car_details: document.getElementById('d_car').value.trim(),
       external_code: document.getElementById('d_code').value.trim()
     };
-    const res = await apiPost('/api/agent/register_driver_v4', payload);
+    const res = await apiPost('/api/agent/register_driver_v3', payload);
     if(res.ok){
       document.getElementById('driverForm').reset();
       setStatus('Driver registered successfully.', 'ok');
@@ -534,7 +534,7 @@ async function submitWithdrawRequest(e){
       phone: document.getElementById('c_phone').value.trim(),
       external_code: document.getElementById('c_code').value.trim()
     };
-    const res = await apiPost('/api/agent/register_client_v4', payload);
+    const res = await apiPost('/api/agent/register_client_v3', payload);
     if(res.ok){
       document.getElementById('clientForm').reset();
       setStatus('Client registered successfully.', 'ok');
