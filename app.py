@@ -2906,3 +2906,44 @@ def api_admin_delete_client(client_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+# --- ADMIN API EXTENSIONS (MODERN UI SUPPORT) ---
+@app.route('/api/admin/fund_agent', methods=['POST'])
+def admin_fund_agent():
+    # Only allow if session is admin
+    if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 403
+    data = request.json
+    email = data.get('email')
+    amount = float(data.get('amount', 0))
+    
+    # Update agent wallet in Supabase
+    try:
+        # Get current balance first
+        user_data = supabase.table('profiles').select('wallet_balance').eq('email', email).single().execute()
+        current_bal = user_data.data.get('wallet_balance', 0)
+        new_bal = current_bal + amount
+        
+        supabase.table('profiles').update({'wallet_balance': new_bal}).eq('email', email).execute()
+        
+        # Log the transaction for audit
+        supabase.table('audit_logs').insert({
+            'action': 'FUND_AGENT',
+            'details': f'Admin loaded N to {email}',
+            'admin_email': session.get('user_email')
+        }).execute()
+        
+        return jsonify({'message': f'Successfully loaded N to {email}'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/delete_agent', methods=['DELETE'])
+def admin_delete_agent():
+    if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 403
+    email = request.json.get('email')
+    try:
+        # 1. Delete from profiles table
+        supabase.table('profiles').delete().eq('email', email).execute()
+        # 2. Delete from auth (if using Supabase Auth admin triggers)
+        return jsonify({'message': f'Agent {email} deleted successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

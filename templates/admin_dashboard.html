@@ -2596,8 +2596,122 @@ window.addEventListener('load', function(){
   }, 700);
 });
 </script>
+
+<style id="YENE_MODERN_V3">
+  #mobile-menu-btn { display: none; font-size: 28px; cursor: pointer; color: var(--brand); margin-right: 15px; }
+  @media(max-width: 900px) {
+    #mobile-menu-btn { display: block; }
+    .nav#tabs { 
+      display: none; flex-direction: column; position: fixed; top: 60px; left: 0; 
+      background: #081225; width: 260px; height: 100vh; padding: 20px; z-index: 1000;
+      border-right: 1px solid var(--border);
+    }
+    .nav#tabs.open { display: flex; animation: slideInLeft 0.3s ease; }
+  }
+  #selectedAgentWrap {
+    position: fixed !important; top: 0; right: 0; width: 100%; max-width: 480px; height: 100vh;
+    background: #0b1730; border-left: 1px solid var(--brand); z-index: 2000;
+    padding: 30px; overflow-y: auto; display: none; box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+  }
+  .admin-action-btn { 
+    padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; width: 100%;
+  }
+  .btn-delete { background: #ff4d4d; color: white; }
+  .btn-fund { background: #25d366; color: white; }
+  .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .filter-input { background: #163464; border: 1px solid var(--brand); color: white; padding: 8px; border-radius: 5px; }
+</style>
+
+<div id="selectedAgentWrap">
+    <button onclick="document.getElementById('selectedAgentWrap').style.display='none'" style="float:right; background:none; border:none; color:white; font-size:20px; cursor:pointer;">✕</button>
+    <h2 id="drawName">Agent Profile</h2>
+    <div id="drawMeta" style="margin-bottom:20px; font-size:14px; color:var(--muted);"></div>
+    
+    <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:10px;">
+        <h4>Wallet & Funds</h4>
+        <input type="number" id="fundAmount" placeholder="Amount (N$)" class="filter-input" style="width:100%">
+        <button class="admin-action-btn btn-fund" onclick="adminLoadFunds()">Load Funds to Agent</button>
+    </div>
+
+    <div style="margin-top:20px;">
+        <h4>Danger Zone</h4>
+        <button class="admin-action-btn btn-delete" onclick="adminDeleteAgent()">Delete Agent Account</button>
+        <button class="admin-action-btn btn-delete" style="background:#f59e0b" onclick="adminDeleteAgentData('drivers')">Delete All Drivers Registered</button>
+        <button class="admin-action-btn btn-delete" style="background:#f59e0b" onclick="adminDeleteAgentData('clients')">Delete All Clients Registered</button>
+    </div>
+
+    <div id="agentLiveMap" style="margin-top:20px; height:150px; background:#071126; border-radius:10px; border:1px solid var(--border); display:grid; place-items:center; position:relative;">
+        <div style="width:10px; height:10px; background:#25d366; border-radius:50%; box-shadow:0 0 10px #25d366;"></div>
+        <span style="font-size:10px; color:var(--brand)">GPS Tracking Active</span>
+    </div>
+</div>
+
+<script>
+// 1. HAMBURGER LOGIC
+setTimeout(() => {
+    const h = document.querySelector('header .left');
+    if(h) {
+        const b = document.createElement('div');
+        b.id = 'mobile-menu-btn'; b.innerHTML = '☰';
+        b.onclick = () => document.getElementById('tabs').classList.toggle('open');
+        h.prepend(b);
+    }
+}, 500);
+
+// 2. FILTERING LOGIC
+function applyAgentFilters() {
+    const town = document.getElementById('filterTown').value.toLowerCase();
+    const rows = document.querySelectorAll('#agentTableBody tr');
+    rows.forEach(r => {
+        const text = r.innerText.toLowerCase();
+        r.style.display = text.includes(town) ? '' : 'none';
+    });
+}
+
+// 3. ADMIN ACTIONS (DELETE & FUND)
+async function adminLoadFunds() {
+    const amt = document.getElementById('fundAmount').value;
+    const email = document.getElementById('drawMeta').innerText; // Assumes email is in meta
+    if(!amt || !confirm('Load N
+</html>
+
+
+
+
+ + amt + ' to ' + email + '?')) return;
+    const res = await fetch('/api/admin/fund_agent', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email: email, amount: amt })
+    });
+    const d = await res.json();
+    alert(d.message || d.error);
+}
+
+async function adminDeleteAgent() {
+    const email = document.getElementById('drawMeta').innerText;
+    if(!confirm('PERMANENTLY DELETE agent ' + email + '? This cannot be undone.')) return;
+    const res = await fetch('/api/admin/delete_agent', {
+        method:'DELETE', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email: email })
+    });
+    location.reload();
+}
+
+// 4. OVERRIDE EXISTING OPEN PROFILE
+const oldOpen = window.openAgentProfile;
+window.openAgentProfile = function(id) {
+    if(oldOpen) oldOpen(id);
+    const wrap = document.getElementById('selectedAgentWrap');
+    wrap.style.display = 'block';
+    // Fill drawer details from the selectedAgentMeta in your original code
+    setTimeout(() => {
+        document.getElementById('drawMeta').innerText = document.getElementById('selectedAgentMeta').innerText;
+    }, 200);
+}
+</script>
 </body>
 </html>
+
 
 
 
