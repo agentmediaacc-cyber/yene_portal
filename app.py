@@ -2947,3 +2947,37 @@ def admin_delete_agent():
         return jsonify({'message': f'Agent {email} deleted successfully'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# --- ADMIN API: FUNDING, DELETING & GPS TRACKING ---
+@app.route('/api/admin/agent_details/<email>')
+def get_agent_details(email):
+    if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 403
+    try:
+        # Fetching specific agent details including coordinates from your profiles/activity table
+        agent = supabase.table('profiles').select('*').eq('email', email).single().execute()
+        return jsonify(agent.data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/fund_agent', methods=['POST'])
+def admin_fund_agent():
+    if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 403
+    data = request.json
+    email, amount = data.get('email'), float(data.get('amount', 0))
+    try:
+        user_data = supabase.table('profiles').select('wallet_balance').eq('email', email).single().execute()
+        new_bal = (user_data.data.get('wallet_balance') or 0) + amount
+        supabase.table('profiles').update({'wallet_balance': new_bal}).eq('email', email).execute()
+        return jsonify({'success': True, 'message': f'Loaded N to {email}'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/delete_agent', methods=['DELETE'])
+def admin_delete_agent():
+    if not session.get('is_admin'): return jsonify({'error': 'Unauthorized'}), 403
+    email = request.json.get('email')
+    try:
+        supabase.table('profiles').delete().eq('email', email).execute()
+        return jsonify({'success': True, 'message': 'Agent deleted'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
