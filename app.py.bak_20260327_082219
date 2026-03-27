@@ -2727,33 +2727,3 @@ from agent_dashboard_full import register_agent_dashboard_routes, register_agent
 # # # register_agent_dashboard_debug_routes(app, sb_admin, require_login)
 
 
-
-
-@app.route('/api/admin/wallet_ledger', methods=['GET'])
-def api_admin_wallet_ledger():
-    try:
-        res = supabase.table('agent_wallet_ledger').select('*').order('created_at', desc=True).execute()
-        return jsonify({'success': True, 'rows': res.data or []})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/admin/assign_agent_region/<agent_id>', methods=['POST'])
-def api_admin_assign_agent_region(agent_id):
-    try:
-        data = request.get_json(silent=True) or {}
-        region = (data.get('region') or '').strip()
-        town = (data.get('town') or '').strip()
-
-        payload = {}
-        if region:
-            payload['region'] = region
-        if town:
-            payload['town'] = town
-
-        if not payload:
-            return jsonify({'success': False, 'error': 'No region or town provided'}), 400
-
-        supabase.table('agents').update(payload).eq('id', agent_id).execute()
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
