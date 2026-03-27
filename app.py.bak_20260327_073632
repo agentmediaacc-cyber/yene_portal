@@ -1,7 +1,6 @@
-﻿from supabase import create_client, Client
+from supabase import create_client, Client
 from flask_cors import CORS
 from flask import jsonify,  Flask, render_template, request, jsonify, session, flash, redirect, url_for, Response
-from werkzeug.security import generate_password_hash
 
 # -----------------------------
 # Supabase token auth (Agent API)
@@ -10,7 +9,6 @@ import os
 import requests
 from functools import wraps
 from flask import request, jsonify
-from werkzeug.security import generate_password_hash
 
 def _sb_get_user_id_from_token(access_token: str):
     """Validate Supabase access token and return user_id (uuid string) or None."""
@@ -103,7 +101,6 @@ def agent_dashboard_alias():
 # --- Inject Supabase env into all templates (agent login needs this) ---
 import os
 from flask import jsonify,  Flask
-from werkzeug.security import generate_password_hash
 
 @app.context_processor
 def inject_supabase_env():
@@ -132,7 +129,6 @@ def require_login(required_role=None):
     """
     from functools import wraps
     from flask import request, session, redirect, url_for, flash
-from werkzeug.security import generate_password_hash
 
     def decorator(fn):
         @wraps(fn)
@@ -617,7 +613,6 @@ def api_admin_manage_driver(id):
 
 
 from flask import session
-from werkzeug.security import generate_password_hash
 
 @app.get("/api/debug-session")
 def debug_session():
@@ -892,7 +887,6 @@ def api_agent_register_client_v2_working():
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from flask import send_file
-from werkzeug.security import generate_password_hash
 import tempfile
 
 def _v4_monday_from_string(s):
@@ -1166,7 +1160,6 @@ def public_config():
 
 import os
 from flask import jsonify, request
-from werkzeug.security import generate_password_hash
 
 @app.get("/api/agent/me")
 @require_agent_token
@@ -1252,7 +1245,6 @@ def verify_supabase_bearer():
     Returns dict: { "id": <uuid>, "email": ... }
     """
     from flask import request
-from werkzeug.security import generate_password_hash
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return None
@@ -1277,7 +1269,6 @@ from werkzeug.security import generate_password_hash
 def require_supabase_user(fn):
     from functools import wraps
     from flask import jsonify
-from werkzeug.security import generate_password_hash
     @wraps(fn)
     def wrapped(*args, **kwargs):
         u = verify_supabase_bearer()
@@ -1311,7 +1302,6 @@ def week_bounds_local(today=None):
 
 
 from flask import request, jsonify
-from werkzeug.security import generate_password_hash
 
 @app.get("/api/agent/me_v1")
 @require_supabase_user
@@ -1463,7 +1453,6 @@ import csv
 import datetime
 import requests
 from flask import request, jsonify, Response
-from werkzeug.security import generate_password_hash
 
 def _fa_env(name, default=""):
     return (os.getenv(name, default) or "").strip()
@@ -2531,7 +2520,6 @@ def api_admin_agent_payment_due():
 import csv
 from io import StringIO, BytesIO
 from flask import Response
-from werkzeug.security import generate_password_hash
 
 NAMIBIA_REGIONS = [
     "Erongo",
@@ -2725,5 +2713,4 @@ if __name__ == "__main__":
 from agent_dashboard_full import register_agent_dashboard_routes, register_agent_dashboard_debug_routes
 # # # register_agent_dashboard_routes(app, sb_admin, require_login, globals().get("log_system_event"))
 # # # register_agent_dashboard_debug_routes(app, sb_admin, require_login)
-
 

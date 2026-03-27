@@ -1,8 +1,8 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>YENE ADMIN â€¢ Command Center</title>
+  <title>YENE ADMIN • Command Center</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
@@ -100,63 +100,6 @@
     }
     .right{display:flex;gap:10px;align-items:center}
   </style>
-<style id="YENE_ADMIN_RESPONSIVE_PATCH">
-.table-wrap, .table-responsive, .overflow-auto { overflow-x:auto; width:100%; -webkit-overflow-scrolling:touch; }
-.admin-section-card{
-  background: rgba(255,255,255,.03);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 16px;
-  padding: 16px;
-  margin-top: 18px;
-}
-.admin-actions{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-}
-.admin-btn{
-  border:none;
-  border-radius:10px;
-  padding:8px 12px;
-  font-weight:700;
-  cursor:pointer;
-}
-.admin-btn.ok{ background:#16a34a; color:#fff; }
-.admin-btn.no{ background:#dc2626; color:#fff; }
-.admin-btn.alt{ background:#2563eb; color:#fff; }
-.admin-btn.warn{ background:#f59e0b; color:#111; }
-.admin-badge{
-  display:inline-block;
-  padding:4px 10px;
-  border-radius:999px;
-  font-size:11px;
-  font-weight:800;
-}
-.admin-badge.pending{ background:rgba(245,158,11,.14); color:#fbbf24; }
-.admin-badge.approved{ background:rgba(22,163,74,.14); color:#4ade80; }
-.admin-badge.rejected{ background:rgba(220,38,38,.14); color:#f87171; }
-
-.region-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:12px;
-  margin-top:14px;
-}
-.region-box{
-  border:1px solid rgba(255,255,255,.08);
-  border-radius:14px;
-  padding:14px;
-  background:rgba(255,255,255,.02);
-}
-.region-box .k{ color:#9ca3af; font-size:12px; margin-bottom:6px; }
-.region-box .v{ color:#fff; font-size:24px; font-weight:800; }
-
-@media (max-width: 900px){
-  table{ min-width: 760px; }
-  .admin-actions{ flex-direction:column; align-items:stretch; }
-  .admin-btn{ width:100%; }
-}
-</style>
 </head>
 <body>
 <header>
@@ -164,7 +107,7 @@
     <div class="logo">Y</div>
     <div class="title">
       <h1>YENE ADMIN</h1>
-      <p>Command Center â€¢ approvals â€¢ pricing â€¢ finance â€¢ audit</p>
+      <p>Command Center • approvals • pricing • finance • audit</p>
     </div>
     <span class="pill"><span class="dot" id="liveDot"></span><span id="liveText">Live</span></span>
   </div>
@@ -195,7 +138,7 @@
       <div class="row" style="justify-content:space-between">
         <div>
           <div class="big">Admin Command Center</div>
-          <div class="muted">Approve agents â€¢ monitor registrations â€¢ control pricing â€¢ broadcast messages</div>
+          <div class="muted">Approve agents • monitor registrations • control pricing • broadcast messages</div>
         </div>
         <div class="row">
           <button class="btn" onclick="exportCSV('agents')">Export Agents CSV</button>
@@ -209,28 +152,28 @@
       <div class="card">
         <h3>Agents</h3>
         <div class="kpi">
-          <div class="big" id="k_agents_total">â€”</div>
-          <div class="small muted" id="k_agents_meta">â€”</div>
+          <div class="big" id="k_agents_total">—</div>
+          <div class="small muted" id="k_agents_meta">—</div>
         </div>
       </div>
       <div class="card">
         <h3>Drivers Registered</h3>
         <div class="kpi">
-          <div class="big" id="k_drivers_total">â€”</div>
+          <div class="big" id="k_drivers_total">—</div>
           <div class="small muted">With timestamps + recruiter</div>
         </div>
       </div>
       <div class="card">
         <h3>Clients Registered</h3>
         <div class="kpi">
-          <div class="big" id="k_clients_total">â€”</div>
+          <div class="big" id="k_clients_total">—</div>
           <div class="small muted">With timestamps + recruiter</div>
         </div>
       </div>
       <div class="card">
         <h3>Total Paid (N$)</h3>
         <div class="kpi">
-          <div class="big" id="k_total_paid">â€”</div>
+          <div class="big" id="k_total_paid">—</div>
           <div class="small muted">Ledger totals</div>
         </div>
       </div>
@@ -240,7 +183,7 @@
       <div class="row" style="justify-content:space-between;align-items:center">
         <div>
           <h3 style="margin:0">Recent Activity</h3>
-          <div class="muted">Last 25 registrations across the network â€¢ Audit-ready timestamps</div>
+          <div class="muted">Last 25 registrations across the network • Audit-ready timestamps</div>
         </div>
       </div>
       <div class="hr"></div>
@@ -327,7 +270,7 @@
         <div class="row">
           <span class="pill"><span class="dot warn"></span>Pending</span>
           <span class="pill"><span class="dot"></span>Active</span>
-          <span class="pill"><span class="dot bad"></span>Block</button> <button onclick="resetAgentPasswordAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset Passworded</span>
+          <span class="pill"><span class="dot bad"></span>Block</button> <button onclick="resetAgentPinAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset PINed</span>
         </div>
       </div>
       <div class="hr"></div>
@@ -345,7 +288,7 @@
             </tr>
           </thead>
           <tbody id="approvalsTable">
-            <tr><td colspan="7" class="muted">Loadingâ€¦</td></tr>
+            <tr><td colspan="7" class="muted">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -361,7 +304,7 @@
           <div class="muted">Full list + recruiter performance counts</div>
         </div>
         <div class="row">
-          <input id="agentSearch" placeholder="Search by name / email / phoneâ€¦" oninput="renderAgents()" style="max-width:360px">
+          <input id="agentSearch" placeholder="Search by name / email / phone…" oninput="renderAgents()" style="max-width:360px">
         </div>
       </div>
       <div class="hr"></div>
@@ -380,7 +323,7 @@
             </tr>
           </thead>
           <tbody id="agentsTable">
-            <tr><td colspan="8" class="muted">Loadingâ€¦</td></tr>
+            <tr><td colspan="8" class="muted">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -396,7 +339,7 @@
           <div class="muted">Registered drivers with recruiter details</div>
         </div>
         <div class="row">
-          <input id="driverSearch" placeholder="Search driversâ€¦" oninput="renderDrivers()" style="max-width:360px">
+          <input id="driverSearch" placeholder="Search drivers…" oninput="renderDrivers()" style="max-width:360px">
         </div>
       </div>
       <div class="hr"></div>
@@ -413,7 +356,7 @@
             </tr>
           </thead>
           <tbody id="driversTable">
-            <tr><td colspan="6" class="muted">Loadingâ€¦</td></tr>
+            <tr><td colspan="6" class="muted">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -429,7 +372,7 @@
           <div class="muted">Registered clients with recruiter details</div>
         </div>
         <div class="row">
-          <input id="clientSearch" placeholder="Search clientsâ€¦" oninput="renderClients()" style="max-width:360px">
+          <input id="clientSearch" placeholder="Search clients…" oninput="renderClients()" style="max-width:360px">
         </div>
       </div>
       <div class="hr"></div>
@@ -445,7 +388,7 @@
             </tr>
           </thead>
           <tbody id="clientsTable">
-            <tr><td colspan="5" class="muted">Loadingâ€¦</td></tr>
+            <tr><td colspan="5" class="muted">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -461,7 +404,7 @@
           <div class="muted">All entries from finance_ledger</div>
         </div>
         <div class="row">
-          <input id="financeSearch" placeholder="Search ledgerâ€¦" oninput="renderFinance()" style="max-width:360px">
+          <input id="financeSearch" placeholder="Search ledger…" oninput="renderFinance()" style="max-width:360px">
         </div>
       </div>
       <div class="hr"></div>
@@ -477,7 +420,7 @@
             </tr>
           </thead>
           <tbody id="financeTable">
-            <tr><td colspan="5" class="muted">Loadingâ€¦</td></tr>
+            <tr><td colspan="5" class="muted">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -535,7 +478,7 @@
                 </tr>
               </thead>
               <tbody id="pricingTable">
-                <tr><td colspan="3" class="muted">Loadingâ€¦</td></tr>
+                <tr><td colspan="3" class="muted">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -564,7 +507,7 @@
             Uses your endpoint: <code class="muted">POST /api/admin/broadcast</code> (message + target_region="ALL")
           </div>
           <label class="muted">Message</label>
-          <textarea id="bc_new_message" placeholder="Type broadcast messageâ€¦"></textarea>
+          <textarea id="bc_new_message" placeholder="Type broadcast message…"></textarea>
           <div class="row" style="margin-top:10px">
             <button class="btn ok" onclick="createBroadcast()">Send Broadcast</button>
             <button class="btn ghost" onclick="loadBroadcasts()">Reload List</button>
@@ -578,7 +521,7 @@
           </div>
           <input id="bc_edit_id" placeholder="Broadcast ID" readonly>
           <label class="muted" style="margin-top:10px">Message</label>
-          <textarea id="bc_edit_message" placeholder="Edit messageâ€¦"></textarea>
+          <textarea id="bc_edit_message" placeholder="Edit message…"></textarea>
           <div class="row" style="margin-top:10px">
             <button class="btn ok" onclick="updateBroadcast()">Update</button>
             <button class="btn bad" onclick="deleteBroadcast()">Delete</button>
@@ -600,7 +543,7 @@
               </tr>
             </thead>
             <tbody id="broadcastsTable">
-              <tr><td colspan="4" class="muted">Loadingâ€¦</td></tr>
+              <tr><td colspan="4" class="muted">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -632,7 +575,7 @@
             </tr>
           </thead>
           <tbody id="auditTable">
-            <tr><td colspan="5" class="muted">Loadingâ€¦</td></tr>
+            <tr><td colspan="5" class="muted">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -659,9 +602,9 @@
     el.style.display = "block";
     setTimeout(()=> el.style.display="none", 2600);
   }
-  function safe(v, fallback="â€”"){ return (v===null || v===undefined || v==="") ? fallback : v; }
+  function safe(v, fallback="—"){ return (v===null || v===undefined || v==="") ? fallback : v; }
   function fmtDate(x){
-    if(!x) return "â€”";
+    if(!x) return "—";
     try { return new Date(x).toLocaleString(); } catch(e){ return String(x); }
   }
   function fmtMoney(n){
@@ -713,7 +656,7 @@
 
     document.getElementById("k_agents_total").textContent = safe(d.agents_total, "0");
     document.getElementById("k_agents_meta").textContent =
-      `Active ${safe(d.agents_active,0)} â€¢ Pending ${safe(d.agents_pending,0)} â€¢ Block</button> <button onclick="resetAgentPasswordAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset Passworded ${safe(d.agents_blocked,0)}`;
+      `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Block</button> <button onclick="resetAgentPinAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset PINed ${safe(d.agents_blocked,0)}`;
 
     document.getElementById("k_drivers_total").textContent = safe(d.drivers_total, "0");
     document.getElementById("k_clients_total").textContent = safe(d.clients_total, "0");
@@ -792,7 +735,7 @@
 
     tb.innerHTML = sorted.length ? sorted.map(a => `
       <tr>
-        <td class="${statusClass(a.status)}">${esc(safe(a.status,"â€”"))}</td>
+        <td class="${statusClass(a.status)}">${esc(safe(a.status,"—"))}</td>
         <td>${esc(safe(a.full_name))}</td>
         <td>${esc(safe(a.email))}</td>
         <td>${esc(safe(a.phone || a.phone_number))}</td>
@@ -801,7 +744,7 @@
         <td>
           <div class="row">
             <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')">Approve</button>
-            <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button> <button onclick="resetAgentPasswordAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset Password</button>
+            <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button> <button onclick="resetAgentPinAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset PIN</button>
             <button class="btn ghost" onclick="setAgentStatus('${a.id}','PENDING_APPROVAL')">Set Pending</button>
           </div>
         </td>
@@ -822,7 +765,7 @@
       const c = agentCounts[a.id] || {drivers:0, clients:0};
       return `
         <tr>
-          <td class="${statusClass(a.status)}">${esc(safe(a.status,"â€”"))}</td>
+          <td class="${statusClass(a.status)}">${esc(safe(a.status,"—"))}</td>
           <td>${esc(safe(a.full_name))}</td>
           <td>${esc(safe(a.email))}</td>
           <td>${esc(safe(a.phone || a.phone_number))}</td>
@@ -832,7 +775,7 @@
           <td>
             <div class="row">
               <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')">Active</button>
-              <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button> <button onclick="resetAgentPasswordAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset Password</button>
+              <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button> <button onclick="resetAgentPinAdmin('{{ agent.id if agent else '' }}','{{ agent.full_name if agent else '' }}')" style="padding:6px 10px;border:none;border-radius:8px;background:#f59e0b;color:#111;font-weight:700;cursor:pointer;margin-left:6px">Reset PIN</button>
             </div>
           </td>
         </tr>
@@ -1276,7 +1219,7 @@ async function adminJson(url, options = {}){
   try { return JSON.parse(txt); } catch(e) { return { success:false, error: txt }; }
 }
 
-async function resetAgentPasswordAdmin(agentId, agentName){
+async function resetAgentPinAdmin(agentId, agentName){
   const newPin = prompt("Enter new PIN for " + (agentName || "agent"));
   if(newPin === null) return;
   if(!newPin.trim()){
@@ -1643,202 +1586,5 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 
-<script id="YENE_ADMIN_APPROVAL_PATCH">
-async function adminGetJson(url, options = {}){
-  const res = await fetch(url, { credentials: 'same-origin', ...options });
-  const txt = await res.text();
-  try { return JSON.parse(txt); } catch(e) { return { success:false, error: txt }; }
-}
-
-function safeEsc(v){
-  return String(v ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-function approvalBadge(status){
-  const s = String(status || "pending").toLowerCase();
-  if (s.includes("approve") || s === "active") return '<span class="admin-badge approved">APPROVED</span>';
-  if (s.includes("reject") || s === "blocked") return '<span class="admin-badge rejected">REJECTED</span>';
-  return '<span class="admin-badge pending">PENDING</span>';
-}
-
-function renderApprovalButtons(type, id, status){
-  const s = String(status || "").toLowerCase();
-  if (s.includes("approve") || s === "active") {
-    return '<div class="admin-actions"><span class="admin-badge approved">APPROVED</span></div>';
-  }
-  if (s.includes("reject") || s === "blocked") {
-    return '<div class="admin-actions"><span class="admin-badge rejected">REJECTED</span></div>';
-  }
-  return 
-    <div class="admin-actions">
-      <button class="admin-btn ok" onclick="approveRegistration('\','\')">Approve</button>
-      <button class="admin-btn no" onclick="rejectRegistration('\','\')">Reject</button>
-    </div>
-  ;
-}
-
-async function approveRegistration(type, id){
-  const url = type === "driver"
-    ? "/api/admin/approve_driver/" + encodeURIComponent(id)
-    : "/api/admin/approve_client/" + encodeURIComponent(id);
-
-  const res = await adminGetJson(url, { method: "POST" });
-  if(res.success){
-    alert(type + " approved successfully");
-    await loadPendingApprovals().catch(()=>{});
-    await loadRegionStats().catch(()=>{});
-    if(typeof refreshAll === "function") await refreshAll().catch(()=>{});
-  } else {
-    alert("Approval failed: " + (res.error || "Unknown error"));
-  }
-}
-
-async function rejectRegistration(type, id){
-  const url = type === "driver"
-    ? "/api/admin/reject_driver/" + encodeURIComponent(id)
-    : "/api/admin/reject_client/" + encodeURIComponent(id);
-
-  const res = await adminGetJson(url, { method: "POST" });
-  if(res.success){
-    alert(type + " rejected successfully");
-    await loadPendingApprovals().catch(()=>{});
-    await loadRegionStats().catch(()=>{});
-    if(typeof refreshAll === "function") await refreshAll().catch(()=>{});
-  } else {
-    alert("Reject failed: " + (res.error || "Unknown error"));
-  }
-}
-
-async function resetAgentPasswordAdmin(agentId, agentName){
-  const p = prompt("Enter new password for " + (agentName || "agent"));
-  if (p === null) return;
-
-  const newPassword = String(p || "").trim();
-  if (newPassword.length < 6){
-    alert("Password must be at least 6 characters");
-    return;
-  }
-
-  const res = await adminGetJson("/api/admin/reset_agent_password/" + encodeURIComponent(agentId), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ new_password: newPassword })
-  });
-
-  if(res.success){
-    alert("Agent password reset successfully");
-  } else {
-    alert("Reset failed: " + (res.error || "Unknown error"));
-  }
-}
-
-async function loadPendingApprovals(){
-  const body = document.getElementById("pendingApprovalsBody");
-  if(!body) return;
-
-  const driverRes = await adminGetJson("/api/admin/pending_drivers");
-  const clientRes = await adminGetJson("/api/admin/pending_clients");
-
-  const drivers = driverRes.success ? (driverRes.rows || []) : [];
-  const clients = clientRes.success ? (clientRes.rows || []) : [];
-  const rows = [];
-
-  drivers.forEach(d => {
-    rows.push(
-      <tr>
-        <td>Driver</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-      </tr>
-    );
-  });
-
-  clients.forEach(c => {
-    rows.push(
-      <tr>
-        <td>Client</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-      </tr>
-    );
-  });
-
-  body.innerHTML = rows.length
-    ? rows.join("")
-    : '<tr><td colspan="7" style="padding:10px">No pending driver or client approvals.</td></tr>';
-}
-
-async function loadRegionStats(){
-  const body = document.getElementById("regionStatsBody");
-  if(!body) return;
-
-  const [agentsRes, driversRes, clientsRes] = await Promise.all([
-    adminGetJson("/api/admin/agents"),
-    adminGetJson("/api/admin/drivers"),
-    adminGetJson("/api/admin/clients")
-  ]);
-
-  const agents = agentsRes.success ? (agentsRes.rows || agentsRes.data || []) : [];
-  const drivers = driversRes.success ? (driversRes.rows || driversRes.data || []) : [];
-  const clients = clientsRes.success ? (clientsRes.rows || clientsRes.data || []) : [];
-
-  const stats = {};
-
-  function regionOf(x){
-    return String(x.region || x.town || "Unassigned").trim() || "Unassigned";
-  }
-
-  agents.forEach(a => {
-    const r = regionOf(a);
-    if(!stats[r]) stats[r] = { region:r, agents:0, drivers:0, clients:0 };
-    stats[r].agents += 1;
-  });
-
-  drivers.forEach(d => {
-    const r = regionOf(d);
-    if(!stats[r]) stats[r] = { region:r, agents:0, drivers:0, clients:0 };
-    stats[r].drivers += 1;
-  });
-
-  clients.forEach(c => {
-    const r = regionOf(c);
-    if(!stats[r]) stats[r] = { region:r, agents:0, drivers:0, clients:0 };
-    stats[r].clients += 1;
-  });
-
-  const rows = Object.values(stats).sort((a,b)=>a.region.localeCompare(b.region));
-  body.innerHTML = rows.length
-    ? rows.map(r => 
-      <tr>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-        <td>\</td>
-      </tr>
-    ).join("")
-    : '<tr><td colspan="4" style="padding:10px">No regional data yet.</td></tr>';
-}
-
-window.addEventListener("load", function(){
-  setTimeout(() => {
-    loadPendingApprovals().catch(()=>{});
-    loadRegionStats().catch(()=>{});
-  }, 400);
-});
-</script>
 </body>
 </html>
-
