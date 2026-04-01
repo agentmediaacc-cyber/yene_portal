@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>YENE Town Leader Dashboard</title>
+  <style>
+    :root{
+      --bg:#07111f; --card:rgba(10,23,43,.92); --line:rgba(255,255,255,.10);
+      --text:#ebf4ff; --muted:#9db3d6; --yene:#58b7ff; --shadow:0 14px 40px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box;font-family:Inter,Arial,sans-serif}
+    body{
+      margin:0;color:var(--text);
+      background:linear-gradient(rgba(5,12,24,.78), rgba(5,12,24,.88)),
+      url("https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1800&q=80")
+      center/cover fixed no-repeat;
+      min-height:100vh;
+    }
+    .wrap{max-width:1280px;margin:0 auto;padding:20px}
+    .topbar{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;
+      background:rgba(8,18,34,.46);border:1px solid var(--line);border-radius:22px;padding:16px;
+      box-shadow:var(--shadow);backdrop-filter:blur(14px);margin-bottom:16px;
+    }
+    .topbar h1{margin:0;font-size:28px}
+    .topbar p{margin:6px 0 0;color:var(--muted)}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:12px 16px;border-radius:12px;text-decoration:none;border:none;cursor:pointer;
+      background:linear-gradient(135deg,#58b7ff,#238dff);color:#041021;font-weight:900;
+    }
+    .btn.secondary{background:linear-gradient(135deg,#16243d,#203657);color:#fff}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+    .layout{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+    .card{
+      background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;box-shadow:var(--shadow)
+    }
+    .title{font-size:20px;font-weight:900;margin:0 0 10px}
+    .mini{font-size:12px;color:var(--muted);text-transform:uppercase;font-weight:800}
+    .big{font-size:30px;font-weight:900;margin-top:8px}
+    .row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    input,button{
+      width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);
+      background:#081426;color:#fff
+    }
+    button{background:linear-gradient(135deg,#58b7ff,#238dff);color:#041021;font-weight:900;cursor:pointer}
+    table{width:100%;border-collapse:collapse;min-width:620px}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}
+    .tableWrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.02)}
+    @media(max-width:980px){.layout{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+    @media(max-width:680px){.row2{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>YENE Town Leader Dashboard</h1>
+      <p id="leaderInfo">Loading...</p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a href="/" class="btn secondary">Home</a>
+      <a href="/logout" class="btn">Logout</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><div class="mini">Agents</div><div class="big" id="sumAgents">0</div></div>
+    <div class="card"><div class="mini">Drivers</div><div class="big" id="sumDrivers">0</div></div>
+    <div class="card"><div class="mini">Clients</div><div class="big" id="sumClients">0</div></div>
+  </div>
+
+  <div class="layout" style="margin-top:16px">
+    <div class="card">
+      <div class="title">Create Agent In My Town</div>
+      <div class="row2">
+        <input id="newName" placeholder="Full name">
+        <input id="newEmail" placeholder="Email">
+        <input id="newPhone" placeholder="Phone">
+      </div>
+      <button style="margin-top:12px" onclick="createAgent()">Create Agent</button>
+    </div>
+
+    <div class="card">
+      <div class="title">Town Summary</div>
+      <div id="townSummaryText" style="color:#9db3d6">Loading...</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="title">Agents In My Town</div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Town</th><th>Status</th></tr></thead>
+        <tbody id="agentsTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="title">Drivers In My Town</div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Name</th><th>Phone</th><th>Town</th><th>Status</th></tr></thead>
+        <tbody id="driversTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="title">Clients In My Town</div>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Name</th><th>Phone</th><th>Town</th><th>Status</th></tr></thead>
+        <tbody id="clientsTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+async function api(url, options={}){
+  const r = await fetch(url, {credentials:'same-origin', ...options});
+  const j = await r.json();
+  if(!r.ok || j.ok === false) throw new Error(j.error || 'Request failed');
+  return j;
+}
+function esc(v){ return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
+
+async function loadData(){
+  const j = await api('/api/town_leader/me');
+  document.getElementById('leaderInfo').textContent =
+    `${j.leader.name} • ${j.leader.role} • ${j.leader.town} / ${j.leader.region}`;
+  document.getElementById('townSummaryText').textContent =
+    `You are controlling ${j.leader.town || 'your town'} in ${j.leader.region || 'your region'}.`;
+
+  document.getElementById('sumAgents').textContent = j.summary.agents || 0;
+  document.getElementById('sumDrivers').textContent = j.summary.drivers || 0;
+  document.getElementById('sumClients').textContent = j.summary.clients || 0;
+
+  document.getElementById('agentsTable').innerHTML = (j.agents || []).map(r => `
+    <tr><td>${esc(r.full_name || r.username || '')}</td><td>${esc(r.email || '')}</td><td>${esc(r.town || '')}</td><td>${esc(r.status || '')}</td></tr>
+  `).join('') || '<tr><td colspan="4">No agents</td></tr>';
+
+  document.getElementById('driversTable').innerHTML = (j.drivers || []).map(r => `
+    <tr><td>${esc(r.full_name || '')}</td><td>${esc(r.phone || r.phone_number || '')}</td><td>${esc(r.town || '')}</td><td>${esc(r.status || '')}</td></tr>
+  `).join('') || '<tr><td colspan="4">No drivers</td></tr>';
+
+  document.getElementById('clientsTable').innerHTML = (j.clients || []).map(r => `
+    <tr><td>${esc(r.full_name || '')}</td><td>${esc(r.phone || r.phone_number || '')}</td><td>${esc(r.town || '')}</td><td>${esc(r.status || '')}</td></tr>
+  `).join('') || '<tr><td colspan="4">No clients</td></tr>';
+}
+
+async function createAgent(){
+  try{
+    await api('/api/town_leader/create_agent', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        full_name: document.getElementById('newName').value.trim(),
+        email: document.getElementById('newEmail').value.trim(),
+        phone: document.getElementById('newPhone').value.trim()
+      })
+    });
+    alert('Agent created');
+    loadData();
+  }catch(err){
+    alert(err.message || 'Create failed');
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>YENE Admin • Agent Profile</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#0b1220;color:#e8f0ff}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .card{background:#101a33;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;margin:12px 0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+    .metric{font-size:28px;font-weight:800;color:#7db7ff}
+    .muted{opacity:.8}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{padding:10px 14px;border-radius:10px;border:none;font-weight:700;cursor:pointer}
+    .btn-blue{background:#2c6cff;color:#fff}
+    .btn-red{background:#dc2626;color:#fff}
+    .btn-green{background:#16a34a;color:#fff}
+    .btn-dark{background:#111827;color:#fff;border:1px solid rgba(255,255,255,.12)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-size:14px}
+    input{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#0b1220;color:#fff}
+    a{color:#9ec0ff}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <button class="btn btn-dark" onclick="window.location.href='/admin'">← Back to Admin</button>
+      <button class="btn btn-blue" onclick="loadAgentProfile()">Refresh</button>
+    </div>
+
+    <div class="card">
+      <div class="muted">YENE ADMIN</div>
+      <h1 id="agentName" style="margin:8px 0">Agent Profile</h1>
+      <div id="agentMeta" class="muted">Loading…</div>
+    </div>
+
+    <div id="statusBox" class="card">Loading profile…</div>
+
+    <div class="grid">
+      <div class="card"><div class="muted">Wallet Balance</div><div class="metric" id="walletBalance">N$ 0.00</div></div>
+      <div class="card"><div class="muted">Drivers Registered</div><div class="metric" id="driversCount">0</div></div>
+      <div class="card"><div class="muted">Clients Registered</div><div class="metric" id="clientsCount">0</div></div>
+      <div class="card"><div class="muted">Status</div><div class="metric" id="agentStatus">-</div></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Admin Actions</h3>
+      <div class="row">
+        <input id="newPin" placeholder="Enter new temporary PIN">
+        <button class="btn btn-blue" onclick="resetPin()">Reset PIN</button>
+        <button class="btn btn-green" onclick="setStatus('ACTIVE')">Set Active</button>
+        <button class="btn btn-red" onclick="setStatus('BLOCKED')">Block Agent</button>
+        <button class="btn btn-red" onclick="deleteAgent()">Delete Agent</button>
+      </div>
+      <div id="pinResult" class="muted" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Profile Details</h3>
+      <div id="profileDetails" class="muted">Loading…</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Drivers Registered</h3>
+      <table>
+        <thead><tr><th>Date</th><th>Name</th><th>Phone</th><th>Town</th><th>Status</th></tr></thead>
+        <tbody id="driversBody"><tr><td colspan="5">No drivers yet.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Clients Registered</h3>
+      <table>
+        <thead><tr><th>Date</th><th>Name</th><th>Phone</th><th>Code</th><th>Status</th></tr></thead>
+        <tbody id="clientsBody"><tr><td colspan="5">No clients yet.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Wallet Transactions</h3>
+      <table>
+        <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th><th>Status</th></tr></thead>
+        <tbody id="walletBody"><tr><td colspan="5">No wallet transactions yet.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+const AGENT_ID = {{ agent_id|tojson }};
+
+function money(v){ return 'N$ ' + Number(v || 0).toFixed(2); }
+
+async function getJson(url, options = {}){
+  const res = await fetch(url, { credentials:'same-origin', ...options });
+  const txt = await res.text();
+  try { return JSON.parse(txt); } catch(e) { return { success:false, error:txt }; }
+}
+
+function setStatusBox(msg){
+  document.getElementById('statusBox').textContent = msg;
+}
+
+async function loadAgentProfile(){
+  setStatusBox('Loading profile…');
+  const r = await getJson('/api/admin/agent_profile/' + encodeURIComponent(AGENT_ID));
+  if(!r.success){
+    setStatusBox('Load failed: ' + (r.error || 'Unknown error'));
+    return;
+  }
+
+  const a = r.agent || {};
+  document.getElementById('agentName').textContent = a.full_name || a.email || 'Agent';
+  document.getElementById('agentMeta').textContent = (a.email || '') + ' • ' + (a.phone || '') + ' • ' + (a.operation_region || a.town || '');
+  document.getElementById('walletBalance').textContent = money(r.wallet_balance || 0);
+  document.getElementById('driversCount').textContent = (r.drivers || []).length;
+  document.getElementById('clientsCount').textContent = (r.clients || []).length;
+  document.getElementById('agentStatus').textContent = a.status || '-';
+
+  document.getElementById('profileDetails').innerHTML =
+    'Email: ' + (a.email || '') + '<br>' +
+    'Phone: ' + (a.phone || '') + '<br>' +
+    'Username: ' + (a.username || '') + '<br>' +
+    'Town: ' + (a.town || '') + '<br>' +
+    'Operation Region: ' + (a.operation_region || '') + '<br>' +
+    'Residential Address: ' + (a.residential_address || '');
+
+  const db = document.getElementById('driversBody');
+  db.innerHTML = '';
+  if(!(r.drivers || []).length){
+    db.innerHTML = '<tr><td colspan="5">No drivers yet.</td></tr>';
+  } else {
+    r.drivers.forEach(x => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${x.created_at ? new Date(x.created_at).toLocaleString() : ''}</td><td>${x.full_name || ''}</td><td>${x.phone || x.phone_number || ''}</td><td>${x.town || ''}</td><td>${x.status || ''}</td>`;
+      db.appendChild(tr);
+    });
+  }
+
+  const cb = document.getElementById('clientsBody');
+  cb.innerHTML = '';
+  if(!(r.clients || []).length){
+    cb.innerHTML = '<tr><td colspan="5">No clients yet.</td></tr>';
+  } else {
+    r.clients.forEach(x => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${x.created_at ? new Date(x.created_at).toLocaleString() : ''}</td><td>${x.full_name || ''}</td><td>${x.phone || x.phone_number || ''}</td><td>${x.external_code || x.yene_code || ''}</td><td>${x.status || ''}</td>`;
+      cb.appendChild(tr);
+    });
+  }
+
+  const wb = document.getElementById('walletBody');
+  wb.innerHTML = '';
+  if(!(r.wallet_rows || []).length){
+    wb.innerHTML = '<tr><td colspan="5">No wallet transactions yet.</td></tr>';
+  } else {
+    r.wallet_rows.forEach(x => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${x.created_at ? new Date(x.created_at).toLocaleString() : ''}</td><td>${x.txn_type || ''}</td><td>${money(x.amount || 0)}</td><td>${x.description || ''}</td><td>${x.status || ''}</td>`;
+      wb.appendChild(tr);
+    });
+  }
+
+  setStatusBox('Profile loaded successfully.');
+}
+
+async function resetPin(){
+  const newPin = (document.getElementById('newPin').value || '').trim();
+  if(!newPin){
+    alert('Enter new temporary PIN first.');
+    return;
+  }
+
+  const r = await getJson('/api/admin/agent_reset_pin/' + encodeURIComponent(AGENT_ID), {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ new_pin: newPin })
+  });
+
+  if(!r.success){
+    alert('PIN reset failed: ' + (r.error || 'Unknown error'));
+    return;
+  }
+
+  const text = 'Agent: ' + (r.agent_name || '') + '\nEmail: ' + (r.agent_email || '') + '\nTemporary PIN: ' + (r.temporary_pin || '');
+  document.getElementById('pinResult').textContent = text;
+
+  try{
+    await navigator.clipboard.writeText(r.temporary_pin || '');
+    alert('PIN reset successful. Temporary PIN copied to clipboard.');
+  }catch(e){
+    alert('PIN reset successful.');
+  }
+}
+
+async function setStatus(status){
+  const r = await getJson('/api/admin/agent_set_status/' + encodeURIComponent(AGENT_ID), {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status })
+  });
+  if(!r.success){
+    alert('Status update failed: ' + (r.error || 'Unknown error'));
+    return;
+  }
+  await loadAgentProfile();
+}
+
+async function deleteAgent(){
+  if(!confirm('Delete this agent profile?')) return;
+  const r = await getJson('/api/admin/delete_agent/' + encodeURIComponent(AGENT_ID), { method:'POST' });
+  if(!r.success){
+    alert('Delete failed: ' + (r.error || 'Unknown error'));
+    return;
+  }
+  alert('Agent deleted successfully.');
+  window.location.href = '/admin';
+}
+
+document.addEventListener('DOMContentLoaded', loadAgentProfile);
+</script>
+</body>
+</html>

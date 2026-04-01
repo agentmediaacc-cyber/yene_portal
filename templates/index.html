@@ -1,132 +1,312 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>YENE | Namibia's Nationwide Network</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <style>
-        :root{--yene:#4aa8ff;--bg:#0b1220;--card:#111b2e;--text:#eaf2ff;--muted:#a9b7d6;--ok:#2ed573;--warn:#ffa502;}
-        *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-        body{margin:0;background:var(--bg);color:var(--text);padding:20px;line-height:1.6;}
-        .container{max-width:1000px;margin:0 auto;}
-        .card{background:var(--card);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:24px;margin-bottom:20px;}
-        .hero{text-align:center;padding:40px 20px;}
-        .hero h1{font-size:38px;margin:10px 0;font-weight:900;}
-        .pill{display:inline-flex;align-items:center;gap:6px;background:rgba(74,168,255,0.1);color:var(--yene);padding:6px 14px;border-radius:99px;font-size:12px;font-weight:800;text-transform:uppercase;}
-        .dot{width:8px;height:8px;border-radius:50%;}
-        .dot.ok{background:var(--ok);}
-        .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:12px;text-decoration:none;font-weight:800;transition:0.2s;}
-        .btn.primary{background:var(--yene);color:#0b1220;}
-        .btn.outline{border:1px solid rgba(255,255,255,0.2);color:var(--text);}
-        .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
-        @media (max-width:768px){.grid{grid-template-columns:1fr;}}
-        .section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:10px;}
-        .table-wrap{overflow-x:auto;}
-        table{width:100%;border-collapse:collapse;font-size:14px;}
-        th{text-align:left;color:var(--yene);padding:12px;border-bottom:2px solid rgba(255,255,255,0.1);}
-        td{padding:12px;border-bottom:1px solid rgba(255,255,255,0.05);}
-    </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>YENE Promoter & Agent Platform</title>
+  <style>
+    :root{
+      --bg:#07131f;
+      --card:rgba(9,22,40,.84);
+      --card2:rgba(8,18,34,.72);
+      --line:rgba(255,255,255,.10);
+      --text:#eef6ff;
+      --muted:#b5c8e8;
+      --blue:#58b7ff;
+      --blue2:#238dff;
+      --green:#33d17a;
+      --warn:#ffb84d;
+      --danger:#ff6b6b;
+      --shadow:0 18px 40px rgba(0,0,0,.30);
+      --radius:24px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family:Inter,Segoe UI,Arial,sans-serif;
+      color:var(--text);
+      background:
+        linear-gradient(rgba(4,13,24,.70), rgba(4,13,24,.86)),
+        url("https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1800&q=80")
+        center/cover fixed no-repeat;
+      min-height:100vh;
+    }
+    a{text-decoration:none;color:inherit}
+    .wrap{max-width:1280px;margin:0 auto;padding:20px}
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+      background:rgba(7,18,33,.62);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:14px 18px;
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(10px);
+      position:sticky;top:12px;z-index:20;
+    }
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{
+      width:52px;height:52px;border-radius:16px;
+      display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,var(--blue),#7c4dff);
+      color:white;font-weight:900;font-size:24px;
+      box-shadow:0 12px 26px rgba(0,0,0,.25);
+    }
+    .brand h1{margin:0;font-size:20px;font-weight:900;letter-spacing:.2px}
+    .brand p{margin:3px 0 0;color:var(--muted);font-size:13px}
+    .nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .nav a{
+      padding:10px 14px;border-radius:12px;border:1px solid transparent;
+      background:rgba(255,255,255,.04);font-weight:700;transition:.18s ease;
+    }
+    .nav a:hover{border-color:rgba(88,183,255,.25);background:rgba(88,183,255,.10);transform:translateY(-1px)}
+    .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-top:18px;align-items:stretch}
+    .panel{
+      background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+      box-shadow:var(--shadow);padding:24px;backdrop-filter:blur(10px);min-width:0;
+    }
+    .eyebrow{
+      display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;
+      background:rgba(88,183,255,.10);border:1px solid rgba(88,183,255,.20);
+      color:#d8efff;font-size:13px;font-weight:800;margin-bottom:14px;
+    }
+    .hero h2{font-size:clamp(30px,5vw,56px);line-height:1.02;margin:0 0 14px;font-weight:950;max-width:760px}
+    .hero p{margin:0;color:var(--muted);font-size:17px;line-height:1.6;max-width:760px}
+    .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;min-width:160px;
+      padding:14px 18px;border-radius:14px;font-weight:900;border:none;cursor:pointer;
+      transition:.18s ease;box-shadow:0 10px 24px rgba(0,0,0,.22);
+    }
+    .btn.primary{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#04111d}
+    .btn.secondary{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--line)}
+    .btn:hover{transform:translateY(-2px)}
+    .heroStats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:22px}
+    .miniCard{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:18px;padding:16px}
+    .miniLabel{color:var(--muted);font-size:12px;text-transform:uppercase;font-weight:800;letter-spacing:.4px}
+    .miniValue{margin-top:8px;font-size:28px;font-weight:950}
+    .welcomeBox{position:relative;overflow:hidden;min-height:100%}
+    .welcomeBox:before{
+      content:"";position:absolute;inset:auto -60px -60px auto;width:220px;height:220px;border-radius:50%;
+      background:radial-gradient(circle, rgba(88,183,255,.28), rgba(88,183,255,0) 70%);pointer-events:none;
+    }
+    .sectionGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+    .title{font-size:21px;font-weight:900;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+    .subtitle{color:var(--muted);margin:-2px 0 14px;font-size:14px}
+    .updates{display:grid;gap:10px}
+    .updateItem{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:16px;padding:14px}
+    .updateDate{font-size:12px;color:#cce7ff;font-weight:800;margin-bottom:6px}
+    .updateText{color:var(--text);line-height:1.5}
+    .rules{display:grid;gap:10px}
+    .rule{display:flex;gap:12px;align-items:flex-start;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:16px;padding:14px}
+    .ruleIcon{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(88,183,255,.12);flex:0 0 auto;font-size:17px}
+    .infoCards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}
+    .feature{background:var(--card2);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
+    .feature h3{margin:12px 0 8px;font-size:18px}
+    .feature p{margin:0;color:var(--muted);line-height:1.55;font-size:14px}
+    .feature .icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:rgba(88,183,255,.12);font-size:22px}
+    .tableWrap{width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.03)}
+    table{width:100%;border-collapse:collapse;min-width:680px}
+    th,td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-size:14px}
+    th{background:rgba(10,24,44,.72);color:#d2e8ff;font-weight:900}
+    .pill{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}
+    .pill.active{background:rgba(51,209,122,.16);color:#9ef2c1}
+    .pill.inactive{background:rgba(255,107,107,.14);color:#ffc4c4}
+    .footerBox{margin-top:18px;display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+    .footerText{color:var(--muted);line-height:1.65;font-size:15px}
+    .ctaStrip{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    @media (max-width:1080px){
+      .hero,.sectionGrid,.footerBox{grid-template-columns:1fr}
+      .infoCards{grid-template-columns:1fr 1fr}
+    }
+    @media (max-width:720px){
+      .wrap{padding:14px}
+      .heroStats,.infoCards{grid-template-columns:1fr}
+      .topbar{border-radius:18px}
+      .panel{padding:18px}
+      .nav{width:100%}
+      .nav a{flex:1 1 auto;text-align:center}
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="hero card">
-            <div class="pill"><span class="dot ok"></span> Network Active • Namibia</div>
-            <h1>YENE Promoter & Agent Platform</h1>
-            <p style="color:var(--muted);max-width:700px;margin:15px auto;">
-                Join the nationwide e-hailing revolution. Our secure system allows verified agents to register drivers and clients across all 14 regions of Namibia.
-            </p>
-            <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;">
-                <a href="/register" class="btn primary">Apply to Join</a>
-                <a href="/login" class="btn outline">Agent Login</a>
-            </div>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">Y</div>
+        <div>
+          <h1>YENE Promoter & Agent Platform</h1>
+          <p>Network Active • Namibia</p>
         </div>
+      </div>
 
-        <div class="grid">
-            <div class="card">
-                <div class="section-title">
-                    <h2 style="margin:0;font-size:18px;"><i class="fa-solid fa-bullhorn"></i> Official Updates</h2>
-                </div>
-                <div id="broadcastList">
-                    <p class="muted">Scanning network for updates...</p>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="section-title">
-                    <h2 style="margin:0;font-size:18px;"><i class="fa-solid fa-shield-check"></i> Network Rules</h2>
-                </div>
-                <ul style="padding-left:18px;font-size:14px;color:var(--muted);">
-                    <li>Only approved agents can earn commissions.</li>
-                    <li>Duplicate phone registrations are blocked.</li>
-                    <li>Verified trip tracking for all rewards.</li>
-                    <li>Transparent ledger for agent payouts.</li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="section-title">
-                <h2 style="margin:0;font-size:18px;"><i class="fa-solid fa-coins"></i> Regional Payment Rates</h2>
-            </div>
-            <div class="table-wrap">
-                <table id="paymentTable">
-                    <thead>
-                        <tr>
-                            <th>Region</th>
-                            <th>Town</th>
-                            <th>Driver (N$)</th>
-                            <th>Client (N$)</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="5" style="text-align:center;">Loading regional data...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+      <div class="nav">
+        <a href="/apply">Apply to Join</a>
+        <a href="/login">Agent Login</a>
+        <a href="#updates">Official Updates</a>
+      </div>
     </div>
 
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script>
-        const SUPABASE_URL = "https://kcxphxihykonzuagtgke.supabase.co";
-        const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjeHBoeGloeWtvbnp1YWd0Z2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODQ3NTYsImV4cCI6MjA4NzE2MDc1Nn0.apk8My6XuGnv1374_q-r45QMYO2FYveWIlXuj12VCR0";
-        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    <div class="hero">
+      <div class="panel welcomeBox">
+        <div class="eyebrow">🌊 Welcome to the YENE Network</div>
+        <h2>Join the nationwide e-hailing revolution across Namibia.</h2>
+        <p>
+          Our secure YENE system helps approved promoters and agents register drivers and clients,
+          grow teams, earn transparently, and support mobility across all 14 regions of Namibia.
+          Build your network, track progress, and become part of a modern remote-work transport platform.
+        </p>
 
-        async function loadPublicData() {
-            // Load Broadcasts
-            const { data: bData } = await sb.from('broadcasts').select('message,created_at').order('created_at', {ascending:false}).limit(3);
-            const bList = document.getElementById('broadcastList');
-            if(bData && bData.length > 0) {
-                bList.innerHTML = bData.map(msg => `
-                    <div style="background:rgba(255,255,255,0.03);padding:12px;border-radius:10px;margin-bottom:10px;border-left:3px solid var(--yene);">
-                        <div style="font-weight:bold;font-size:14px;">${msg.message}</div>
-                        <div style="font-size:11px;color:var(--muted);margin-top:4px;">${new Date(msg.created_at).toLocaleDateString()}</div>
-                    </div>
-                `).join('');
-            } else {
-                bList.innerHTML = "<p style='color:var(--muted)'>No active announcements.</p>";
-            }
+        <div class="cta">
+          <a class="btn primary" href="/apply">Apply to Join</a>
+          <a class="btn secondary" href="/login">Agent Login</a>
+        </div>
 
-            // Load Payment Rules
-            const { data: pData } = await sb.from('payment_rules').select('*').order('region', {ascending:true});
-            const pTable = document.querySelector('#paymentTable tbody');
-            if(pData && pData.length > 0) {
-                pTable.innerHTML = pData.map(r => `
-                    <tr>
-                        <td>${r.region}</td>
-                        <td><b>${r.town}</b></td>
-                        <td>${r.driver_reg || 0}</td>
-                        <td>${r.client_reg || 0}</td>
-                        <td style="color:${r.is_active ? 'var(--ok)' : 'var(--warn)'}">${r.is_active ? 'Active' : 'Inactive'}</td>
-                    </tr>
-                `).join('');
-            } else {
-                pTable.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Regional rates coming soon.</td></tr>";
-            }
-        }
-        loadPublicData();
-    </script>
+        <div class="heroStats">
+          <div class="miniCard">
+            <div class="miniLabel">Regions</div>
+            <div class="miniValue">{{ stats.regions }}</div>
+          </div>
+          <div class="miniCard">
+            <div class="miniLabel">Approved Agents</div>
+            <div class="miniValue">{{ stats.agents }}</div>
+          </div>
+          <div class="miniCard">
+            <div class="miniLabel">Drivers</div>
+            <div class="miniValue">{{ stats.drivers }}</div>
+          </div>
+          <div class="miniCard">
+            <div class="miniLabel">Clients</div>
+            <div class="miniValue">{{ stats.clients }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="title">✨ Why Join YENE?</div>
+        <div class="subtitle">A welcoming platform for promoters, agents, drivers, and clients.</div>
+
+        <div class="rules">
+          <div class="rule">
+            <div class="ruleIcon">🚕</div>
+            <div><strong>Nationwide opportunity</strong><br>Grow a real transport network in towns and cities across Namibia.</div>
+          </div>
+          <div class="rule">
+            <div class="ruleIcon">💼</div>
+            <div><strong>Earn through verified work</strong><br>Commissions and bonuses are based on approved registrations and transparent rules.</div>
+          </div>
+          <div class="rule">
+            <div class="ruleIcon">🛡️</div>
+            <div><strong>Secure admin approval</strong><br>Agents, drivers, and clients are reviewed before earnings are counted.</div>
+          </div>
+          <div class="rule">
+            <div class="ruleIcon">📍</div>
+            <div><strong>Regional growth model</strong><br>Build teams by town, region, and local network leadership.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="infoCards">
+      <div class="feature">
+        <div class="icon">🤝</div>
+        <h3>Promoter Path</h3>
+        <p>Join as a YENE promoter or agent and help grow drivers, clients, and brand visibility in your area.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">📲</div>
+        <h3>Digital Registration</h3>
+        <p>Use a structured system to register networks with approval, codes, and recruiter tracking.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🏆</div>
+        <h3>Performance Rewards</h3>
+        <p>Track commissions, network activity, and future bonus opportunities as the platform grows.</p>
+      </div>
+    </div>
+
+    <div class="sectionGrid">
+      <div class="panel" id="updates">
+        <div class="title">📢 Official Updates</div>
+        <div class="updates">
+          {% for u in updates %}
+          <div class="updateItem">
+            <div class="updateDate">{{ u.title }} • {{ u.date }}</div>
+            <div class="updateText">{{ u.message }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="title">📘 Network Rules</div>
+        <div class="rules">
+          {% for r in rules %}
+          <div class="rule">
+            <div class="ruleIcon">{{ r.icon }}</div>
+            <div>{{ r.text }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <div class="title">📍 Regional Payment Rates</div>
+      <div class="subtitle">Live payment visibility from your network setup.</div>
+      <div class="tableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Region</th>
+              <th>Town</th>
+              <th>Driver (N$)</th>
+              <th>Client (N$)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rates %}
+            <tr>
+              <td>{{ r.region }}</td>
+              <td>{{ r.town }}</td>
+              <td>{{ r.driver }}</td>
+              <td>{{ r.client }}</td>
+              <td>
+                {% if (r.status|string|lower) == 'active' %}
+                <span class="pill active">{{ r.status }}</span>
+                {% else %}
+                <span class="pill inactive">{{ r.status }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="footerBox">
+      <div class="panel">
+        <div class="title">🇳🇦 Built for Namibia</div>
+        <div class="footerText">
+          YENE is more than a signup page. It is a modern digital network for promoters, agents, drivers,
+          and clients to build mobility and remote work opportunities around Namibia. From coastal towns
+          to inland cities, the platform is designed to scale with approvals, rewards, and structured leadership.
+        </div>
+        <div class="ctaStrip">
+          <a class="btn primary" href="/apply">Start My Application</a>
+          <a class="btn secondary" href="/login">Open Agent Portal</a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="title">💬 Quick Welcome</div>
+        <div class="footerText">
+          Welcome to YENE. We are excited to help you grow with us. Apply, get approved, build your team,
+          and become part of the next generation of transport and promoter work in Namibia.
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

@@ -1,5 +1,17 @@
 ﻿from uuid import uuid4
 from supabase import create_client, Client
+from agent_team_features import register_agent_team_routes
+from admin_compat_routes import register_admin_compat_routes
+from admin_presence_town_routes import register_admin_presence_town_routes
+from admin_extended_routes import register_admin_extended_routes
+from admin_final_routes import register_admin_final_routes
+from admin_workflow_routes import register_admin_workflow_routes
+from admin_agents_reject_fix_routes import register_admin_agents_reject_fix_routes
+from admin_agents_master_routes import register_admin_agents_master_routes
+from admin_agents_live_routes import register_admin_agents_live_routes
+from admin_approval_working_routes import register_admin_approval_working_routes
+from admin_error_fixes_routes import register_admin_error_fixes_routes
+from admin_broadcast_fix_routes import register_admin_broadcast_fix_routes
 from flask_cors import CORS
 from flask import jsonify,  Flask, render_template, request, jsonify, session, flash, redirect, url_for, Response
 from werkzeug.security import generate_password_hash
@@ -121,8 +133,8 @@ URL = os.getenv('SUPABASE_URL', 'https://kcxphxihykonzuagtgke.supabase.co')
 ANON_KEY = os.getenv('SUPABASE_ANON_KEY', '')
 SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', '')
 
-supabase: Client = create_client(URL, ANON_KEY)
-sb_admin: Client = create_client(URL, SERVICE_KEY) if SERVICE_KEY else supabase
+supabase = create_client(URL, ANON_KEY)
+sb_admin = create_client(URL, SERVICE_KEY) if SERVICE_KEY else supabase
 
 # --- HELPER FUNCTIONS ---
 
@@ -176,9 +188,148 @@ def log_system_event(event_type, description, user_id=None):
 # --- 2. YOUR ROUTES ---
 
 
-@app.route("/")
+register_agent_team_routes(app, sb_admin)
+register_admin_compat_routes(app, sb_admin)
+register_admin_presence_town_routes(app, sb_admin)
+register_admin_extended_routes(app, sb_admin)
+register_admin_final_routes(app, sb_admin)
+register_admin_workflow_routes(app, sb_admin)
+register_admin_agents_reject_fix_routes(app, sb_admin)
+register_admin_agents_master_routes(app, sb_admin)
+register_admin_agents_live_routes(app, sb_admin)
+register_admin_approval_working_routes(app, sb_admin)
+register_admin_error_fixes_routes(app, sb_admin)
+register_admin_broadcast_fix_routes(app, sb_admin)
+
+
+
+def homepage_stats(sb_admin):
+    def _safe_select(table, filters=None, cols="*", limit=None, order_col=None, desc=False):
+        filters = filters or {}
+        try:
+            q = sb_admin.table(table).select(cols)
+            for k, v in filters.items():
+                q = q.eq(k, v)
+            if order_col:
+                q = q.order(order_col, desc=desc)
+            if limit:
+                q = q.limit(limit)
+            res = q.execute()
+            return res.data or []
+        except Exception:
+            return []
+
+    def _clean(v):
+        return str(v or "").strip()
+
+    def _approved(v):
+        return _clean(v).upper() in ("ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED")
+
+    def _official_updates():
+        rows = _safe_select("broadcasts", {}, "*", 10, "created_at", True)
+        out = []
+        for r in rows:
+            msg = _clean(r.get("message"))
+            if not msg:
+                continue
+            out.append({
+                "date": _clean(r.get("created_at"))[:10],
+                "title": _clean(r.get("title")) or "Official Update",
+                "message": msg,
+            })
+        if out:
+            return out[:5]
+
+        rows = _safe_select("system_logs", {}, "*", 10, "created_at", True)
+        for r in rows:
+            details = _clean(r.get("details"))
+            if not details:
+                continue
+            out.append({
+                "date": _clean(r.get("created_at"))[:10],
+                "title": _clean(r.get("event_type")) or "Official Update",
+                "message": details,
+            })
+        if out:
+            return out[:5]
+
+        return [
+            {"date": "2026-04-01", "title": "Promotion Time", "message": "Windhoek, YENE is coming. Get ready for network growth and driver recruitment."},
+            {"date": "2026-03-08", "title": "Remote Work", "message": "We are building great remote work opportunities around Namibia. Join YENE and earn with us."},
+            {"date": "2026-03-05", "title": "Network Growth", "message": "Regional expansion continues as we strengthen recruitment, approvals, and team leadership."},
+        ]
+
+    def _network_rules():
+        return [
+            {"icon": "✅", "text": "Only approved agents can earn commissions."},
+            {"icon": "📵", "text": "Duplicate phone registrations are blocked for network integrity."},
+            {"icon": "🧾", "text": "Verified trip tracking supports clear reward calculations."},
+            {"icon": "💳", "text": "Transparent ledger and admin review support fair payouts."},
+        ]
+
+    def _regional_rates():
+        rows = _safe_select("payment_rules", {}, "*", 200, "updated_at", True)
+        out = []
+        for r in rows:
+            region = _clean(r.get("region"))
+            town = _clean(r.get("town"))
+            driver = r.get("driver_reg")
+            client = r.get("client_reg")
+            status = _clean(r.get("status")) or "Active"
+            if region or town:
+                out.append({
+                    "region": region or "Namibia",
+                    "town": town or "General",
+                    "driver": driver if driver is not None else 0,
+                    "client": client if client is not None else 0,
+                    "status": status,
+                })
+
+        if out:
+            seen = set()
+            unique = []
+            for r in out:
+                key = (r["region"].lower(), r["town"].lower(), str(r["driver"]), str(r["client"]), r["status"].lower())
+                if key in seen:
+                    continue
+                seen.add(key)
+                unique.append(r)
+            return unique[:12]
+
+        return [
+            {"region": "Erongo", "town": "Walvis Bay", "driver": 10, "client": 10, "status": "Active"},
+            {"region": "Erongo", "town": "Swakopmund", "driver": 10, "client": 10, "status": "Active"},
+            {"region": "Khomas", "town": "Windhoek", "driver": 10, "client": 10, "status": "Active"},
+            {"region": "Kavango East", "town": "Rundu", "driver": 10, "client": 15, "status": "Active"},
+        ]
+
+    agents = _safe_select("agent_profiles", {}, "*", 10000)
+    if not agents:
+        agents = _safe_select("agents", {}, "*", 10000)
+
+    return {
+        "stats": {
+            "regions": 14,
+            "agents": len([r for r in agents if _approved(r.get("status")) or not _clean(r.get("status"))]),
+            "drivers": len(_safe_select("drivers", {}, "*", 10000)),
+            "clients": len(_safe_select("clients", {}, "*", 10000)),
+        },
+        "updates": _official_updates(),
+        "rules": _network_rules(),
+        "rates": _regional_rates(),
+    }
+
+
+@app.route('/')
 def index():
-    return render_template("index.html")
+    home = homepage_stats(sb_admin)
+    return render_template(
+        'index.html',
+        stats=home['stats'],
+        updates=home['updates'],
+        rules=home['rules'],
+        rates=home['rates'],
+    )
 
 
 # ---------------------------
@@ -503,10 +654,8 @@ def admin_entry():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
-@app.route("/api/agent/register_client", methods=["POST"])
-@require_agent_token
-@require_login("AGENT")
-def api_agent_register_client():
+@app.route("/api/agent/register_client_legacy", methods=["POST"])
+def api_agent_register_client_legacy():
     data = request.json
     phone = (data.get("phone") or "").strip()
     
@@ -825,8 +974,8 @@ def api_agent_activity_v2():
     rows.sort(key=lambda x: x.get("created_at") or "", reverse=True)
     return jsonify({"ok": True, "rows": rows[:30], "profile": prof})
 
-@app.post("/api/agent/register_driver_v2_working")
-def api_agent_register_driver_v2_working():
+@app.post("/api/agent/register_driver_v2_working_legacy")
+def api_agent_register_driver_v2_working_legacy():
     user = _verify_bearer()
     if not user:
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
@@ -1992,9 +2141,8 @@ def api_agent_weekly():
         "recent": recent
     })
 
-@app.route("/api/agent/register_driver", methods=["POST"])
-@require_login("AGENT")
-def api_agent_register_driver():
+@app.route("/api/agent/register_driver_legacy", methods=["POST"])
+def api_agent_register_driver_legacy():
     data = request.json
     email = session.get("email")
     agent = sb_admin.table("agent_profiles").select("id, full_name").eq("email", email).execute().data
@@ -2716,6 +2864,217 @@ def api_admin_broadcast_by_region():
                 "region": a.get("operation_region") or a.get("town") or ""
             } for a in targets]
         })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+
+
+@app.route("/admin/agent/<agent_id>")
+def admin_agent_profile_page(agent_id):
+    if session.get("role") != "ADMIN":
+        return redirect(url_for("admin_login"))
+    return render_template("admin_agent_profile.html", agent_id=agent_id)
+
+
+@app.route("/api/admin/agent_profile/<agent_id>", methods=["GET"])
+def api_admin_agent_profile(agent_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        agents = sb_admin.table("agent_profiles").select("*").eq("id", agent_id).limit(1).execute().data or []
+        if not agents:
+            return jsonify({"success": False, "error": "Agent not found"}), 404
+
+        agent = agents[0]
+
+        drivers = sb_admin.table("drivers").select("*").eq("recruiter_agent_id", str(agent_id)).order("created_at", desc=True).limit(500).execute().data or []
+        clients = sb_admin.table("clients").select("*").eq("recruiter_agent_id", str(agent_id)).order("created_at", desc=True).limit(500).execute().data or []
+
+        try:
+            ledger = sb_admin.table("agent_wallet_ledger").select("*").eq("agent_id", str(agent_id)).order("created_at", desc=True).limit(200).execute().data or []
+        except Exception:
+            ledger = []
+
+        balance = 0.0
+        for row in ledger:
+            amt = float(row.get("amount") or 0)
+            typ = (row.get("txn_type") or "").lower()
+            status = (row.get("status") or "approved").lower()
+            if status != "approved":
+                continue
+            if typ == "debit":
+                balance -= amt
+            else:
+                balance += amt
+
+        return jsonify({
+            "success": True,
+            "agent": agent,
+            "drivers": drivers,
+            "clients": clients,
+            "wallet_balance": round(balance, 2),
+            "wallet_rows": ledger
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/agent_reset_pin/<agent_id>", methods=["POST"])
+def api_admin_agent_reset_pin_stable(agent_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json(silent=True) or {}
+        new_pin = (data.get("new_pin") or "").strip()
+
+        if not new_pin:
+            return jsonify({"success": False, "error": "New PIN is required"}), 400
+
+        rows = sb_admin.table("agent_profiles").select("*").eq("id", agent_id).limit(1).execute().data or []
+        if not rows:
+            return jsonify({"success": False, "error": "Agent not found"}), 404
+
+        agent = rows[0]
+
+        sb_admin.table("agent_profiles").update({"pin": new_pin}).eq("id", agent_id).execute()
+
+        return jsonify({
+            "success": True,
+            "agent_id": agent_id,
+            "agent_name": agent.get("full_name") or "",
+            "agent_email": agent.get("email") or "",
+            "temporary_pin": new_pin,
+            "message": "PIN reset successfully"
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/agent_set_status/<agent_id>", methods=["POST"])
+def api_admin_agent_set_status(agent_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json(silent=True) or {}
+        status = (data.get("status") or "").strip()
+        if not status:
+            return jsonify({"success": False, "error": "Status is required"}), 400
+
+        sb_admin.table("agent_profiles").update({"status": status}).eq("id", agent_id).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+
+
+@app.route("/api/admin/agents_manager_data", methods=["GET"])
+def api_admin_agents_manager_data():
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    q = (request.args.get("q") or "").strip().lower()
+
+    try:
+        agents = sb_admin.table("agent_profiles").select("*").limit(5000).execute().data or []
+        drivers = sb_admin.table("drivers").select("recruiter_agent_id").limit(10000).execute().data or []
+        clients = sb_admin.table("clients").select("recruiter_agent_id").limit(10000).execute().data or []
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+    dcount = {}
+    ccount = {}
+
+    for d in drivers:
+        aid = str(d.get("recruiter_agent_id") or "")
+        if aid:
+            dcount[aid] = dcount.get(aid, 0) + 1
+
+    for c in clients:
+        aid = str(c.get("recruiter_agent_id") or "")
+        if aid:
+            ccount[aid] = ccount.get(aid, 0) + 1
+
+    rows = []
+    for a in agents:
+        aid = str(a.get("id") or "")
+        row = {
+            "id": aid,
+            "status": a.get("status") or "ACTIVE",
+            "full_name": a.get("full_name") or "",
+            "email": a.get("email") or "",
+            "phone": a.get("phone") or "",
+            "town": a.get("operation_region") or a.get("town") or "—",
+            "created_at": a.get("created_at"),
+            "drivers": dcount.get(aid, 0),
+            "clients": ccount.get(aid, 0),
+        }
+
+        hay = " ".join([
+            str(row["full_name"]),
+            str(row["email"]),
+            str(row["phone"]),
+            str(row["town"]),
+            str(row["status"]),
+        ]).lower()
+
+        if q and q not in hay:
+            continue
+
+        rows.append(row)
+
+    rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    return jsonify({"success": True, "rows": rows})
+
+
+@app.route("/api/admin/agent_reset_pin/<agent_id>", methods=["POST"])
+def api_admin_agent_reset_pin():
+    agent_id = request.view_args["agent_id"]
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json(silent=True) or {}
+        new_pin = (data.get("new_pin") or "").strip()
+
+        if not new_pin:
+            return jsonify({"success": False, "error": "New PIN is required"}), 400
+
+        rows = sb_admin.table("agent_profiles").select("*").eq("id", agent_id).limit(1).execute().data or []
+        if not rows:
+            return jsonify({"success": False, "error": "Agent not found"}), 404
+
+        agent = rows[0]
+        sb_admin.table("agent_profiles").update({"pin": new_pin}).eq("id", agent_id).execute()
+
+        return jsonify({
+            "success": True,
+            "agent_id": agent_id,
+            "agent_name": agent.get("full_name") or "",
+            "agent_email": agent.get("email") or "",
+            "temporary_pin": new_pin
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/agent_set_status/<agent_id>", methods=["POST"])
+def api_admin_agent_set_status_clean(agent_id):
+    if session.get("role") != "ADMIN":
+        return jsonify({"success": False, "error": "Unauthorized"}), 403
+
+    try:
+        data = request.get_json(silent=True) or {}
+        status = (data.get("status") or "").strip()
+        if not status:
+            return jsonify({"success": False, "error": "Status is required"}), 400
+
+        sb_admin.table("agent_profiles").update({"status": status}).eq("id", agent_id).execute()
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
