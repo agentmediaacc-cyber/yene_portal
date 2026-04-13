@@ -1,330 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>YENE Portal | Login</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <style>
-    :root{--yene:#4aa8ff;--bg:#0b1220;--card:#111b2e;--text:#eaf2ff;--muted:#a9b7d6;--line:rgba(255,255,255,.12);}
-    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);padding:18px}
-    .card{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px}
-    
-    .logo-box{text-align:center;margin-bottom:20px;}
-    .logo{width:50px;height:50px;border-radius:14px;background:rgba(74,168,255,.18);display:inline-flex;align-items:center;justify-content:center;color:var(--yene);font-size:24px;border:1px solid rgba(74,168,255,.28);margin-bottom:10px;}
-    h1{margin:0 0 6px;font-size:22px;}
-    p{margin:0;color:var(--muted);font-size:14px;}
-
-    /* The Toggle Switch */
-    .toggle-container{display:flex;background:#0b1427;border-radius:12px;border:1px solid var(--line);margin-bottom:24px;padding:4px;}
-    .toggle-btn{flex:1;text-align:center;padding:10px;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer;color:var(--muted);transition:all 0.2s;}
-    .toggle-btn.active{background:var(--yene);color:#041021;}
-
-    label{display:block;margin:10px 0 6px;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
-    input{width:100%;padding:12px 12px;border-radius:12px;border:1px solid var(--line);background:#0b1427;color:var(--text);outline:none;margin-bottom:12px;}
-    input:focus{border-color:var(--yene)}
-    
-    .btn{width:100%;margin-top:10px;padding:14px;border-radius:12px;border:none;background:var(--yene);color:#041021;font-weight:1000;font-size:15px;cursor:pointer}
-    .btn:hover{opacity:0.9;}
-    
-    .msg{margin-bottom:16px;padding:12px;border-radius:12px;border:1px solid rgba(255,92,92,.5);background:rgba(255,92,92,.12);color:#ffd7d7;text-align:center;font-size:14px;}
-    .small{font-size:13px;color:var(--muted);text-align:center;margin-top:20px;}
-    a{color:var(--yene);text-decoration:none;font-weight:800;}
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-async function __yeneWaitSession(sb, ms=7000){
-  const start = Date.now();
-  while(Date.now() - start < ms){
-    const { data } = await sb.auth.getSession();
-    if(data && data.session) return data.session;
-    await new Promise(r => setTimeout(r, 200));
-  }
-  return null;
-}
-
-    async function waitForSession(sb, ms=2000){
-      const start = Date.now();
-      while(Date.now() - start < ms){
-        const { data } = await sb.auth.getSession();
-        if(data && data.session) return data.session;
-
-        // also wait for auth event
-        await new Promise(res=>{
-          let done = false;
-          const { data: sub } = sb.auth.onAuthStateChange((_e,_s)=>{
-            if(!done){ done=true; sub?.subscription?.unsubscribe?.(); res(); }
-          });
-          setTimeout(()=>{ if(!done){ done=true; sub?.subscription?.unsubscribe?.(); res(); } }, 250);
-        });
-      }
-      return null;
-    }
-
-</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yene Portal - Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-
-  <div class="card">
-    <div class="logo-box">
-      <div class="logo"><i class="fa-solid fa-car-side"></i></div>
-      <h1 id="form-title">Agent Login</h1>
-      <p>Welcome back to the Yene Portal</p>
-    </div>
-
-    <div class="toggle-container">
-      <div class="toggle-btn active" id="tab-agent" onclick="setMode('agent')">Agent</div>
-      <div class="toggle-btn" id="tab-admin" onclick="setMode('admin')">Admin</div>
-    </div>
-
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        <div class="msg">{{ messages[0] }}</div>
-      {% endif %}
-    {% endwith %}
-
-    <form method="POST" action="/login">
-        <input type="hidden" name="login_mode" id="login_mode" value="{{ login_mode | default('agent') }}">
-
-        <label>Email Address</label>
-        <input name="username" type="email" placeholder="you@email.com" required />
-
-        <label>Password</label>
-        <input name="password" type="password" placeholder="••••••••" required />
-
-        <button class="btn" type="submit">
-          <i class="fa-solid fa-right-to-bracket"></i> Sign In
-        </button>
-    </form>
-
-    <div class="small" id="register-link">
-      Don't have an agent account? <a href="/register">Apply Here</a>
-    </div>
-  </div>
-
-  <script>
-    // This script magically changes the form based on what you click
-    function setMode(mode) {
-      document.getElementById('login_mode').value = mode;
-      
-      // Update Button Colors
-      document.getElementById('tab-agent').classList.remove('active');
-      document.getElementById('tab-admin').classList.remove('active');
-      document.getElementById('tab-' + mode).classList.add('active');
-
-      // Update Titles and Links
-      const title = document.getElementById('form-title');
-      const regLink = document.getElementById('register-link');
-      
-      if(mode === 'admin') {
-         title.innerHTML = 'Admin Command Center';
-         regLink.style.display = 'none'; // Admins don't register here
-      } else {
-         title.innerHTML = 'Agent Login';
-         regLink.style.display = 'block';
-      }
-    }
-
-    // If the server tells us it's supposed to be admin, set it on load
-    window.onload = function() {
-      const initialMode = document.getElementById('login_mode').value;
-      if (initialMode === 'admin') {
-        setMode('admin');
-      }
-    };
-  </script>
-
-<!-- YENE_AGENT_SUPABASE_LOGIN_FIX -->
-<script>
-  (function(){
-    // Attach to first form on the page
-    const form = document.querySelector("form");
-    if (!form) { console.warn("Login fix: no form found"); return; }
-
-    // Find email + password inputs robustly
-    const emailEl = document.querySelector('input[type="email"], input[name="email"], input#email');
-    const passEl  = document.querySelector('input[type="password"], input[name="password"], input#password');
-
-    if (!emailEl || !passEl) {
-      console.warn("Login fix: missing email/password inputs");
-      return;
-    }
-
-    // Prevent double binding
-    if (form.dataset.sbBound === "1") return;
-    form.dataset.sbBound = "1";
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = (emailEl.value || "").trim();
-      const password = passEl.value || "";
-
-      if (!email || !password) {
-        alert("Enter email and password.");
-        return;
-      }
-
-      // Create browser session (this stops the /agent -> /login bounce)
-            const sb = await ensureSupabase();
-      if(!sb){
-        alert('Supabase client not ready. Please refresh.');
-        return;
-      }
-
-const { data, error } = await sb.auth.signInWithPassword({ email, password });
-      if (error) {
-        alert(error.message || "Login failed");
-        return;
-      }
-
-      if (data && data.session && data.session.access_token && data.session.refresh_token) {
-        await sb.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token
-        });
-      }
-
-      const savedSession = await __yeneWaitSession(sb, 7000);
-      if (!savedSession) {
-        alert("Login succeeded but session was not restored yet. Please try again.");
-        return;
-      }
-
-      // Wait until session is actually available (prevents dashboard flash->login loop)
-      const sess = await waitForSession(sb, 2500);
-      if(!sess){ alert("Login succeeded but session not ready yet. Refresh and try again."); return; }
-
-      const { data: u1 } = await sb.auth.getUser();
-      const uid = u1?.user?.id;
-      const uemail = u1?.user?.email;
-
-      let role = null;
-      if(uid){
-        const r1 = await sb.from("agent_profiles").select("role,full_name,username,email,auth_id,user_id")
-          .or(`auth_id.eq.${uid},user_id.eq.${uid}`).maybeSingle();
-        role = r1?.data?.role || null;
-      }
-      if(!role && uemail){
-        const r2 = await sb.from("agent_profiles").select("role").eq("email", uemail).maybeSingle();
-        role = r2?.data?.role || null;
-      }
-      role = String(role || "AGENT").toUpperCase().trim();
-      window.location.href = (role === "ADMIN") ? "/dashboard/admin" : "/agent/dashboard";
-      return;
-
-
-      if (error || !data?.session) {
-        alert("Login failed: " + (error?.message || "No session"));
-        return;
-      }
-
-      // Success
-      
-            const sessionOk = await _waitForSession(sb);
-            if(!sessionOk){ alert("Login succeeded but session didn’t persist. Please refresh once."); return; }
-            
-      // Role-based redirect (ADMIN -> /dashboard/admin, AGENT -> /agent/dashboard)
-      const { data: { session: s2 } } = await sb.auth.getSession();
-      const tok = s2?.access_token;
-      if (!tok) { alert("No session token after login."); return; }
-
-      const who = await fetch("/api/whoami", { headers: { "Authorization": "Bearer " + tok } });
-      const j = await who.json().catch(()=>({}));
-      if (!who.ok || !j.ok) { alert("Role check failed: " + (j.error || "unknown")); return; }
-
-      if ((j.role || "").toUpperCase() === "ADMIN") // ✅ Role-based redirect (ADMIN -> /dashboard/admin, else -> /agent/dashboard)
-const sb = await window.sbReady;
-if(!sb){ alert("Supabase client not ready. " + (window.__sbInitError||"")); return; }
-
-const access_token = (data && data.session && data.session.access_token) ? data.session.access_token : null;
-if(!access_token){ alert("Missing access token. Try again."); return; }
-
-const r = await fetch("/api/whoami", { headers: { "Authorization": "Bearer " + access_token } });
-const j = await r.json();
-if(!j.ok){ alert("Login role check failed: " + (j.error||"unknown")); return; }
-
-const role = String(j.role||"").toUpperCase().trim();
-window.location.href = (role === "ADMIN") ? "/dashboard/admin" : "/agent/dashboard";
-      else 
-      // role-based redirect fallback
-      const sb = await window.sbReady;
-      const { data: u } = await sb.auth.getUser();
-      const uid = u?.user?.id;
-      let role = null;
-      const r1 = await sb.from("agent_profiles").select("role").eq("auth_id", uid).maybeSingle();
-      role = r1?.data?.role || null;
-      if (!role) {
-        const r2 = await sb.from("agent_profiles").select("role").eq("user_id", uid).maybeSingle();
-        role = r2?.data?.role || null;
-      }
-      role = String(role || "").toUpperCase().trim();
-      window.location.href = (role === "ADMIN") ? "/dashboard/admin" : "/agent/dashboard";
-
-
+    <div class="login-container">
+        <h2>Admin Command Center</h2>
+        <p>Welcome back to the Yene Portal</p>
         
-    });
-  })();
-</script>
-<!-- END YENE_AGENT_SUPABASE_LOGIN_FIX -->
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
 
+        <form action="/login" method="POST">
+            <input type="hidden" name="login_mode" value="{{ login_mode or 'agent' }}">
 
-<script>
-  async function loadSupabaseJs(){
-    if (window.supabase && window.supabase.createClient) return true;
-    return await new Promise((resolve) => {
-      const existing = document.querySelector('script[data-supabasejs="1"]');
-      if (existing) { existing.addEventListener("load", ()=>resolve(true)); return; }
-      const sc = document.createElement("script");
-      sc.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-      sc.async = true;
-      sc.setAttribute("data-supabasejs","1");
-      sc.onload = () => resolve(true);
-      sc.onerror = () => resolve(false);
-      document.head.appendChild(sc);
-    });
-  }
+            <div class="input-group">
+                <label for="username">Email Address</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    placeholder="kasera@admin.com" 
+                    autocomplete="username" 
+                    required
+                >
+            </div>
 
-  async function ensureSupabase(){
-    // 1) If base already created it, use it
-    if (window.supabaseClient && window.supabaseClient.auth) return window.supabaseClient;
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    placeholder="••••••••" 
+                    autocomplete="current-password" 
+                    required
+                >
+            </div>
 
-    // 2) Wait for sbReady if it exists
-    if (window.sbReady) {
-      try {
-        const sb = await ensureSupabase();
-        if (sb && sb.auth) { window.supabaseClient = sb; return sb; }
-      } catch(e) {}
-    }
-
-    // 3) Load supabase-js if missing
-    const okJs = await loadSupabaseJs();
-    if (!okJs) return null;
-
-    // 4) Fetch runtime config from server
-    const r = await fetch("/api/public-config", { credentials: "same-origin" });
-    const cfg = await r.json();
-    if (!cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) return null;
-
-    // 5) Create client
-    const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
-    window.supabaseClient = sb;
-    window.supabase = sb; // backward compatible
-    return sb;
-  }
-</script>
-
-
-<script>
-async function _waitForSession(sb, ms=4000){
-  const start = Date.now();
-  while(Date.now() - start < ms){
-    const { data: { session } } = await sb.auth.getSession();
-    if(session) return session;
-    await new Promise(r=>setTimeout(r, 150));
-  }
-  return null;
-}
-</script>
-
+            <button type="submit" class="btn-signin">Sign In</button>
+        </form>
+    </div>
 </body>
 </html>
