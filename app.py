@@ -147,7 +147,7 @@ def require_login(required_role=None):
     from flask import request, session, redirect, url_for, flash
 from werkzeug.security import generate_password_hash
 
-  def decorator(fn):
+def decorator(fn):
     from functools import wraps
 
     @wraps(fn)
