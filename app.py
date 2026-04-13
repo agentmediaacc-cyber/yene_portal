@@ -147,17 +147,22 @@ def require_login(required_role=None):
     from flask import request, session, redirect, url_for, flash
 from werkzeug.security import generate_password_hash
 
-    def decorator(fn):
-        @wraps(fn)
-        def wrapped(*args, **kwargs):
-            # PUBLIC PAGES (do NOT redirect)
-            if request.path in ("/agent/dashboard", "/dashboard/admin"):
-                return fn(*args, **kwargs)
+  def decorator(fn):
+    from functools import wraps
 
-            # Must have some session identity for legacy-protected routes
-            if not session.get("user_id") and not session.get("email") and not session.get("role"):
-                flash("Please log in.")
-                return redirect(url_for("login"))
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+
+        if request.path in ("/agent/dashboard", "/dashboard/admin"):
+            return fn(*args, **kwargs)
+
+        if not session.get("user_id") and not session.get("email") and not session.get("role"):
+            flash("Please log in.")
+            return redirect(url_for("login"))
+
+        return fn(*args, **kwargs)
+
+    return wrapped
 
             # Role enforcement (legacy)
             if required_role:
