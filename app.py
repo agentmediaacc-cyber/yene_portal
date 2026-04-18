@@ -159,6 +159,42 @@ def _set_admin_session(email):
 def _require_admin():
     return bool(session.get("admin_email")) and session.get("role") == "ADMIN"
 
+def _current_dashboard_for_session():
+    role = (session.get("role") or "").upper()
+    if role == "ADMIN" and session.get("admin_email"):
+        return "/dashboard/admin"
+    if role == "AGENT" and session.get("agent_email"):
+        return "/agent/dashboard"
+    return None
+
+def _clean_status(value):
+    return str(value or "").strip().upper()
+
+def _is_active_profile(profile):
+    status = _clean_status(profile.get("status"))
+    return not status or status in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
+
+def _role_is_admin(profile):
+    return str(profile.get("role") or "").strip().upper() == "ADMIN"
+
+def _lookup_profile(table_name, email):
+    try:
+        rows = (
+            sb_admin.table(table_name)
+            .select("*")
+            .eq("email", email)
+            .limit(1)
+            .execute()
+            .data or []
+        )
+        return rows[0] if rows else None
+    except Exception as exc:
+        app.logger.warning("profile_lookup_failed table=%s email=%s error=%s", table_name, email, exc)
+        return None
+
+def _sign_in_supabase(email, password):
+    return supabase.auth.sign_in_with_password({"email": email, "password": password})
+
 def _safe_log_system_event(event_type, details, user_id=None):
     try:
         fn = globals().get("log_system_event")
@@ -172,13 +208,17 @@ def _safe_log_system_event(event_type, details, user_id=None):
 @app.route("/dashboard/admin")
 def admin_dashboard():
     if not _require_admin():
+        if (session.get("role") or "").upper() == "AGENT" and session.get("agent_email"):
+            return redirect("/agent/dashboard")
         return redirect("/admin/login")
     return render_template("admin_dashboard.html")
 
 
 @app.route("/agent/dashboard")
 def agent_dashboard():
-    if not session.get("agent_email"):
+    if (session.get("role") or "").upper() != "AGENT" or not session.get("agent_email"):
+        if _require_admin():
+            return redirect("/dashboard/admin")
         return redirect("/login")
     return render_template("agent_dashboard.html")
 
@@ -468,8 +508,9 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "GET":
-        if session.get("agent_email"):
-            return redirect("/agent/dashboard")
+        dashboard = _current_dashboard_for_session()
+        if dashboard:
+            return redirect(dashboard)
         return render_template(
             "login.html",
             login_mode="agent",
@@ -485,16 +526,19 @@ def login():
         return redirect("/login")
 
     try:
-        if "sb" in globals():
-            sb.auth.sign_in_with_password({"email": email, "password": password})
-        elif "supabase" in globals():
-            supabase.auth.sign_in_with_password({"email": email, "password": password})
+        _sign_in_supabase(email, password)
     except Exception as e:
         msg = str(e)
         if "JWT expired" in msg:
             flash("Session expired. Please login again.")
         else:
             flash(f"Login error: {msg}")
+        return redirect("/login")
+
+    profile = _lookup_profile("agent_profiles", email)
+    if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
+        session.clear()
+        flash("No approved agent profile found for this account")
         return redirect("/login")
 
     _set_agent_session(email)
@@ -504,20 +548,35 @@ def login():
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     if request.method == "GET":
-        if _require_admin():
-            return redirect("/dashboard/admin")
+        dashboard = _current_dashboard_for_session()
+        if dashboard:
+            return redirect(dashboard)
         return render_template("login.html", login_mode="admin")
 
     email = (request.form.get("email") or "").strip().lower()
     password = request.form.get("password") or ""
 
-    if email == "kasera@admin.com" and password == "admin123":
-        _set_admin_session(email)
-        _safe_log_system_event("LOGIN", f"ADMIN logged in: {email}", user_id=email)
-        return redirect("/dashboard/admin")
+    if not email or not password:
+        flash("Email and password are required")
+        return redirect("/admin/login")
 
-    flash("Invalid admin credentials")
-    return redirect("/admin/login")
+    try:
+        _sign_in_supabase(email, password)
+    except Exception as e:
+        app.logger.warning("admin_login_auth_failed email=%s error=%s", email, e)
+        flash("Invalid admin credentials")
+        return redirect("/admin/login")
+
+    profile = _lookup_profile("admin_profiles", email)
+    if not profile or not _is_active_profile(profile):
+        session.clear()
+        app.logger.warning("admin_login_profile_rejected email=%s profile_found=%s", email, bool(profile))
+        flash("No approved admin profile found for this account")
+        return redirect("/admin/login")
+
+    _set_admin_session(email)
+    _safe_log_system_event("LOGIN", f"ADMIN logged in: {email}", user_id=email)
+    return redirect("/dashboard/admin")
 
 @app.route("/logout")
 def logout():
