@@ -45,6 +45,7 @@ from agent_academy_v1 import register_agent_academy_v1_routes
 from agent_dashboard_v4 import register_agent_dashboard_v4_routes
 from agent_team_features import register_agent_team_routes
 from agent_wallet_v1 import register_agent_wallet_v1_routes
+from yene_compat_routes import register_yene_compat_routes
 
 
 def _sb_get_user_id_from_token(access_token: str):
@@ -124,10 +125,9 @@ def require_agent_token(fn):
     return wrapper
 
 
+load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
-
-load_dotenv()
 
 # --- 1. THE FOUNDATION & TOOLS ---
 app = Flask(__name__)
@@ -145,11 +145,13 @@ def _agent_session_email():
 
 def _set_agent_session(email):
     session.clear()
+    session["email"] = email
     session["agent_email"] = email
     session["role"] = "AGENT"
 
 def _set_admin_session(email):
     session.clear()
+    session["email"] = email
     session["admin_email"] = email
     session["role"] = "ADMIN"
     session["is_admin"] = True
@@ -211,6 +213,17 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-me")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 CORS(app)
 
+
+@app.before_request
+def protect_role_scoped_api_routes():
+    if request.path.startswith("/api/admin/") and not _require_admin():
+        return jsonify({"ok": False, "error": "Admin login required"}), 401
+
+    if request.path.startswith("/api/agent/"):
+        role = (session.get("role") or "").upper()
+        if role != "AGENT" or not session.get("email"):
+            return jsonify({"ok": False, "error": "Agent login required"}), 401
+
 URL = os.getenv("SUPABASE_URL", "https://kcxphxihykonzuagtgke.supabase.co")
 ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -223,6 +236,9 @@ sb_admin = create_client(URL, SERVICE_KEY) if SERVICE_KEY else supabase
 
 
 register_agent_team_routes(app, sb_admin)
+register_agent_dashboard_v4_routes(app, sb_admin, require_login, _safe_log_system_event)
+register_agent_wallet_v1_routes(app, sb_admin, require_login)
+register_agent_academy_v1_routes(app, sb_admin, require_login)
 register_admin_compat_routes(app, sb_admin)
 register_admin_presence_town_routes(app, sb_admin)
 register_admin_extended_routes(app, sb_admin)
@@ -234,6 +250,7 @@ register_admin_agents_live_routes(app, sb_admin)
 register_admin_approval_working_routes(app, sb_admin)
 register_admin_error_fixes_routes(app, sb_admin)
 register_admin_broadcast_fix_routes(app, sb_admin)
+register_yene_compat_routes(app, sb_admin)
 
 
 def homepage_stats(sb_admin):
@@ -489,8 +506,6 @@ def admin_login():
     flash("Invalid admin credentials")
     return redirect("/admin/login")
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
 @app.route("/logout")
 def logout():
     session.clear()

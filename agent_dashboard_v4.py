@@ -436,6 +436,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         try:
             sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
             session["email"] = updates["email"]
+            session["agent_email"] = updates["email"]
             return jsonify({"ok": True, "success": True})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500

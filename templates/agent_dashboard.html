@@ -2305,8 +2305,8 @@
 
     async function loadLeaderboard(period='week'){
       state.leaderboardPeriod = period;
-      state.leaderboardDrivers = data.top_driver_recruiters || [];
-      state.leaderboardClients = data.top_client_recruiters || [];
+      state.leaderboardDrivers = [];
+      state.leaderboardClients = [];
       try{
         const data = await jget('/api/agent/leaderboard_v4?period=' + encodeURIComponent(period));
         state.leaderboard = data || {};
@@ -2320,8 +2320,8 @@
       }catch(e){
         console.error('leaderboard load failed', e);
         state.leaderboard = {};
-        state.leaderboardDrivers = data.top_driver_recruiters || [];
-        state.leaderboardClients = data.top_client_recruiters || [];
+        state.leaderboardDrivers = [];
+        state.leaderboardClients = [];
       }
 
       try{
@@ -3124,4 +3124,3 @@
   });
 })();
 </script>
-

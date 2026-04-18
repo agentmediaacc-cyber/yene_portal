@@ -615,7 +615,7 @@ function fmtMoney(n){
 async function apiGET(url){
   const r = await fetch(url, {credentials:"same-origin"});
   const j = await r.json().catch(()=> ({}));
-  if(!r.ok || j.success === false){
+  if(!r.ok || j.success === false || j.ok === false){
     throw new Error(j.error || ("Request failed: " + r.status));
   }
   return j;
@@ -629,7 +629,7 @@ async function apiJSON(url, method, body){
     body: JSON.stringify(body || {})
   });
   const j = await r.json().catch(()=> ({}));
-  if(!r.ok || j.success === false){
+  if(!r.ok || j.success === false || j.ok === false){
     throw new Error(j.error || ("Request failed: " + r.status));
   }
   return j;
@@ -758,7 +758,7 @@ async function loadPricingRules(){
 
 async function loadBroadcasts(){
   const j = await apiGET("/api/admin/broadcasts");
-  broadcasts = j.data || [];
+  broadcasts = j.data || j.rows || [];
   renderBroadcasts();
 }
 
