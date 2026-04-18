@@ -167,16 +167,20 @@
             <div class="miniValue">{{ stats.regions }}</div>
           </div>
           <div class="miniCard">
-            <div class="miniLabel">Approved Agents</div>
-            <div class="miniValue">{{ stats.agents }}</div>
+            <div class="miniLabel">Active Agents</div>
+            <div class="miniValue">{{ stats.agents_active }}</div>
           </div>
           <div class="miniCard">
-            <div class="miniLabel">Drivers</div>
-            <div class="miniValue">{{ stats.drivers }}</div>
+            <div class="miniLabel">Drivers Registered</div>
+            <div class="miniValue">{{ stats.drivers_registered }}</div>
           </div>
           <div class="miniCard">
-            <div class="miniLabel">Clients</div>
-            <div class="miniValue">{{ stats.clients }}</div>
+            <div class="miniLabel">Clients Registered</div>
+            <div class="miniValue">{{ stats.clients_registered }}</div>
+          </div>
+          <div class="miniCard">
+            <div class="miniLabel">Pending Agents</div>
+            <div class="miniValue">{{ stats.agents_pending }}</div>
           </div>
         </div>
       </div>
@@ -228,12 +232,19 @@
       <div class="panel" id="updates">
         <div class="title">📢 Official Updates</div>
         <div class="updates">
+          {% if updates %}
           {% for u in updates %}
           <div class="updateItem">
             <div class="updateDate">{{ u.title }} • {{ u.date }}</div>
             <div class="updateText">{{ u.message }}</div>
           </div>
           {% endfor %}
+          {% else %}
+          <div class="updateItem">
+            <div class="updateDate">Live updates</div>
+            <div class="updateText">No official updates have been published yet.</div>
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -265,6 +276,7 @@
             </tr>
           </thead>
           <tbody>
+            {% if rates %}
             {% for r in rates %}
             <tr>
               <td>{{ r.region }}</td>
@@ -280,6 +292,11 @@
               </td>
             </tr>
             {% endfor %}
+            {% else %}
+            <tr>
+              <td colspan="5">No payment rates have been published yet.</td>
+            </tr>
+            {% endif %}
           </tbody>
         </table>
       </div>
@@ -308,17 +325,5 @@
       </div>
     </div>
   </div>
-<div style="text-align:center; margin-top:50px; opacity:0.5;"> 
-  <a href="#" onclick="adminBypass()" style="color:#4aa8ff; font-size:12px;">Internal Admin Access</a> 
-</div> 
-<script> 
-async function adminBypass() { 
-    const email = prompt("Enter Admin Email:"); 
-    const password = prompt("Enter Admin Password:"); 
-    const sb = await ensureSupabase(); 
-    const { data, error } = await sb.auth.signInWithPassword({ email, password }); 
-    if (error) { alert(error.message); } 
-    else { window.location.href = "/dashboard/admin"; } 
-} 
-</script><div style="text-align:center; margin-top:20px;"><a href="/admin/login" style="color:#4aa8ff; text-decoration:none; font-size:14px; border:1px solid #4aa8ff; padding:10px; border-radius:8px;">Master Admin Login</a></div></body>
+<div style="text-align:center; margin-top:20px;"><a href="/admin/login" style="color:#4aa8ff; text-decoration:none; font-size:14px; border:1px solid #4aa8ff; padding:10px; border-radius:8px;">Admin Login</a></div></body>
 </html>

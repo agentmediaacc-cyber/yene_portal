@@ -330,6 +330,9 @@ def homepage_stats(sb_admin):
     def _approved(v):
         return _clean(v).upper() in ("ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED")
 
+    def _pending(v):
+        return _clean(v).upper() in ("PENDING", "PENDING_APPROVAL", "UNDER_REVIEW")
+
     def _official_updates():
         rows = _safe_select("broadcasts", {}, "*", 10, "created_at", True)
         out = []
@@ -362,23 +365,7 @@ def homepage_stats(sb_admin):
         if out:
             return out[:5]
 
-        return [
-            {
-                "date": "2026-04-01",
-                "title": "Promotion Time",
-                "message": "Windhoek, YENE is coming. Get ready for network growth and driver recruitment.",
-            },
-            {
-                "date": "2026-03-08",
-                "title": "Remote Work",
-                "message": "We are building great remote work opportunities around Namibia. Join YENE and earn with us.",
-            },
-            {
-                "date": "2026-03-05",
-                "title": "Network Growth",
-                "message": "Regional expansion continues as we strengthen recruitment, approvals, and team leadership.",
-            },
-        ]
+        return []
 
     def _network_rules():
         return [
@@ -434,53 +421,52 @@ def homepage_stats(sb_admin):
                 unique.append(r)
             return unique[:12]
 
-        return [
-            {
-                "region": "Erongo",
-                "town": "Walvis Bay",
-                "driver": 10,
-                "client": 10,
-                "status": "Active",
-            },
-            {
-                "region": "Erongo",
-                "town": "Swakopmund",
-                "driver": 10,
-                "client": 10,
-                "status": "Active",
-            },
-            {
-                "region": "Khomas",
-                "town": "Windhoek",
-                "driver": 10,
-                "client": 10,
-                "status": "Active",
-            },
-            {
-                "region": "Kavango East",
-                "town": "Rundu",
-                "driver": 10,
-                "client": 15,
-                "status": "Active",
-            },
-        ]
+        return []
 
     agents = _safe_select("agent_profiles", {}, "*", 10000)
     if not agents:
         agents = _safe_select("agents", {}, "*", 10000)
+    drivers = _safe_select("drivers", {}, "*", 10000, "created_at", True)
+    clients = _safe_select("clients", {}, "*", 10000, "created_at", True)
+    recent = []
+    for d in drivers[:10]:
+        recent.append({
+            "type": "Driver",
+            "name": _clean(d.get("full_name") or d.get("name")),
+            "phone": _clean(d.get("phone") or d.get("phone_number")),
+            "town": _clean(d.get("town")),
+            "created_at": _clean(d.get("created_at")),
+        })
+    for c in clients[:10]:
+        recent.append({
+            "type": "Client",
+            "name": _clean(c.get("full_name") or c.get("name")),
+            "phone": _clean(c.get("phone") or c.get("phone_number")),
+            "town": _clean(c.get("town")),
+            "created_at": _clean(c.get("created_at")),
+        })
+    recent.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+
+    active_agents = [r for r in agents if _approved(r.get("status")) or not _clean(r.get("status"))]
+    pending_agents = [r for r in agents if _pending(r.get("status"))]
+    regions = set()
+    for row in agents + drivers + clients:
+        region = _clean(row.get("region") or row.get("operation_region"))
+        if region:
+            regions.add(region.lower())
 
     return {
         "stats": {
-            "regions": 14,
-            "agents": len(
-                [
-                    r
-                    for r in agents
-                    if _approved(r.get("status")) or not _clean(r.get("status"))
-                ]
-            ),
-            "drivers": len(_safe_select("drivers", {}, "*", 10000)),
-            "clients": len(_safe_select("clients", {}, "*", 10000)),
+            "regions": len(regions),
+            "agents": len(active_agents),
+            "agents_total": len(agents),
+            "agents_active": len(active_agents),
+            "agents_pending": len(pending_agents),
+            "drivers": len(drivers),
+            "drivers_registered": len(drivers),
+            "clients": len(clients),
+            "clients_registered": len(clients),
+            "recent_activity": recent[:12],
         },
         "updates": _official_updates(),
         "rules": _network_rules(),
