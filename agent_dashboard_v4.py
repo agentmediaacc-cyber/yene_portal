@@ -667,13 +667,19 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         data = request.get_json(silent=True) or {}
         updates = {
             "full_name": (data.get("full_name") or "").strip() or agent.get("full_name"),
-            "phone": (data.get("phone") or "").strip(),
+            "phone": (data.get("phone") or "").strip() or agent.get("phone"),
             "email": (data.get("email") or "").strip() or agent.get("email"),
-            "profile_picture_url": (data.get("profile_picture_url") or "").strip(),
-            "residential_address": (data.get("residential_address") or "").strip(),
-            "operation_region": (data.get("operation_region") or "").strip(),
-            "pin": (data.get("pin") or "").strip(),
+            "town": (data.get("town") or "").strip() or agent.get("town"),
+            "region": (data.get("region") or "").strip() or agent.get("region"),
+            "operation_region": (
+                (data.get("operation_region") or "").strip()
+                or (data.get("region") or "").strip()
+                or agent.get("operation_region")
+            ),
         }
+        for optional_key in ("profile_picture_url", "residential_address", "pin"):
+            if optional_key in data:
+                updates[optional_key] = (data.get(optional_key) or "").strip()
 
         try:
             sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
@@ -749,14 +755,16 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 lambda: sb_admin.table("drivers").insert(payload),
                 retries=2,
             )
+            inserted = res.data or []
             safe_log("REGISTER_DRIVER", f"Agent {agent.get('email')} registered driver {full_name}")
             app.logger.info(
-                "agent_register_driver_v4 insert_ok agent_id=%s inserted_rows=%s duration_ms=%s",
+                "agent_register_driver_v4 insert_ok agent_id=%s inserted_rows=%s created_id=%s duration_ms=%s",
                 agent.get("id"),
-                len(res.data or []),
+                len(inserted),
+                (inserted[0] or {}).get("id") if inserted else None,
                 int((time.monotonic() - route_start) * 1000),
             )
-            return jsonify({"ok": True, "success": True})
+            return jsonify({"ok": True, "success": True, "row": inserted[0] if inserted else None})
         except Exception as e:
             app.logger.exception(
                 "agent_register_driver_v4_failed phase=insert agent_id=%s duration_ms=%s error=%s",
@@ -831,14 +839,16 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 lambda: sb_admin.table("clients").insert(payload),
                 retries=2,
             )
+            inserted = res.data or []
             safe_log("REGISTER_CLIENT", f"Agent {agent.get('email')} registered client {phone}")
             app.logger.info(
-                "agent_register_client_v4 insert_ok agent_id=%s inserted_rows=%s duration_ms=%s",
+                "agent_register_client_v4 insert_ok agent_id=%s inserted_rows=%s created_id=%s duration_ms=%s",
                 agent.get("id"),
-                len(res.data or []),
+                len(inserted),
+                (inserted[0] or {}).get("id") if inserted else None,
                 int((time.monotonic() - route_start) * 1000),
             )
-            return jsonify({"ok": True, "success": True})
+            return jsonify({"ok": True, "success": True, "row": inserted[0] if inserted else None})
         except Exception as e:
             app.logger.exception(
                 "agent_register_client_v4_failed phase=insert agent_id=%s duration_ms=%s error=%s",

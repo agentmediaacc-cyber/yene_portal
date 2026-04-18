@@ -2269,7 +2269,8 @@
 
     async function loadActivity(period='week'){
       state.currentPeriod = period;
-      let url = '/api/agent/activity_v4?period=' + encodeURIComponent(period === 'all' ? 'week' : period);
+      const apiPeriod = period === 'today' ? 'day' : period;
+      let url = '/api/agent/activity_v4?period=' + encodeURIComponent(apiPeriod);
       try{
         const data = await jget(url);
         state.activity = guessRows(data);

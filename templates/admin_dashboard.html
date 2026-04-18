@@ -696,6 +696,7 @@ function openAdminMenu(){
   if(tabs) tabs.classList.add("open");
   if(backdrop) backdrop.classList.add("show");
   document.body.classList.add("menu-open");
+  document.body.style.overflow = "hidden";
   if(btn) btn.setAttribute("aria-expanded", "true");
 }
 
@@ -706,6 +707,7 @@ function closeAdminMenu(){
   if(tabs) tabs.classList.remove("open");
   if(backdrop) backdrop.classList.remove("show");
   document.body.classList.remove("menu-open");
+  document.body.style.overflow = "";
   if(btn) btn.setAttribute("aria-expanded", "false");
 }
 
@@ -1213,13 +1215,13 @@ function toggleAgentCenterDateInputs(){
 function bindAgentCenterControls(){
   const mode = document.getElementById("agentCenterMode");
   const week = document.getElementById("agentCenterWeek");
+  const day = document.getElementById("agentCenterDay");
   const from = document.getElementById("agentCenterFrom");
   const to = document.getElementById("agentCenterTo");
 
   if (mode && !mode.dataset.bound) {
     mode.addEventListener("change", () => {
       toggleAgentCenterDateInputs();
-  bindAgentCenterControls();
       maybeAutoLoadAgentCenter();
     });
     mode.dataset.bound = "1";
@@ -1240,6 +1242,7 @@ function bindAgentCenterControls(){
   };
 
   bindDate(week);
+  bindDate(day);
   bindDate(from);
   bindDate(to);
 }
@@ -1344,8 +1347,6 @@ async function loadSelectedAgentCenter(){
       <td>${esc(safe(days[day]?.clients,0))}</td>
     </tr>
   `).join("");
-
-  loadSelectedAgentMessages();
 
   loadSelectedAgentMessages();
 
