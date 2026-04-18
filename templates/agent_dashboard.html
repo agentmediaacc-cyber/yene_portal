@@ -157,6 +157,29 @@
     }
     .menu-btn:hover,.icon-btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
     .menu-btn{display:none}
+    .menu-backdrop{
+      position:fixed;
+      inset:0;
+      z-index:45;
+      background:rgba(0,0,0,.48);
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .2s ease;
+      backdrop-filter:blur(3px);
+    }
+    .menu-backdrop.show{opacity:1;pointer-events:auto}
+    .sidebar-close{
+      display:none;
+      width:42px;height:42px;border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.05);
+      color:var(--text);
+      cursor:pointer;
+      place-items:center;
+      margin-left:auto;
+      margin-bottom:12px;
+    }
+    body.menu-open{overflow:hidden}
 
     .soft-badge{
       padding:10px 12px;border-radius:999px;
@@ -836,9 +859,12 @@
         position:fixed;left:0;top:0;bottom:0;width:min(86vw,320px);height:100vh;
         transform:translateX(-104%);
         transition:.24s ease;
+        z-index:60;
+        box-shadow:20px 0 45px rgba(0,0,0,.38);
       }
       .sidebar.open{transform:translateX(0)}
       .menu-btn{display:grid}
+      .sidebar-close{display:grid}
       .topbar{padding:14px 16px}
       .page{padding:16px}
       .search-hide{display:none}
@@ -849,6 +875,7 @@
 <body>
   <div class="app">
     <aside class="sidebar" id="sidebar">
+      <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Close menu">×</button>
       <div class="brand">
         <div class="logo">Y</div>
         <div>
@@ -897,11 +924,12 @@
         Live Supabase dashboard shell connected to the current agent routes. Extra trip/client-activity modules can plug in later.
       </div>
     </aside>
+    <div class="menu-backdrop" id="menuBackdrop" aria-hidden="true"></div>
 
     <main class="main">
       <div class="topbar">
         <div class="top-left">
-          <button class="menu-btn" id="menuBtn">☰</button>
+          <button class="menu-btn" id="menuBtn" type="button" aria-controls="sidebar" aria-expanded="false">☰</button>
           <div class="soft-badge search-hide" id="helloBadge">Loading agent...</div>
         </div>
         <div class="top-right">
@@ -1652,10 +1680,12 @@
       walletHistory: [],
       withdraws: [],
       teamSummary: null,
+      leaderboardError: "",
       currentPeriod: "week",
       leaderboardPeriod: "week"
     };
 
+    const menuState = { open: false };
     const $ = (id) => document.getElementById(id);
 
     function esc(v){
@@ -1692,7 +1722,12 @@
     }
 
     async function jget(url, opts={}){
-      const r = await fetch(url, {credentials:"same-origin", ...opts});
+      const timeoutMs = opts.timeoutMs || 15000;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const fetchOpts = {...opts};
+      delete fetchOpts.timeoutMs;
+      const r = await fetch(url, {credentials:"same-origin", signal: controller.signal, ...fetchOpts}).finally(() => clearTimeout(timer));
       const txt = await r.text();
       let data = {};
       try{ data = txt ? JSON.parse(txt) : {}; }catch(_){}
@@ -1739,8 +1774,48 @@
       if(sec) sec.classList.add("active");
       const btn = document.querySelector('.nav-btn[data-section="' + id + '"]');
       if(btn) btn.classList.add("active");
-      if(window.innerWidth <= 900) $("sidebar").classList.remove("open");
+      if(window.innerWidth <= 900) closeAgentMenu();
       history.replaceState(null, "", "#" + id);
+    }
+
+    function setLoadingText(id, text){
+      const el = $(id);
+      if(el) el.textContent = text;
+    }
+
+    function setAgentMenu(open){
+      const sidebar = $("sidebar");
+      const backdrop = $("menuBackdrop");
+      const btn = $("menuBtn");
+      menuState.open = Boolean(open);
+      if(sidebar) sidebar.classList.toggle("open", menuState.open);
+      if(backdrop) backdrop.classList.toggle("show", menuState.open);
+      document.body.classList.toggle("menu-open", menuState.open);
+      document.body.style.overflow = menuState.open ? "hidden" : "";
+      if(btn) btn.setAttribute("aria-expanded", menuState.open ? "true" : "false");
+    }
+
+    function openAgentMenu(){
+      setAgentMenu(true);
+    }
+
+    function closeAgentMenu(){
+      setAgentMenu(false);
+    }
+
+    function toggleAgentMenu(){
+      setAgentMenu(!menuState.open);
+    }
+
+    async function loadAndRender(label, loader, renderer){
+      try{
+        await loader();
+        if(renderer) renderer();
+        return true;
+      }catch(e){
+        console.error(label + ' load failed', e);
+        return false;
+      }
     }
 
     function updateHero(){
@@ -2031,6 +2106,7 @@
       const me = state.me || {};
       const myName = String(me.full_name || me.name || me.username || '').trim().toLowerCase();
       const periodLabel = state.leaderboardPeriod === 'month' ? 'Month' : (state.leaderboardPeriod === 'all' ? 'All Time' : 'Week');
+      const leaderboardError = state.leaderboardError || "";
 
       $('leaderboardPeriodLabel').textContent = periodLabel;
 
@@ -2048,7 +2124,7 @@
       const cBody = $('clientLeaderTable');
 
       if(!driverRows.length){
-        dBody.innerHTML = '<tr><td colspan="4" class="muted">No driver leaderboard data yet.</td></tr>';
+        dBody.innerHTML = `<tr><td colspan="4" class="muted">${leaderboardError ? esc(leaderboardError) : 'No driver leaderboard data yet.'}</td></tr>`;
       } else {
         dBody.innerHTML = driverRows.map((r, i) => `
           <tr>
@@ -2061,7 +2137,7 @@
       }
 
       if(!clientRows.length){
-        cBody.innerHTML = '<tr><td colspan="4" class="muted">No client leaderboard data yet.</td></tr>';
+        cBody.innerHTML = `<tr><td colspan="4" class="muted">${leaderboardError ? esc(leaderboardError) : 'No client leaderboard data yet.'}</td></tr>`;
       } else {
         cBody.innerHTML = clientRows.map((r, i) => `
           <tr>
@@ -2210,24 +2286,16 @@
     }
 
     async function loadWallet(){
-      try{
-        const ws = await jget('/api/agent/wallet_summary_v1');
-        state.walletSummary = ws.summary || ws.wallet || ws.data || ws || {};
-      }catch(_){
-        state.walletSummary = {};
-      }
-      try{
-        const wh = await jget('/api/agent/wallet_history_v1');
-        state.walletHistory = guessRows(wh);
-      }catch(_){
-        state.walletHistory = [];
-      }
-      try{
-        const wr = await jget('/api/agent/withdraw_requests_v1');
-        state.withdraws = guessRows(wr);
-      }catch(_){
-        state.withdraws = [];
-      }
+      const [summary, history, requests] = await Promise.allSettled([
+        jget('/api/agent/wallet_summary_v1'),
+        jget('/api/agent/wallet_history_v1'),
+        jget('/api/agent/withdraw_requests_v1')
+      ]);
+      state.walletSummary = summary.status === 'fulfilled'
+        ? (summary.value.summary || summary.value.wallet || summary.value.data || summary.value || {})
+        : {};
+      state.walletHistory = history.status === 'fulfilled' ? guessRows(history.value) : [];
+      state.withdraws = requests.status === 'fulfilled' ? guessRows(requests.value) : [];
     }
 
     async function loadTeam(){
@@ -2307,6 +2375,7 @@
       state.leaderboardPeriod = period;
       state.leaderboardDrivers = [];
       state.leaderboardClients = [];
+      state.leaderboardError = "";
       try{
         const data = await jget('/api/agent/leaderboard_v4?period=' + encodeURIComponent(period));
         state.leaderboard = data || {};
@@ -2322,6 +2391,7 @@
         state.leaderboard = {};
         state.leaderboardDrivers = [];
         state.leaderboardClients = [];
+        state.leaderboardError = e.message || "Leaderboard could not load.";
       }
 
       try{
@@ -2496,21 +2566,21 @@
 
     async function refreshAll(showToast=true){
       $("helloBadge").innerHTML = '<span class="loader"></span>';
+      setLoadingText("weekBadge", "Loading...");
+      await loadAndRender("profile", loadMe, updateHero);
+
       await Promise.allSettled([
-        loadMe(),
-        loadSummary(),
-        loadActivity(state.currentPeriod),
-        loadMessages(),
-        loadWallet(),
-        loadTeam(),
-        loadLeaderboard(state.leaderboardPeriod)
+        loadAndRender("summary", loadSummary, updateHero),
+        loadAndRender("activity", () => loadActivity(state.currentPeriod), renderActivity),
+        loadAndRender("messages", loadMessages, null),
+        loadAndRender("wallet", loadWallet, () => { updateHero(); renderWallet(); }),
+        loadAndRender("team", loadTeam, renderTeam),
+        loadAndRender("leaderboard", () => loadLeaderboard(state.leaderboardPeriod), () => {
+          renderLeaderboard();
+          if(window.loadLeaderboardOverride) window.loadLeaderboardOverride();
+          forceRenderCompetitionCards();
+        })
       ]);
-      updateHero();
-      renderActivity();
-      renderWallet();
-      renderTeam();
-      renderLeaderboard();
-      forceRenderCompetitionCards();
       setTimeout(forceRenderCompetitionCards, 120);
       setTimeout(forceRenderCompetitionCards, 500);
       $("weekBadge").textContent = state.leaderboardPeriod === 'month' ? 'Current month' : (state.leaderboardPeriod === 'all' ? 'All time' : 'Current week');
@@ -2538,6 +2608,7 @@
         btn.classList.add('active');
         await loadLeaderboard(btn.dataset.period);
         renderLeaderboard();
+        if(window.loadLeaderboardOverride) window.loadLeaderboardOverride();
         forceRenderCompetitionCards();
         setTimeout(forceRenderCompetitionCards, 120);
         setTimeout(forceRenderCompetitionCards, 500);
@@ -2553,12 +2624,20 @@
     $("settingsForm").addEventListener('submit', saveSettings);
     $("copyCodeBtn").addEventListener('click', copyReferral);
 
-    $("menuBtn").addEventListener('click', () => $("sidebar").classList.toggle('open'));
-    document.addEventListener('keydown', (e) => {
-      if(e.key === 'Escape') $("sidebar").classList.remove('open');
-    });
+    function bindAgentMenu(){
+      $("menuBtn")?.addEventListener('click', toggleAgentMenu);
+      $("sidebarClose")?.addEventListener('click', closeAgentMenu);
+      $("menuBackdrop")?.addEventListener('click', closeAgentMenu);
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape') closeAgentMenu();
+      });
+      window.addEventListener('resize', () => {
+        if(window.innerWidth > 900) closeAgentMenu();
+      });
+    }
 
-    window.addEventListener('load', async () => {
+    document.addEventListener('DOMContentLoaded', async () => {
+      bindAgentMenu();
       const hash = location.hash.replace('#','').trim();
       if(hash && $(hash)) openSection(hash);
       await refreshAll(false);
@@ -2765,9 +2844,13 @@
   async function loadLeaderboardOverride(){
     try{
       const period = getPeriod();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
       const res = await fetch('/api/agent/leaderboard_v4?period=' + encodeURIComponent(period), {
-        credentials: 'same-origin'
-      });
+        credentials: 'same-origin',
+        signal: controller.signal
+      }).finally(() => clearTimeout(timer));
+      if(!res.ok) throw new Error('Leaderboard request failed: ' + res.status);
       const data = await res.json();
 
       const driverRows = Array.isArray(data.top_driver_recruiters) ? data.top_driver_recruiters : [];
@@ -2803,6 +2886,7 @@
 
       fillRivals(driverRows, clientRows, myName);
       fillBadges(driverRows, clientRows, myName);
+      if(window.patchOverviewFromLeaderboard) window.patchOverviewFromLeaderboard();
 
       console.log('leaderboard override loaded', {
         period,
@@ -2816,25 +2900,6 @@
   }
 
   window.loadLeaderboardOverride = loadLeaderboardOverride;
-
-  document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(loadLeaderboardOverride, 300);
-
-    document.querySelectorAll('.leader-btn').forEach(btn => {
-      btn.addEventListener('click', function(){
-        document.querySelectorAll('.leader-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        setTimeout(loadLeaderboardOverride, 50);
-      });
-    });
-
-    const refreshBtn = document.getElementById('refreshBtn');
-    if(refreshBtn){
-      refreshBtn.addEventListener('click', function(){
-        setTimeout(loadLeaderboardOverride, 150);
-      });
-    }
-  });
 })();
 </script>
 
@@ -2881,25 +2946,9 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(patchOverviewFromLeaderboard, 500);
-    setTimeout(patchOverviewFromLeaderboard, 1200);
-
-    document.querySelectorAll('.leader-btn').forEach(btn => {
-      btn.addEventListener('click', function(){
-        setTimeout(patchOverviewFromLeaderboard, 300);
-        setTimeout(patchOverviewFromLeaderboard, 900);
-      });
-    });
-
-    const refreshBtn = document.getElementById('refreshBtn');
-    if(refreshBtn){
-      refreshBtn.addEventListener('click', function(){
-        setTimeout(patchOverviewFromLeaderboard, 500);
-        setTimeout(patchOverviewFromLeaderboard, 1200);
-      });
-    }
-  });
+  window.patchOverviewFromLeaderboard = patchOverviewFromLeaderboard;
+  setTimeout(patchOverviewFromLeaderboard, 500);
+  setTimeout(patchOverviewFromLeaderboard, 1200);
 })();
 </script>
 
@@ -2926,7 +2975,12 @@
   }
 
   async function supportGet(url, opts={}){
-    const r = await fetch(url, {credentials:'same-origin', ...opts});
+    const timeoutMs = opts.timeoutMs || 15000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const fetchOpts = {...opts};
+    delete fetchOpts.timeoutMs;
+    const r = await fetch(url, {credentials:'same-origin', signal:controller.signal, ...fetchOpts}).finally(() => clearTimeout(timer));
     const txt = await r.text();
     let data = {};
     try{ data = txt ? JSON.parse(txt) : {}; }catch(_){}

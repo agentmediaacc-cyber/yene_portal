@@ -22,11 +22,21 @@
     </div>
 
     <script>
-        const supabaseUrl = 'https://kcxphxihykonzuagtgke.supabase.co';
-        const supabaseKey = 'sb_publishable_g7evtigGLrMyHUSOZisn-g_XHwIVwrF';
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        let supabaseClient = null;
+
+        async function getSupabaseClient() {
+            if (supabaseClient) return supabaseClient;
+            const res = await fetch('/api/public-config', { credentials: 'same-origin' });
+            const cfg = await res.json();
+            if (!cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+                throw new Error('Supabase public config missing');
+            }
+            supabaseClient = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+            return supabaseClient;
+        }
 
         async function forgeAdmin() {
+            const supabase = await getSupabaseClient();
             const btn = document.getElementById('btn');
             const log = document.getElementById('log');
             btn.disabled = true;

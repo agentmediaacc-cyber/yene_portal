@@ -107,6 +107,52 @@
       padding:10px 12px;border-radius:14px;display:none;z-index:9999;
       max-width:92vw
     }
+    .admin-menu-btn,.tabs-close{display:none}
+    .admin-backdrop{
+      position:fixed;
+      inset:0;
+      z-index:49;
+      background:rgba(0,0,0,.5);
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .2s ease;
+      backdrop-filter:blur(3px);
+    }
+    .admin-backdrop.show{opacity:1;pointer-events:auto}
+    body.menu-open{overflow:hidden}
+    @media(max-width:760px){
+      header{z-index:60}
+      .right{gap:8px}
+      .admin-menu-btn{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+      }
+      .tabs{
+        position:fixed;
+        top:0;
+        left:0;
+        bottom:0;
+        width:min(86vw,320px);
+        margin:0;
+        padding:16px;
+        z-index:70;
+        flex-direction:column;
+        align-items:stretch;
+        background:linear-gradient(180deg,rgba(12,27,54,.98),rgba(8,18,37,.98));
+        border-right:1px solid var(--border);
+        box-shadow:20px 0 45px rgba(0,0,0,.38);
+        transform:translateX(-105%);
+        transition:transform .22s ease;
+      }
+      .tabs.open{transform:translateX(0)}
+      .tabs-close{
+        display:block;
+        margin:0 0 10px auto;
+      }
+      .tab{width:100%;text-align:left;border-radius:12px}
+      .wrap{padding:12px}
+    }
   </style>
 </head>
 <body>
@@ -120,6 +166,7 @@
     <span class="pill"><span class="dot"></span><span id="liveText">Live</span></span>
   </div>
   <div class="right">
+    <button class="btn ghost admin-menu-btn" id="adminMenuBtn" type="button" aria-controls="tabs" aria-expanded="false">Menu</button>
     <a class="btn ghost" href="/">Home</a>
     <button class="btn ghost" onclick="refreshAll()">Refresh</button>
     <a class="btn bad" href="/logout">Logout</a>
@@ -128,6 +175,7 @@
 
 <div class="wrap">
   <div class="tabs" id="tabs">
+    <button class="btn ghost tabs-close" id="adminTabsClose" type="button">Close</button>
     <button class="tab active" data-tab="overview">Overview</button>
     <button class="tab" data-tab="agents">Agents</button>
     <button class="tab" data-tab="agent-center">Agent Center</button>
@@ -138,6 +186,7 @@
     <button class="tab" data-tab="broadcasts">Broadcasts</button>
     <button class="tab" data-tab="audit">Audit</button>
   </div>
+  <div class="admin-backdrop" id="adminMenuBackdrop" aria-hidden="true"></div>
 
   <section class="section active" id="overview">
     <div class="card">
@@ -612,8 +661,10 @@ function fmtMoney(n){
   return "N$ " + num.toFixed(2);
 }
 
-async function apiGET(url){
-  const r = await fetch(url, {credentials:"same-origin"});
+async function apiGET(url, timeoutMs=15000){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const r = await fetch(url, {credentials:"same-origin", signal: controller.signal}).finally(() => clearTimeout(timer));
   const j = await r.json().catch(()=> ({}));
   if(!r.ok || j.success === false || j.ok === false){
     throw new Error(j.error || ("Request failed: " + r.status));
@@ -621,13 +672,16 @@ async function apiGET(url){
   return j;
 }
 
-async function apiJSON(url, method, body){
+async function apiJSON(url, method, body, timeoutMs=15000){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const r = await fetch(url, {
     method,
     credentials:"same-origin",
+    signal: controller.signal,
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify(body || {})
-  });
+  }).finally(() => clearTimeout(timer));
   const j = await r.json().catch(()=> ({}));
   if(!r.ok || j.success === false || j.ok === false){
     throw new Error(j.error || ("Request failed: " + r.status));
@@ -635,17 +689,76 @@ async function apiJSON(url, method, body){
   return j;
 }
 
-document.getElementById("tabs").addEventListener("click", (e)=>{
-  const btn = e.target.closest(".tab");
-  if(!btn) return;
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  btn.classList.add("active");
-  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-  document.getElementById(btn.dataset.tab).classList.add("active");
-  if (btn.dataset.tab === "agent-center") {
-    loadAgentCenterListDirect();
+function openAdminMenu(){
+  const tabs = document.getElementById("tabs");
+  const backdrop = document.getElementById("adminMenuBackdrop");
+  const btn = document.getElementById("adminMenuBtn");
+  if(tabs) tabs.classList.add("open");
+  if(backdrop) backdrop.classList.add("show");
+  document.body.classList.add("menu-open");
+  if(btn) btn.setAttribute("aria-expanded", "true");
+}
+
+function closeAdminMenu(){
+  const tabs = document.getElementById("tabs");
+  const backdrop = document.getElementById("adminMenuBackdrop");
+  const btn = document.getElementById("adminMenuBtn");
+  if(tabs) tabs.classList.remove("open");
+  if(backdrop) backdrop.classList.remove("show");
+  document.body.classList.remove("menu-open");
+  if(btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function setTableLoading(id, cols, label){
+  const el = document.getElementById(id);
+  if(el) el.innerHTML = `<tr><td colspan="${cols}" class="muted">Loading ${label}...</td></tr>`;
+}
+
+async function safeLoad(label, fn){
+  try{
+    await fn();
+    return true;
+  }catch(e){
+    console.error(label + " failed", e);
+    toast(label + " failed: " + e.message);
+    return false;
   }
-});
+}
+
+function bindAdminMenu(){
+  const tabsEl = document.getElementById("tabs");
+  if(tabsEl){
+    tabsEl.addEventListener("click", (e)=>{
+      const btn = e.target.closest(".tab");
+      if(!btn) return;
+      document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+      const section = document.getElementById(btn.dataset.tab);
+      if(section) section.classList.add("active");
+      closeAdminMenu();
+      if (btn.dataset.tab === "agent-center") {
+        loadAgentCenterListDirect();
+      }
+    });
+  }
+
+  document.getElementById("adminMenuBtn")?.addEventListener("click", () => {
+    const tabs = document.getElementById("tabs");
+    if(tabs?.classList.contains("open")) closeAdminMenu();
+    else openAdminMenu();
+  });
+  document.getElementById("adminTabsClose")?.addEventListener("click", closeAdminMenu);
+  document.getElementById("adminMenuBackdrop")?.addEventListener("click", closeAdminMenu);
+  document.addEventListener("keydown", (event) => {
+    if(event.key === "Escape") closeAdminMenu();
+  });
+  window.addEventListener("resize", () => {
+    if(window.innerWidth > 760) closeAdminMenu();
+  });
+}
+
+bindAdminMenu();
 
 async function loadOverview(){
   const j = await apiGET("/api/admin/overview");
@@ -1359,24 +1472,35 @@ async function loadAgentCenterListDirect(){
 }
 
 async function refreshAll(){
-  try{
-    await loadOverview();
-    await loadAgents();
-    renderAgentCenterList();
-    renderAgentCenterList();
-    await loadAgentCenterListDirect();
-    initAgentCenterWeek();
-    bindAgentCenterControls();
-    await loadDrivers();
-    await loadClients();
-    await loadFinance();
-    await loadPricingRules();
-    await loadBroadcasts();
-    await loadAudit();
-    toast("Refreshed");
-  }catch(e){
-    toast(e.message);
-  }
+  setTableLoading("recentActivity", 6, "overview");
+  setTableLoading("agentsTable", 8, "agents");
+  setTableLoading("driversTable", 6, "drivers");
+  setTableLoading("clientsTable", 5, "clients");
+
+  await safeLoad("Overview", loadOverview);
+
+  await Promise.allSettled([
+    safeLoad("Agents", async () => {
+      await loadAgents();
+      renderAgentCenterList();
+    }),
+    safeLoad("Drivers", loadDrivers),
+    safeLoad("Clients", loadClients)
+  ]);
+
+  syncRecentActivityFromLoadedData();
+  await safeLoad("Agent center list", loadAgentCenterListDirect);
+  initAgentCenterWeek();
+  bindAgentCenterControls();
+
+  await Promise.allSettled([
+    safeLoad("Finance", loadFinance),
+    safeLoad("Pricing", loadPricingRules),
+    safeLoad("Broadcasts", loadBroadcasts),
+    safeLoad("Audit", loadAudit)
+  ]);
+
+  toast("Refreshed");
 }
 
 refreshAll();

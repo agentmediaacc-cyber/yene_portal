@@ -224,9 +224,22 @@ def protect_role_scoped_api_routes():
         if role != "AGENT" or not session.get("email"):
             return jsonify({"ok": False, "error": "Agent login required"}), 401
 
-URL = os.getenv("SUPABASE_URL", "https://kcxphxihykonzuagtgke.supabase.co")
-ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
-SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+URL = os.getenv("SUPABASE_URL", "").strip()
+ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "").strip()
+SERVICE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    or os.getenv("SUPABASE_SERVICE_KEY", "").strip()
+)
+
+if not URL or not ANON_KEY:
+    raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be configured in environment")
+
+app.logger.info(
+    "Supabase config loaded: url_present=%s anon_present=%s service_role_present=%s",
+    bool(URL),
+    bool(ANON_KEY),
+    bool(SERVICE_KEY),
+)
 
 supabase = create_client(URL, ANON_KEY)
 sb_admin = create_client(URL, SERVICE_KEY) if SERVICE_KEY else supabase

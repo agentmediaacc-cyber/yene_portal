@@ -58,10 +58,18 @@
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
-    const SUPABASE_URL = "https://kcxphxihykonzuagtgke.supabase.co";
-    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtjeHBoeGloeWtvbnp1YWd0Z2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODQ3NTYsImV4cCI6MjA4NzE2MDc1Nn0.apk8My6XuGnv1374_q-r45QMYO2FYveWIlXuj12VCR0";
+    let sb = null;
 
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    async function getSupabaseClient() {
+      if (sb) return sb;
+      const res = await fetch('/api/public-config', { credentials: 'same-origin' });
+      const cfg = await res.json();
+      if (!cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+        throw new Error('Supabase public config missing');
+      }
+      sb = supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      return sb;
+    }
 
     function showMsg(text, isErr=false){
       const m = document.getElementById("msg");
@@ -95,8 +103,9 @@ agent_id).execute()
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
 
       try{
+        const sbClient = await getSupabaseClient();
         // 1) Create Auth account (email+password)
-        const { data, error } = await sb.auth.signUp({ email, password });
+        const { data, error } = await sbClient.auth.signUp({ email, password });
         if(error) throw error;
         if(!data.user) throw new Error("Account not created.");
 
@@ -104,7 +113,7 @@ agent_id).execute()
 
         // 2) Try to create minimal profile row (if RLS allows)
         // If insert fails due to RLS, we still redirect, and dashboard can create it later via server/admin.
-        const { error: profileErr } = await sb.from("agent_profiles").insert([{
+        const { error: profileErr } = await sbClient.from("agent_profiles").insert([{
           id: userId,
           email: email,
           phone: phone,
@@ -131,8 +140,6 @@ agent_id).execute()
   </script>
 </body>
 </html>
-
-
 
 
 

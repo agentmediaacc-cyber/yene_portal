@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from io import BytesIO
+import os
 import uuid
 
 from flask import flash, jsonify, redirect, render_template, request, send_file, session
@@ -20,6 +21,22 @@ def register_yene_compat_routes(app, sb_admin):
         except Exception:
             return default
 
+    def _debug(route, identity=None, **counts):
+        try:
+            app.logger.info(
+                "compat_data route=%s identity=%s counts=%s env=%s",
+                route,
+                identity or {},
+                counts,
+                {
+                    "url_present": bool(os.getenv("SUPABASE_URL")),
+                    "anon_present": bool(os.getenv("SUPABASE_ANON_KEY")),
+                    "service_present": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")),
+                },
+            )
+        except Exception:
+            pass
+
     def _safe_select(table, filters=None, cols="*", limit=None, order_col=None, desc=False):
         filters = filters or {}
         try:
@@ -30,8 +47,23 @@ def register_yene_compat_routes(app, sb_admin):
                 q = q.order(order_col, desc=desc)
             if limit:
                 q = q.limit(limit)
-            return q.execute().data or []
-        except Exception:
+            rows = q.execute().data or []
+            _debug("_safe_select", table=table, rows=len(rows))
+            return rows
+        except Exception as e:
+            if order_col:
+                try:
+                    q = sb_admin.table(table).select(cols)
+                    for k, v in filters.items():
+                        q = q.eq(k, v)
+                    if limit:
+                        q = q.limit(limit)
+                    rows = q.execute().data or []
+                    _debug("_safe_select_retry_no_order", table=table, rows=len(rows))
+                    return rows
+                except Exception:
+                    pass
+            app.logger.warning("Supabase select failed table=%s error=%s", table, e)
             return []
 
     def _safe_insert(table, payload):
@@ -63,26 +95,34 @@ def register_yene_compat_routes(app, sb_admin):
         return str(status or "").upper() in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
 
     def _all_agents():
-        rows = _safe_select("agent_profiles", {}, "*", 5000, "created_at", True)
-        return rows or _safe_select("agents", {}, "*", 5000, "created_at", True)
+        return _safe_select("agent_profiles", {}, "*", 5000, "created_at", True)
 
     def _agent_by_id(agent_id):
         rows = _safe_select("agent_profiles", {"id": str(agent_id)}, "*", 1)
-        if rows:
-            return rows[0]
-        rows = _safe_select("agents", {"id": str(agent_id)}, "*", 1)
         return rows[0] if rows else None
 
     def _agent_by_email(email):
         email = _clean(email).lower()
         rows = _safe_select("agent_profiles", {"email": email}, "*", 1)
-        if rows:
-            return rows[0]
-        rows = _safe_select("agents", {"email": email}, "*", 1)
         return rows[0] if rows else None
 
     def _current_agent():
         return _agent_by_email(session.get("email") or session.get("agent_email"))
+
+    def _identity_values(agent):
+        vals = []
+        for key in ("id", "auth_id", "user_id", "email"):
+            val = str((agent or {}).get(key) or "").strip()
+            if val and val not in vals:
+                vals.append(val)
+        return vals
+
+    def _matches_identity(row, values, fields):
+        return any(str(row.get(field) or "").strip() in values for field in fields)
+
+    def _agent_rows(table, agent, fields):
+        values = _identity_values(agent)
+        return [r for r in _safe_select(table, {}, "*", 10000, "created_at", True) if _matches_identity(r, values, fields)]
 
     def _drivers():
         return _safe_select("drivers", {}, "*", 10000, "created_at", True)
@@ -90,10 +130,12 @@ def register_yene_compat_routes(app, sb_admin):
     def _clients():
         return _safe_select("clients", {}, "*", 10000, "created_at", True)
 
-    def _agent_registration_rows(agent_id, date_from=None, date_to=None):
+    def _agent_registration_rows(agent_or_id, date_from=None, date_to=None):
+        agent = agent_or_id if isinstance(agent_or_id, dict) else _agent_by_id(agent_or_id)
+        values = _identity_values(agent) if agent else [str(agent_or_id)]
         rows = []
         for d in _drivers():
-            if str(d.get("recruiter_agent_id") or "") != str(agent_id):
+            if not _matches_identity(d, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")):
                 continue
             rows.append({
                 "type": "Driver",
@@ -105,7 +147,7 @@ def register_yene_compat_routes(app, sb_admin):
                 "status": d.get("status"),
             })
         for c in _clients():
-            if str(c.get("recruiter_agent_id") or "") != str(agent_id):
+            if not _matches_identity(c, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")):
                 continue
             rows.append({
                 "type": "Client",
@@ -131,6 +173,7 @@ def register_yene_compat_routes(app, sb_admin):
         if date_from or date_to:
             rows = [r for r in rows if in_range(r)]
         rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        _debug("_agent_registration_rows", {"ids": values[:3]}, rows=len(rows))
         return rows
 
     def _period_from_request():
@@ -156,8 +199,8 @@ def register_yene_compat_routes(app, sb_admin):
     def public_config():
         return jsonify({
             "ok": True,
-            "SUPABASE_URL": app.jinja_env.globals.get("SUPABASE_URL") or __import__("os").getenv("SUPABASE_URL", ""),
-            "SUPABASE_ANON_KEY": app.jinja_env.globals.get("SUPABASE_ANON_KEY") or __import__("os").getenv("SUPABASE_ANON_KEY", ""),
+            "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
+            "SUPABASE_ANON_KEY": os.getenv("SUPABASE_ANON_KEY", ""),
         })
 
     @app.get("/admin")
@@ -226,11 +269,6 @@ def register_yene_compat_routes(app, sb_admin):
 
         res = _safe_insert("agent_profiles", payload)
         if isinstance(res, Exception):
-            fallback = dict(payload)
-            for key in ("auth_id", "user_id", "phone_number", "created_at"):
-                fallback.pop(key, None)
-            res = _safe_insert("agents", fallback)
-        if isinstance(res, Exception):
             flash(f"Registration failed: {res}")
             return redirect("/register")
 
@@ -249,6 +287,7 @@ def register_yene_compat_routes(app, sb_admin):
         agent = _current_agent()
         if not agent:
             return jsonify({"ok": False, "error": "Agent profile not found"}), 404
+        _debug("agent_me", {"agent_id": agent.get("id"), "email": agent.get("email")}, agent_profiles=1)
         return jsonify({"ok": True, "agent": agent, "profile": agent, "me": agent})
 
     @app.get("/api/agent/competition_board_v1")
@@ -262,8 +301,9 @@ def register_yene_compat_routes(app, sb_admin):
         rows = []
         for a in agents:
             aid = str(a.get("id") or "")
-            d_count = len([x for x in drivers if str(x.get("recruiter_agent_id") or "") == aid])
-            c_count = len([x for x in clients if str(x.get("recruiter_agent_id") or "") == aid])
+            values = _identity_values(a)
+            d_count = len([x for x in drivers if _matches_identity(x, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_email"))])
+            c_count = len([x for x in clients if _matches_identity(x, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_email"))])
             rows.append({
                 "agent_id": aid,
                 "agent_name": a.get("full_name") or a.get("username") or a.get("email") or "Agent",
@@ -274,6 +314,7 @@ def register_yene_compat_routes(app, sb_admin):
         rows.sort(key=lambda x: x["score"], reverse=True)
         for idx, row in enumerate(rows, start=1):
             row["rank"] = idx
+        _debug("agent_competition_board_v1", {"agent_id": me.get("id")}, agent_profiles=len(agents), drivers=len(drivers), clients=len(clients), rows=len(rows))
         return jsonify({"ok": True, "rows": rows[:50]})
 
     @app.get("/api/agent/messages")
@@ -281,15 +322,22 @@ def register_yene_compat_routes(app, sb_admin):
         agent = _current_agent()
         if not agent:
             return jsonify({"ok": False, "error": "Agent profile not found"}), 404
-        rows = _safe_select("agent_messages", {"agent_id": str(agent.get("id"))}, "*", 200, "created_at", True)
-        if not rows:
-            rows = _safe_select("agent_messages", {"agent_email": agent.get("email")}, "*", 200, "created_at", True)
+        fields = ("agent_id", "agent_auth_id", "user_id", "auth_id", "agent_email", "email")
+        rows = _agent_rows("agent_messages", agent, fields)
+        notices = _agent_rows("agent_notifications", agent, fields)
+        for n in notices:
+            n.setdefault("subject", n.get("title") or "Notification")
+            n.setdefault("message", n.get("body") or n.get("message") or "")
+            n.setdefault("source", "agent_notifications")
+        rows = (rows + notices)[:200]
+        _debug("agent_messages", {"agent_id": agent.get("id")}, agent_messages=len(rows), agent_notifications=len(notices))
         return jsonify({"ok": True, "rows": rows})
 
     @app.get("/api/agent/messages/summary")
     def agent_messages_summary():
         rows = agent_messages().json.get("rows", [])
         unread = len([r for r in rows if str(r.get("status") or "").lower() not in {"read", "closed"}])
+        _debug("agent_messages_summary", total=len(rows), unread=unread)
         return jsonify({"ok": True, "unread": unread, "total": len(rows)})
 
     @app.post("/api/agent/messages/<message_id>/read")
@@ -341,21 +389,28 @@ def register_yene_compat_routes(app, sb_admin):
             "total_paid": sum(_safe_float(x.get("amount")) for x in ledger if str(x.get("entry_type") or x.get("txn_type") or "").lower() == "debit"),
             "recent_activity": recent[:25],
         }
+        _debug("admin_overview", agent_profiles=len(agents), drivers=len(drivers), clients=len(clients), agent_wallet_ledger=len(ledger))
         return jsonify({"ok": True, "data": data})
 
     @app.get("/api/admin/drivers")
     def admin_drivers():
-        return jsonify({"ok": True, "data": _drivers(), "rows": _drivers()})
+        rows = _drivers()
+        _debug("admin_drivers", drivers=len(rows))
+        return jsonify({"ok": True, "data": rows, "rows": rows})
 
     @app.get("/api/admin/clients")
     def admin_clients():
-        return jsonify({"ok": True, "data": _clients(), "rows": _clients()})
+        rows = _clients()
+        _debug("admin_clients", clients=len(rows))
+        return jsonify({"ok": True, "data": rows, "rows": rows})
 
     @app.get("/api/admin/finance")
     def admin_finance():
-        rows = _safe_select("agent_wallet_ledger", {}, "*", 5000, "created_at", True)
-        if not rows:
-            rows = _safe_select("agent_wallet_transactions", {}, "*", 5000, "created_at", True)
+        ledger = _safe_select("agent_wallet_ledger", {}, "*", 5000, "created_at", True)
+        wallets = _safe_select("agent_wallets", {}, "*", 5000, "updated_at", True)
+        withdraws = _safe_select("agent_withdraw_requests", {}, "*", 5000, "created_at", True)
+        rows = ledger + wallets + withdraws
+        _debug("admin_finance", agent_wallet_ledger=len(ledger), agent_wallets=len(wallets), agent_withdraw_requests=len(withdraws), rows=len(rows))
         return jsonify({"ok": True, "data": rows, "rows": rows})
 
     @app.route("/api/admin/payment_rules", methods=["GET", "POST"])
@@ -390,7 +445,10 @@ def register_yene_compat_routes(app, sb_admin):
 
     @app.get("/api/admin/audit_logs")
     def admin_audit_logs():
-        rows = _safe_select("system_logs", {}, "*", 500, "created_at", True)
+        system = _safe_select("system_logs", {}, "*", 500, "created_at", True)
+        updates = _safe_select("admin_updates", {}, "*", 500, "created_at", True)
+        rows = (system + updates)[:500]
+        _debug("admin_audit_logs", system_logs=len(system), admin_updates=len(updates), rows=len(rows))
         return jsonify({"ok": True, "data": rows, "rows": rows})
 
     @app.get("/api/admin/agent_center/<agent_id>")
@@ -399,7 +457,7 @@ def register_yene_compat_routes(app, sb_admin):
         if not agent:
             return jsonify({"ok": False, "error": "Agent not found"}), 404
         mode, date_from, date_to = _period_from_request()
-        rows = _agent_registration_rows(agent_id, date_from, date_to)
+        rows = _agent_registration_rows(agent, date_from, date_to)
         days = {d: {"drivers": 0, "clients": 0} for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}
         for row in rows:
             try:
@@ -419,6 +477,7 @@ def register_yene_compat_routes(app, sb_admin):
             "days": days,
             "rows": rows,
         }
+        _debug("admin_agent_center", {"agent_id": agent_id}, rows=len(rows))
         return jsonify({"ok": True, "data": data})
 
     @app.get("/api/admin/agent_messages/<agent_id>")

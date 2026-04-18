@@ -126,11 +126,21 @@
     </div>
 
     <script>
-        const supabaseUrl = 'https://kcxphxihykonzuagtgke.supabase.co';
-        const supabaseKey = 'sb_publishable_g7evtigGLrMyHUSOZisn-g_XHwIVwrF';
-        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        let supabaseClient = null;
+
+        async function getSupabaseClient() {
+            if (supabaseClient) return supabaseClient;
+            const res = await fetch('/api/public-config', { credentials: 'same-origin' });
+            const cfg = await res.json();
+            if (!cfg.ok || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+                throw new Error('Supabase public config missing');
+            }
+            supabaseClient = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+            return supabaseClient;
+        }
 
         async function loadInvoice() {
+            const supabase = await getSupabaseClient();
             // Get the transaction ID from the URL (e.g., /invoice?tx=123)
             const urlParams = new URLSearchParams(window.location.search);
             const txId = urlParams.get('tx');
@@ -141,7 +151,7 @@
             }
 
             // Fetch Transaction
-            const { data: tx, error: txError } = await supabase.from('wallet_transactions').select('*').eq('id', txId).single();
+            const { data: tx, error: txError } = await supabase.from('agent_wallet_ledger').select('*').eq('id', txId).single();
             if (txError || !tx) {
                 alert("Transaction not found.");
                 return;
