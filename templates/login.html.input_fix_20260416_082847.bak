@@ -159,7 +159,7 @@
           <div class="field">
             <label for="username">Email Address</label>
             <div class="input-wrap">
-              <input type="email" id="username" name="email" placeholder="you@example.com" autocomplete="username" required>
+              <input type="email" id="username" name="username" placeholder="you@example.com" autocomplete="username" required>
             </div>
           </div>
 

@@ -247,17 +247,7 @@
           <div class="muted">Click any agent to see weekly registrations and full details</div>
         </div>
         <div class="row">
-          <select id="agentCenterMode">
-            <option value="day">Day</option>
-            <option value="current_week">Current Week</option>
-            <option value="previous_week">Previous Week</option>
-            <option value="all_time">All Time</option>
-            <option value="custom">Custom Range</option>
-          </select>
           <input id="agentCenterWeek" type="date">
-          <input id="agentCenterDay" type="date" style="display:none">
-          <input id="agentCenterFrom" type="date" style="display:none">
-          <input id="agentCenterTo" type="date" style="display:none">
           <button class="btn ghost" onclick="loadSelectedAgentCenter()">Load Selected Agent</button>
           <button class="btn ok" onclick="downloadSelectedAgentPDF()">Download Selected Agent PDF</button>
         </div>
@@ -307,58 +297,7 @@
             </div>
           </div>
 
-          
-          <div class="card" style="margin-bottom:12px">
-            <div class="big" style="font-size:18px">Message Agent About Registration</div>
-            <div class="muted" style="margin-top:8px">Send a note to the selected agent about a client or driver registration problem.</div>
-            <div style="height:12px"></div>
-
-            <label class="muted">Registration Type</label>
-            <select id="agentMsgType">
-              <option value="Client">Client</option>
-              <option value="Driver">Driver</option>
-              <option value="Other">Other</option>
-            </select>
-
-            <div style="height:10px"></div>
-            <label class="muted">Registration ID / Code</label>
-            <input id="agentMsgRegistrationId" placeholder="Client code, driver code, phone, or record id">
-
-            <div style="height:10px"></div>
-            <label class="muted">Subject</label>
-            <input id="agentMsgSubject" placeholder="Example: Missing client phone number">
-
-            <div style="height:10px"></div>
-            <label class="muted">Message</label>
-            <textarea id="agentMsgBody" placeholder="Write the issue for the agent..."></textarea>
-
-            <div class="row" style="margin-top:10px">
-              <button class="btn ok" onclick="sendMessageToSelectedAgent()">Send Message</button>
-              <button class="btn ghost" onclick="loadSelectedAgentMessages()">Refresh Messages</button>
-            </div>
-          </div>
-
-          <div class="card" style="margin-bottom:12px">
-            <div class="big" style="font-size:18px">Agent Communication History</div>
-            <div class="table-wrap" style="max-height:240px">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Registration</th>
-                    <th>Subject</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="selectedAgentMessages">
-                  <tr><td colspan="5" class="muted">No messages loaded</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-<div class="card">
+          <div class="card">
             <div class="big" style="font-size:18px">Registration Details</div>
             <div class="table-wrap" style="max-height:420px">
               <table>
@@ -650,25 +589,14 @@ document.getElementById("tabs").addEventListener("click", (e)=>{
 async function loadOverview(){
   const j = await apiGET("/api/admin/overview");
   const d = j.data || {};
-
   document.getElementById("k_agents_total").textContent = safe(d.agents_total, "0");
   document.getElementById("k_agents_meta").textContent =
     `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Blocked ${safe(d.agents_blocked,0)}`;
-
-  const driverCount = (Array.isArray(drivers) && drivers.length) ? drivers.length : safe(d.drivers_total, "0");
-  const clientCount = (Array.isArray(clients) && clients.length) ? clients.length : safe(d.clients_total, "0");
-
-  document.getElementById("k_drivers_total").textContent = String(driverCount);
-  document.getElementById("k_clients_total").textContent = String(clientCount);
+  document.getElementById("k_drivers_total").textContent = safe(d.drivers_total, "0");
+  document.getElementById("k_clients_total").textContent = safe(d.clients_total, "0");
   document.getElementById("k_total_paid").textContent = fmtMoney(d.total_paid);
 
   const body = document.getElementById("recentActivity");
-
-  if (Array.isArray(drivers) && drivers.length || Array.isArray(clients) && clients.length) {
-    syncRecentActivityFromLoadedData();
-    return;
-  }
-
   const rows = d.recent_activity || [];
   body.innerHTML = rows.length ? rows.map(r => `
     <tr>
@@ -704,44 +632,14 @@ async function loadAgents(){
 
 async function loadDrivers(){
   const j = await apiGET("/api/admin/drivers");
-
-  if (Array.isArray(j?.data)) {
-    drivers = j.data;
-  } else if (Array.isArray(j?.rows)) {
-    drivers = j.rows;
-  } else {
-    drivers = [];
-  }
-
+  drivers = j.data || [];
   renderDrivers();
-
-  const k = document.getElementById("k_drivers_total");
-  if (k) {
-    k.textContent = String(drivers.length);
-  }
-
-  syncRecentActivityFromLoadedData();
 }
 
 async function loadClients(){
   const j = await apiGET("/api/admin/clients");
-
-  if (Array.isArray(j?.data)) {
-    clients = j.data;
-  } else if (Array.isArray(j?.rows)) {
-    clients = j.rows;
-  } else {
-    clients = [];
-  }
-
+  clients = j.data || [];
   renderClients();
-
-  const k = document.getElementById("k_clients_total");
-  if (k) {
-    k.textContent = String(clients.length);
-  }
-
-  syncRecentActivityFromLoadedData();
 }
 
 async function loadFinance(){
@@ -827,51 +725,6 @@ function renderDrivers(){
   `).join("") : `<tr><td colspan="6" class="muted">No drivers found</td></tr>`;
 }
 
-
-function syncRecentActivityFromLoadedData(){
-  const body = document.getElementById("recentActivity");
-  if(!body) return;
-
-  const activity = [];
-
-  for (const d of (drivers || [])) {
-    activity.push({
-      created_at: d.created_at,
-      type: "Driver",
-      name: d.full_name || d.name || "",
-      phone: d.phone || d.phone_number || "",
-      town: d.town || "",
-      agent: d.recruiter_name || ""
-    });
-  }
-
-  for (const c of (clients || [])) {
-    activity.push({
-      created_at: c.created_at,
-      type: "Client",
-      name: c.full_name || c.name || "",
-      phone: c.phone || c.phone_number || "",
-      town: c.town || "",
-      agent: c.recruiter_name || ""
-    });
-  }
-
-  activity.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
-
-  const rows = activity.slice(0, 25);
-
-  body.innerHTML = rows.length ? rows.map(r => `
-    <tr>
-      <td>${esc(fmtDate(r.created_at))}</td>
-      <td>${esc(safe(r.type))}</td>
-      <td>${esc(safe(r.name))}</td>
-      <td>${esc(safe(r.phone))}</td>
-      <td>${esc(safe(r.town))}</td>
-      <td>${esc(safe(r.agent))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="6" class="muted">No activity yet</td></tr>`;
-}
-
 function renderClients(){
   const q = (document.getElementById("clientSearch").value || "").toLowerCase().trim();
   const list = clients.filter(c => {
@@ -939,7 +792,6 @@ async function setAgentStatus(agentId, status){
     renderAgentCenterList();
     await loadAgentCenterListDirect();
     initAgentCenterWeek();
-    bindAgentCenterControls();
     await loadOverview();
   }catch(e){
     toast(e.message);
@@ -1035,125 +887,15 @@ function downloadWeeklyPDF(){
 }
 
 
-
-
-function maybeAutoLoadAgentCenter(){
-  if (!selectedAgentId) return;
-
-  const mode = document.getElementById("agentCenterMode")?.value || "current_week";
-  const week = document.getElementById("agentCenterWeek")?.value || "";
-  const day = document.getElementById("agentCenterDay")?.value || "";
-  const from = document.getElementById("agentCenterFrom")?.value || "";
-  const to = document.getElementById("agentCenterTo")?.value || "";
-
-  if (mode === "custom") {
-    if (from && to) loadSelectedAgentCenter();
-    return;
-  }
-
-  if (mode === "day") {
-    if (day) loadSelectedAgentCenter();
-    return;
-  }
-
-  if (mode === "all_time") {
-    loadSelectedAgentCenter();
-    return;
-  }
-
-  if (week) loadSelectedAgentCenter();
-}
-
-function toggleAgentCenterDateInputs(){
-  const mode = document.getElementById("agentCenterMode")?.value || "current_week";
-  const week = document.getElementById("agentCenterWeek");
-  const day = document.getElementById("agentCenterDay");
-  const from = document.getElementById("agentCenterFrom");
-  const to = document.getElementById("agentCenterTo");
-
-  if (!week || !day || !from || !to) return;
-
-  if (mode === "day") {
-    week.style.display = "none";
-    day.style.display = "";
-    from.style.display = "none";
-    to.style.display = "none";
-  } else if (mode === "custom") {
-    week.style.display = "none";
-    day.style.display = "none";
-    from.style.display = "";
-    to.style.display = "";
-  } else if (mode === "all_time") {
-    week.style.display = "none";
-    day.style.display = "none";
-    from.style.display = "none";
-    to.style.display = "none";
-  } else {
-    week.style.display = "";
-    day.style.display = "none";
-    from.style.display = "none";
-    to.style.display = "none";
-  }
-}
-
-
-function bindAgentCenterControls(){
-  const mode = document.getElementById("agentCenterMode");
-  const week = document.getElementById("agentCenterWeek");
-  const from = document.getElementById("agentCenterFrom");
-  const to = document.getElementById("agentCenterTo");
-
-  if (mode && !mode.dataset.bound) {
-    mode.addEventListener("change", () => {
-      toggleAgentCenterDateInputs();
-  bindAgentCenterControls();
-      maybeAutoLoadAgentCenter();
-    });
-    mode.dataset.bound = "1";
-  }
-
-  const bindDate = (el) => {
-    if (!el || el.dataset.bound) return;
-    el.addEventListener("change", () => {
-      maybeAutoLoadAgentCenter();
-    });
-    el.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        maybeAutoLoadAgentCenter();
-      }
-    });
-    el.dataset.bound = "1";
-  };
-
-  bindDate(week);
-  bindDate(from);
-  bindDate(to);
-}
-
 function initAgentCenterWeek(){
   const el = document.getElementById("agentCenterWeek");
-  const dayEl = document.getElementById("agentCenterDay");
-  const from = document.getElementById("agentCenterFrom");
-  const to = document.getElementById("agentCenterTo");
   if(!el) return;
-
   const today = new Date();
-  const weekday = today.getDay();
-  const diff = (weekday === 0 ? -6 : 1 - weekday);
+  const day = today.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
   const monday = new Date(today);
   monday.setDate(today.getDate() + diff);
-
   el.value = monday.toISOString().slice(0,10);
-  if (dayEl) dayEl.value = today.toISOString().slice(0,10);
-  if (from) from.value = monday.toISOString().slice(0,10);
-
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  if (to) to.value = sunday.toISOString().slice(0,10);
-
-  toggleAgentCenterDateInputs();
-  bindAgentCenterControls();
 }
 
 function renderAgentCenterList(){
@@ -1183,7 +925,7 @@ function openAgentCenter(agentId){
   document.querySelector('.tab[data-tab="agent-center"]').classList.add("active");
   document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
   document.getElementById("agent-center").classList.add("active");
-  maybeAutoLoadAgentCenter();
+  loadSelectedAgentCenter();
 }
 
 async function loadSelectedAgentCenter(){
@@ -1191,22 +933,8 @@ async function loadSelectedAgentCenter(){
     toast("Select an agent first");
     return;
   }
-  const mode = document.getElementById("agentCenterMode")?.value || "current_week";
-  const weekStart = document.getElementById("agentCenterWeek")?.value || "";
-  const dayDate = document.getElementById("agentCenterDay")?.value || "";
-  const dateFrom = document.getElementById("agentCenterFrom")?.value || "";
-  const dateTo = document.getElementById("agentCenterTo")?.value || "";
-
-  let qs = `mode=${encodeURIComponent(mode)}`;
-  if (mode === "custom") {
-    qs += `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`;
-  } else if (mode === "day") {
-    qs += `&date_day=${encodeURIComponent(dayDate)}`;
-  } else if (mode !== "all_time") {
-    qs += `&week_start=${encodeURIComponent(weekStart)}`;
-  }
-
-  const j = await apiGET(`/api/admin/agent_center/${encodeURIComponent(selectedAgentId)}?${qs}`);
+  const weekStart = document.getElementById("agentCenterWeek").value || "";
+  const j = await apiGET(`/api/admin/agent_center/${encodeURIComponent(selectedAgentId)}?week_start=${encodeURIComponent(weekStart)}`);
   const d = j.data || {};
   selectedAgentWeekData = d;
 
@@ -1217,8 +945,7 @@ async function loadSelectedAgentCenter(){
     `Phone: ${esc(safe(a.phone))}<br>` +
     `Town: ${esc(safe(a.town))} | Region: ${esc(safe(a.region))}<br>` +
     `Status: ${esc(safe(a.status))}<br>` +
-    `Mode: ${esc(safe(d.mode || "current_week"))}<br>` +
-    `Period: ${d.date_from ? esc(safe(d.date_from)) : "All Time"} ${d.date_to ? "to " + esc(safe(d.date_to)) : ""}<br>` +
+    `Week: ${esc(safe(d.week_start))} to ${esc(safe(d.week_end))}<br>` +
     `Drivers Total: ${esc(safe(d.drivers_total,0))} | Clients Total: ${esc(safe(d.clients_total,0))}`;
 
   const weekBody = document.getElementById("selectedAgentWeekTable");
@@ -1231,10 +958,6 @@ async function loadSelectedAgentCenter(){
       <td>${esc(safe(days[day]?.clients,0))}</td>
     </tr>
   `).join("");
-
-  loadSelectedAgentMessages();
-
-  loadSelectedAgentMessages();
 
   const rowsBody = document.getElementById("selectedAgentRows");
   const rows = d.rows || [];
@@ -1250,87 +973,13 @@ async function loadSelectedAgentCenter(){
   `).join("") : `<tr><td colspan="6" class="muted">No weekly rows for this agent</td></tr>`;
 }
 
-
-async function loadSelectedAgentMessages(){
-  if(!selectedAgentId){
-    return;
-  }
-  try{
-    const j = await apiGET(`/api/admin/agent_messages/${encodeURIComponent(selectedAgentId)}`);
-    const rows = Array.isArray(j?.rows) ? j.rows : [];
-    const body = document.getElementById("selectedAgentMessages");
-    if(!body) return;
-
-    body.innerHTML = rows.length ? rows.map(r => `
-      <tr>
-        <td>${esc(fmtDate(r.created_at))}</td>
-        <td>${esc(safe(r.registration_type))}</td>
-        <td>${esc(safe(r.registration_id))}</td>
-        <td>${esc(safe(r.subject))}</td>
-        <td>${esc(safe(r.status))}</td>
-      </tr>
-    `).join("") : `<tr><td colspan="5" class="muted">No messages yet</td></tr>`;
-  }catch(e){
-    const body = document.getElementById("selectedAgentMessages");
-    if(body){
-      body.innerHTML = `<tr><td colspan="5" class="muted">Failed to load messages</td></tr>`;
-    }
-  }
-}
-
-async function sendMessageToSelectedAgent(){
-  if(!selectedAgentId || !selectedAgentWeekData?.agent){
-    toast("Select an agent first");
-    return;
-  }
-
-  const agent = selectedAgentWeekData.agent;
-  const registration_type = document.getElementById("agentMsgType")?.value || "";
-  const registration_id = document.getElementById("agentMsgRegistrationId")?.value || "";
-  const subject = document.getElementById("agentMsgSubject")?.value || "";
-  const message = document.getElementById("agentMsgBody")?.value || "";
-
-  try{
-    await apiJSON("/api/admin/agent_messages", "POST", {
-      agent_id: agent.id,
-      agent_name: agent.full_name || agent.username || "",
-      registration_type,
-      registration_id,
-      subject,
-      message
-    });
-
-    toast("Message sent to agent");
-    document.getElementById("agentMsgRegistrationId").value = "";
-    document.getElementById("agentMsgSubject").value = "";
-    document.getElementById("agentMsgBody").value = "";
-    await loadSelectedAgentMessages();
-  }catch(e){
-    toast(e.message);
-  }
-}
-
 function downloadSelectedAgentPDF(){
   if(!selectedAgentId){
     toast("Select an agent first");
     return;
   }
-  const mode = document.getElementById("agentCenterMode")?.value || "current_week";
-  const weekStart = document.getElementById("agentCenterWeek")?.value || "";
-  const dayDate = document.getElementById("agentCenterDay")?.value || "";
-  const dateFrom = document.getElementById("agentCenterFrom")?.value || "";
-  const dateTo = document.getElementById("agentCenterTo")?.value || "";
-
-  let qs = `mode=${encodeURIComponent(mode)}`;
-  if (mode === "custom") {
-    qs += `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`;
-  } else if (mode === "day") {
-    qs += `&date_day=${encodeURIComponent(dayDate)}`;
-  } else if (mode !== "all_time") {
-    qs += `&week_start=${encodeURIComponent(weekStart)}`;
-  }
-
-  window.location.href = `/api/admin/agent_center_pdf/${encodeURIComponent(selectedAgentId)}?${qs}`;
+  const weekStart = document.getElementById("agentCenterWeek").value || "";
+  window.location.href = `/api/admin/agent_center_pdf/${encodeURIComponent(selectedAgentId)}?week_start=${encodeURIComponent(weekStart)}`;
 }
 
 
@@ -1366,7 +1015,6 @@ async function refreshAll(){
     renderAgentCenterList();
     await loadAgentCenterListDirect();
     initAgentCenterWeek();
-    bindAgentCenterControls();
     await loadDrivers();
     await loadClients();
     await loadFinance();

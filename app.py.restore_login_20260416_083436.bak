@@ -78,8 +78,31 @@ def _sb_get_user_id_from_token(access_token: str):
 def _agent_session_email():
     return session.get("agent_email")
 
+def _set_agent_session(email):
+    session.clear()
+    session["agent_email"] = email
+    session["role"] = "AGENT"
+
+def _set_admin_session(email):
+    session.clear()
+    session["admin_email"] = email
+    session["role"] = "ADMIN"
+    session["is_admin"] = True
+
+
+def _safe_log_system_event(event_type, details, user_id=None):
+    try:
+        fn = globals().get("log_system_event")
+        if callable(fn):
+            return fn(event_type, details, user_id=user_id)
+    except Exception:
+        pass
+    return None
+
 def _require_admin():
-    return bool(session.get("admin_email")) and session.get("role") == "ADMIN"
+    # uses admin_email session
+    # uses admin_email session
+    return session.get("role") == "ADMIN" or bool(session.get("is_admin"))
 
 def require_login(required_role=None):
     """Early temporary session-based login guard for legacy modules."""
@@ -139,44 +162,16 @@ app = Flask(__name__)
 # ---------------------------
 
 
-
-def _agent_session_email():
-    return session.get("agent_email")
-
-def _set_agent_session(email):
-    session.clear()
-    session["agent_email"] = email
-    session["role"] = "AGENT"
-
-def _set_admin_session(email):
-    session.clear()
-    session["admin_email"] = email
-    session["role"] = "ADMIN"
-    session["is_admin"] = True
-
-def _require_admin():
-    return bool(session.get("admin_email")) and session.get("role") == "ADMIN"
-
-def _safe_log_system_event(event_type, details, user_id=None):
-    try:
-        fn = globals().get("log_system_event")
-        if callable(fn):
-            return fn(event_type, details, user_id=user_id)
-    except Exception:
-        pass
-    return None
-
-
 @app.route("/dashboard/admin")
 def admin_dashboard():
-    if not _require_admin():
+    if session.get("role") != "ADMIN":
         return redirect("/admin/login")
     return render_template("admin_dashboard.html")
 
 
 @app.route("/agent/dashboard")
 def agent_dashboard():
-    if not session.get("agent_email"):
+    if session.get("role") != "AGENT":
         return redirect("/login")
     return render_template("agent_dashboard.html")
 
@@ -435,66 +430,26 @@ def index():
 # ---------------------------
 
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "GET":
-        if session.get("agent_email"):
-            return redirect("/agent/dashboard")
-        return render_template(
-            "login.html",
-            login_mode="agent",
-            SUPABASE_URL=globals().get("SUPABASE_URL", ""),
-            SUPABASE_ANON_KEY=globals().get("SUPABASE_ANON_KEY", "")
-        )
-
-    email = (request.form.get("email") or "").strip().lower()
-    password = request.form.get("password") or ""
-
-    if not email or not password:
-        flash("Email and password are required")
-        return redirect("/login")
-
-    try:
-        if "sb" in globals():
-            sb.auth.sign_in_with_password({"email": email, "password": password})
-        elif "supabase" in globals():
-            supabase.auth.sign_in_with_password({"email": email, "password": password})
-    except Exception as e:
-        msg = str(e)
-        if "JWT expired" in msg:
-            flash("Session expired. Please login again.")
-        else:
-            flash(f"Login error: {msg}")
-        return redirect("/login")
-
-    _set_agent_session(email)
-    _safe_log_system_event("LOGIN", f"AGENT logged in: {email}", user_id=email)
-    return redirect("/agent/dashboard")
-
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     if request.method == "GET":
-        if _require_admin():
-            return redirect("/dashboard/admin")
         return render_template("login.html", login_mode="admin")
 
     email = (request.form.get("email") or "").strip().lower()
     password = request.form.get("password") or ""
 
+    # SIMPLE ADMIN CHECK (adjust later if hashed)
     if email == "kasera@admin.com" and password == "admin123":
-        _set_admin_session(email)
-        _safe_log_system_event("LOGIN", f"ADMIN logged in: {email}", user_id=email)
+        session.clear()
+        session["admin_email"] = email
+        session["role"] = "ADMIN"
+        session["is_admin"] = True
+
         return redirect("/dashboard/admin")
 
     flash("Invalid admin credentials")
     return redirect("/admin/login")
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

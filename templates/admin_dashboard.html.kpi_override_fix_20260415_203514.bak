@@ -650,25 +650,14 @@ document.getElementById("tabs").addEventListener("click", (e)=>{
 async function loadOverview(){
   const j = await apiGET("/api/admin/overview");
   const d = j.data || {};
-
   document.getElementById("k_agents_total").textContent = safe(d.agents_total, "0");
   document.getElementById("k_agents_meta").textContent =
     `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Blocked ${safe(d.agents_blocked,0)}`;
-
-  const driverCount = (Array.isArray(drivers) && drivers.length) ? drivers.length : safe(d.drivers_total, "0");
-  const clientCount = (Array.isArray(clients) && clients.length) ? clients.length : safe(d.clients_total, "0");
-
-  document.getElementById("k_drivers_total").textContent = String(driverCount);
-  document.getElementById("k_clients_total").textContent = String(clientCount);
+  document.getElementById("k_drivers_total").textContent = safe(d.drivers_total, "0");
+  document.getElementById("k_clients_total").textContent = safe(d.clients_total, "0");
   document.getElementById("k_total_paid").textContent = fmtMoney(d.total_paid);
 
   const body = document.getElementById("recentActivity");
-
-  if (Array.isArray(drivers) && drivers.length || Array.isArray(clients) && clients.length) {
-    syncRecentActivityFromLoadedData();
-    return;
-  }
-
   const rows = d.recent_activity || [];
   body.innerHTML = rows.length ? rows.map(r => `
     <tr>

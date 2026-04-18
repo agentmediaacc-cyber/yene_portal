@@ -248,14 +248,12 @@
         </div>
         <div class="row">
           <select id="agentCenterMode">
-            <option value="day">Day</option>
             <option value="current_week">Current Week</option>
             <option value="previous_week">Previous Week</option>
             <option value="all_time">All Time</option>
             <option value="custom">Custom Range</option>
           </select>
           <input id="agentCenterWeek" type="date">
-          <input id="agentCenterDay" type="date" style="display:none">
           <input id="agentCenterFrom" type="date" style="display:none">
           <input id="agentCenterTo" type="date" style="display:none">
           <button class="btn ghost" onclick="loadSelectedAgentCenter()">Load Selected Agent</button>
@@ -650,25 +648,14 @@ document.getElementById("tabs").addEventListener("click", (e)=>{
 async function loadOverview(){
   const j = await apiGET("/api/admin/overview");
   const d = j.data || {};
-
   document.getElementById("k_agents_total").textContent = safe(d.agents_total, "0");
   document.getElementById("k_agents_meta").textContent =
     `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Blocked ${safe(d.agents_blocked,0)}`;
-
-  const driverCount = (Array.isArray(drivers) && drivers.length) ? drivers.length : safe(d.drivers_total, "0");
-  const clientCount = (Array.isArray(clients) && clients.length) ? clients.length : safe(d.clients_total, "0");
-
-  document.getElementById("k_drivers_total").textContent = String(driverCount);
-  document.getElementById("k_clients_total").textContent = String(clientCount);
+  document.getElementById("k_drivers_total").textContent = safe(d.drivers_total, "0");
+  document.getElementById("k_clients_total").textContent = safe(d.clients_total, "0");
   document.getElementById("k_total_paid").textContent = fmtMoney(d.total_paid);
 
   const body = document.getElementById("recentActivity");
-
-  if (Array.isArray(drivers) && drivers.length || Array.isArray(clients) && clients.length) {
-    syncRecentActivityFromLoadedData();
-    return;
-  }
-
   const rows = d.recent_activity || [];
   body.innerHTML = rows.length ? rows.map(r => `
     <tr>
@@ -704,44 +691,14 @@ async function loadAgents(){
 
 async function loadDrivers(){
   const j = await apiGET("/api/admin/drivers");
-
-  if (Array.isArray(j?.data)) {
-    drivers = j.data;
-  } else if (Array.isArray(j?.rows)) {
-    drivers = j.rows;
-  } else {
-    drivers = [];
-  }
-
+  drivers = j.data || [];
   renderDrivers();
-
-  const k = document.getElementById("k_drivers_total");
-  if (k) {
-    k.textContent = String(drivers.length);
-  }
-
-  syncRecentActivityFromLoadedData();
 }
 
 async function loadClients(){
   const j = await apiGET("/api/admin/clients");
-
-  if (Array.isArray(j?.data)) {
-    clients = j.data;
-  } else if (Array.isArray(j?.rows)) {
-    clients = j.rows;
-  } else {
-    clients = [];
-  }
-
+  clients = j.data || [];
   renderClients();
-
-  const k = document.getElementById("k_clients_total");
-  if (k) {
-    k.textContent = String(clients.length);
-  }
-
-  syncRecentActivityFromLoadedData();
 }
 
 async function loadFinance(){
@@ -825,51 +782,6 @@ function renderDrivers(){
       <td>${esc(fmtDate(d.created_at))}</td>
     </tr>
   `).join("") : `<tr><td colspan="6" class="muted">No drivers found</td></tr>`;
-}
-
-
-function syncRecentActivityFromLoadedData(){
-  const body = document.getElementById("recentActivity");
-  if(!body) return;
-
-  const activity = [];
-
-  for (const d of (drivers || [])) {
-    activity.push({
-      created_at: d.created_at,
-      type: "Driver",
-      name: d.full_name || d.name || "",
-      phone: d.phone || d.phone_number || "",
-      town: d.town || "",
-      agent: d.recruiter_name || ""
-    });
-  }
-
-  for (const c of (clients || [])) {
-    activity.push({
-      created_at: c.created_at,
-      type: "Client",
-      name: c.full_name || c.name || "",
-      phone: c.phone || c.phone_number || "",
-      town: c.town || "",
-      agent: c.recruiter_name || ""
-    });
-  }
-
-  activity.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
-
-  const rows = activity.slice(0, 25);
-
-  body.innerHTML = rows.length ? rows.map(r => `
-    <tr>
-      <td>${esc(fmtDate(r.created_at))}</td>
-      <td>${esc(safe(r.type))}</td>
-      <td>${esc(safe(r.name))}</td>
-      <td>${esc(safe(r.phone))}</td>
-      <td>${esc(safe(r.town))}</td>
-      <td>${esc(safe(r.agent))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="6" class="muted">No activity yet</td></tr>`;
 }
 
 function renderClients(){
@@ -1042,17 +954,13 @@ function maybeAutoLoadAgentCenter(){
 
   const mode = document.getElementById("agentCenterMode")?.value || "current_week";
   const week = document.getElementById("agentCenterWeek")?.value || "";
-  const day = document.getElementById("agentCenterDay")?.value || "";
   const from = document.getElementById("agentCenterFrom")?.value || "";
   const to = document.getElementById("agentCenterTo")?.value || "";
 
   if (mode === "custom") {
-    if (from && to) loadSelectedAgentCenter();
-    return;
-  }
-
-  if (mode === "day") {
-    if (day) loadSelectedAgentCenter();
+    if (from && to) {
+      loadSelectedAgentCenter();
+    }
     return;
   }
 
@@ -1061,36 +969,29 @@ function maybeAutoLoadAgentCenter(){
     return;
   }
 
-  if (week) loadSelectedAgentCenter();
+  if (week) {
+    loadSelectedAgentCenter();
+  }
 }
 
 function toggleAgentCenterDateInputs(){
   const mode = document.getElementById("agentCenterMode")?.value || "current_week";
   const week = document.getElementById("agentCenterWeek");
-  const day = document.getElementById("agentCenterDay");
   const from = document.getElementById("agentCenterFrom");
   const to = document.getElementById("agentCenterTo");
 
-  if (!week || !day || !from || !to) return;
+  if (!week || !from || !to) return;
 
-  if (mode === "day") {
+  if (mode === "custom") {
     week.style.display = "none";
-    day.style.display = "";
-    from.style.display = "none";
-    to.style.display = "none";
-  } else if (mode === "custom") {
-    week.style.display = "none";
-    day.style.display = "none";
     from.style.display = "";
     to.style.display = "";
   } else if (mode === "all_time") {
     week.style.display = "none";
-    day.style.display = "none";
     from.style.display = "none";
     to.style.display = "none";
   } else {
     week.style.display = "";
-    day.style.display = "none";
     from.style.display = "none";
     to.style.display = "none";
   }
@@ -1133,19 +1034,17 @@ function bindAgentCenterControls(){
 
 function initAgentCenterWeek(){
   const el = document.getElementById("agentCenterWeek");
-  const dayEl = document.getElementById("agentCenterDay");
   const from = document.getElementById("agentCenterFrom");
   const to = document.getElementById("agentCenterTo");
   if(!el) return;
 
   const today = new Date();
-  const weekday = today.getDay();
-  const diff = (weekday === 0 ? -6 : 1 - weekday);
+  const day = today.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
   const monday = new Date(today);
   monday.setDate(today.getDate() + diff);
 
   el.value = monday.toISOString().slice(0,10);
-  if (dayEl) dayEl.value = today.toISOString().slice(0,10);
   if (from) from.value = monday.toISOString().slice(0,10);
 
   const sunday = new Date(monday);
@@ -1193,15 +1092,12 @@ async function loadSelectedAgentCenter(){
   }
   const mode = document.getElementById("agentCenterMode")?.value || "current_week";
   const weekStart = document.getElementById("agentCenterWeek")?.value || "";
-  const dayDate = document.getElementById("agentCenterDay")?.value || "";
   const dateFrom = document.getElementById("agentCenterFrom")?.value || "";
   const dateTo = document.getElementById("agentCenterTo")?.value || "";
 
   let qs = `mode=${encodeURIComponent(mode)}`;
   if (mode === "custom") {
     qs += `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`;
-  } else if (mode === "day") {
-    qs += `&date_day=${encodeURIComponent(dayDate)}`;
   } else if (mode !== "all_time") {
     qs += `&week_start=${encodeURIComponent(weekStart)}`;
   }
@@ -1317,15 +1213,12 @@ function downloadSelectedAgentPDF(){
   }
   const mode = document.getElementById("agentCenterMode")?.value || "current_week";
   const weekStart = document.getElementById("agentCenterWeek")?.value || "";
-  const dayDate = document.getElementById("agentCenterDay")?.value || "";
   const dateFrom = document.getElementById("agentCenterFrom")?.value || "";
   const dateTo = document.getElementById("agentCenterTo")?.value || "";
 
   let qs = `mode=${encodeURIComponent(mode)}`;
   if (mode === "custom") {
     qs += `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`;
-  } else if (mode === "day") {
-    qs += `&date_day=${encodeURIComponent(dayDate)}`;
   } else if (mode !== "all_time") {
     qs += `&week_start=${encodeURIComponent(weekStart)}`;
   }

@@ -582,230 +582,12 @@
       align-items:center;
     }
 
-    .leaderboard-stack{
-      display:grid;
-      grid-template-columns:1.2fr .8fr;
-      gap:16px;
-      align-items:start;
-    }
-
-    .leaderboard-panels{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:16px;
-    }
-
-    .leaderboard-side{
-      display:flex;
-      flex-direction:column;
-      gap:16px;
-      min-width:0;
-    }
-
-    .compact-list .list-item{
-      padding:12px;
-      border-radius:16px;
-    }
-
-    .compact-table th,.compact-table td{
-      padding:11px 12px;
-      font-size:13px;
-    }
-
-    .leader-topbar{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-      flex-wrap:wrap;
-    }
-
-    .leader-subnote{
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.5;
-    }
-
-    .metric-hero{
-      display:grid;
-      grid-template-columns:repeat(3,minmax(0,1fr));
-      gap:12px;
-    }
-
-    .metric-pill{
-      border:1px solid var(--line);
-      border-radius:16px;
-      padding:12px;
-      background:rgba(255,255,255,.03);
-    }
-
-    .metric-pill .k{
-      font-size:11px;
-      color:var(--muted);
-      text-transform:uppercase;
-      letter-spacing:.12em;
-      font-weight:800;
-    }
-
-    .metric-pill .v{
-      font-size:24px;
-      font-weight:900;
-      margin-top:8px;
-    }
-
-    @media (max-width: 1100px){
-      .leaderboard-stack{
-        grid-template-columns:1fr;
-      }
-    }
-
-    @media (max-width: 800px){
-      .leaderboard-panels{
-        grid-template-columns:1fr;
-      }
-      .metric-hero{
-        grid-template-columns:1fr;
-      }
-      .compact-table th,.compact-table td{
-        padding:10px 10px;
-        font-size:12px;
-      }
-      .rival-box{
-        align-items:flex-start;
-      }
-    }
-
     .pulse-dot{
       width:10px;height:10px;border-radius:50%;
       background:#2ccc8a;
       box-shadow:0 0 0 rgba(44,204,138,.5);
       animation:pulseDot 1.6s infinite;
       flex:0 0 10px;
-    }
-
-    .support-shell{
-      display:grid;
-      grid-template-columns:1.1fr .9fr;
-      gap:16px;
-    }
-
-    .support-tabs{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin-bottom:14px;
-    }
-
-    .support-tab{
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      padding:10px 12px;
-      border-radius:999px;
-      cursor:pointer;
-      font-weight:800;
-    }
-
-    .support-tab.active{
-      background:rgba(77,163,255,.14);
-      border-color:rgba(77,163,255,.28);
-    }
-
-    .support-thread{
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      max-height:560px;
-      overflow:auto;
-      padding-right:4px;
-    }
-
-    .msg-card{
-      border:1px solid var(--line);
-      border-radius:18px;
-      background:rgba(255,255,255,.03);
-      padding:14px;
-    }
-
-    .msg-card.agent{
-      border-color:rgba(44,204,138,.20);
-      background:rgba(44,204,138,.06);
-    }
-
-    .msg-card.admin{
-      border-color:rgba(77,163,255,.20);
-      background:rgba(77,163,255,.06);
-    }
-
-    .msg-meta{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-      margin-bottom:8px;
-      flex-wrap:wrap;
-    }
-
-    .msg-badges{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-
-    .msg-badge{
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.05);
-      padding:6px 8px;
-      border-radius:999px;
-      font-size:11px;
-      font-weight:800;
-    }
-
-    .support-summary{
-      display:grid;
-      grid-template-columns:repeat(4,minmax(0,1fr));
-      gap:10px;
-      margin-bottom:14px;
-    }
-
-    .support-kpi{
-      border:1px solid var(--line);
-      border-radius:16px;
-      background:rgba(255,255,255,.03);
-      padding:12px;
-    }
-
-    .support-kpi .k{
-      color:var(--muted);
-      font-size:11px;
-      text-transform:uppercase;
-      letter-spacing:.12em;
-      font-weight:800;
-    }
-
-    .support-kpi .v{
-      font-size:24px;
-      font-weight:900;
-      margin-top:6px;
-    }
-
-    .reply-actions{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-top:10px;
-    }
-
-    @media (max-width: 1000px){
-      .support-shell{
-        grid-template-columns:1fr;
-      }
-    }
-
-    @media (max-width: 700px){
-      .support-summary{
-        grid-template-columns:repeat(2,minmax(0,1fr));
-      }
     }
 
     @keyframes pulseDot{
@@ -1244,24 +1026,7 @@
         </section>
 
         <section id="leaderboard" class="section">
-          <div class="card">
-            <div class="card-body">
-              <div class="leader-topbar">
-                <div>
-                  <div class="label">Recruitment Leaderboard</div>
-                  <h3 style="margin:6px 0 6px;">Performance, rivalry, and competition</h3>
-                  <div class="leader-subnote">Live rankings from your real agent leaderboard route. Switch between week, month, and all-time views.</div>
-                </div>
-                <div class="toolbar">
-                  <button class="btn btn-soft leader-btn active" data-period="week">This Week</button>
-                  <button class="btn btn-soft leader-btn" data-period="month">This Month</button>
-                  <button class="btn btn-soft leader-btn" data-period="all">All Time</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="metric-hero">
+          <div class="grid-3">
             <div class="card stat">
               <div class="stat-top">
                 <div>
@@ -1292,86 +1057,71 @@
                 </div>
                 <div class="stat-ico">★</div>
               </div>
-              <div class="stat-sub" id="rankAllTimeSub">Real recruiter comparison</div>
+              <div class="stat-sub">Real recruiter data from live route</div>
             </div>
           </div>
 
-          <div class="leaderboard-stack">
-            <div class="leaderboard-panels">
-              <div class="card">
-                <div class="card-header">
-                  <h3>Top Driver Recruiters</h3>
-                  <div class="pill">Drivers</div>
-                </div>
-                <div class="card-body">
-                  <div class="table-wrap compact-table">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Rank</th>
-                          <th>Agent</th>
-                          <th>Drivers</th>
-                          <th>Top Town</th>
-                        </tr>
-                      </thead>
-                      <tbody id="driverLeaderTable">
-                        <tr><td colspan="4" class="muted">No driver leaderboard data yet.</td></tr>
-                      </tbody>
-                    </table>
-                  </div>
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-header">
+                <h3>Recruitment Leaderboard</h3>
+                <div class="toolbar">
+                  <button class="btn btn-soft leader-btn active" data-period="week">This Week</button>
+                  <button class="btn btn-soft leader-btn" data-period="month">This Month</button>
+                  <button class="btn btn-soft leader-btn" data-period="all">All Time</button>
                 </div>
               </div>
+              <div class="card-body">
+                <div class="grid-2">
+                  <div>
+                    <h4 style="margin:0 0 12px;">Top Driver Recruiters</h4>
+                    <div class="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Rank</th>
+                            <th>Agent</th>
+                            <th>Drivers</th>
+                            <th>Top Town</th>
+                          </tr>
+                        </thead>
+                        <tbody id="driverLeaderTable">
+                          <tr><td colspan="4" class="muted">No driver leaderboard data yet.</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
 
-              <div class="card">
-                <div class="card-header">
-                  <h3>Top Client Recruiters</h3>
-                  <div class="pill">Clients</div>
-                </div>
-                <div class="card-body">
-                  <div class="table-wrap compact-table">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Rank</th>
-                          <th>Agent</th>
-                          <th>Clients</th>
-                          <th>Top Town</th>
-                        </tr>
-                      </thead>
-                      <tbody id="clientLeaderTable">
-                        <tr><td colspan="4" class="muted">No client leaderboard data yet.</td></tr>
-                      </tbody>
-                    </table>
+                  <div>
+                    <h4 style="margin:0 0 12px;">Top Client Recruiters</h4>
+                    <div class="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Rank</th>
+                            <th>Agent</th>
+                            <th>Clients</th>
+                            <th>Top Town</th>
+                          </tr>
+                        </thead>
+                        <tbody id="clientLeaderTable">
+                          <tr><td colspan="4" class="muted">No client leaderboard data yet.</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="leaderboard-side">
-              <div class="card">
-                <div class="card-header">
-                  <h3>Rival Tracker</h3>
-                  <div class="pill">Motivation</div>
-                </div>
-                <div class="card-body">
-                  <div class="list compact-list" id="rivalTrackerList">
-                    <div class="muted">Waiting for leaderboard...</div>
-                  </div>
-                </div>
+            <div class="card">
+              <div class="card-header">
+                <h3>Rival Tracker</h3>
+                <div class="pill">Motivation</div>
               </div>
-
-              <div class="card">
-                <div class="card-header">
-                  <h3>Achievement Badges</h3>
-                  <div class="pill">Gamified</div>
-                </div>
-                <div class="card-body">
-                  <div class="badge-grid" id="achievementGrid">
-                    <div class="achievement locked"><div class="a-ico">🏁</div><div class="title">First Driver</div><div class="sub">Register your first driver</div></div>
-                    <div class="achievement locked"><div class="a-ico">🔥</div><div class="title">10 Clients</div><div class="sub">Reach 10 total clients</div></div>
-                    <div class="achievement locked"><div class="a-ico">🚘</div><div class="title">50 Drivers</div><div class="sub">Reach 50 total drivers</div></div>
-                    <div class="achievement locked"><div class="a-ico">👑</div><div class="title">Top 3</div><div class="sub">Enter top 3 on any leaderboard</div></div>
-                  </div>
+              <div class="card-body">
+                <div class="list" id="rivalTrackerList">
+                  <div class="muted">Waiting for leaderboard...</div>
                 </div>
               </div>
             </div>
@@ -1389,7 +1139,7 @@
                   <div class="v" id="compDrivers50">0 / 50</div>
                 </div>
                 <div class="progress-wrap"><div class="progress-bar" id="barDrivers50"></div></div>
-                <div class="list compact-list" id="closeDrivers50" style="margin-top:12px;">
+                <div class="list" id="closeDrivers50" style="margin-top:12px;">
                   <div class="muted">No close agents yet.</div>
                 </div>
               </div>
@@ -1406,7 +1156,7 @@
                   <div class="v" id="compActivatedDrivers50">0 / 50</div>
                 </div>
                 <div class="progress-wrap"><div class="progress-bar" id="barActivatedDrivers50"></div></div>
-                <div class="list compact-list" id="closeActivatedDrivers50" style="margin-top:12px;">
+                <div class="list" id="closeActivatedDrivers50" style="margin-top:12px;">
                   <div class="muted">No close agents yet.</div>
                 </div>
               </div>
@@ -1423,37 +1173,38 @@
                   <div class="v" id="compActivatedClients150">0 / 150</div>
                 </div>
                 <div class="progress-wrap"><div class="progress-bar" id="barActivatedClients150"></div></div>
-                <div class="list compact-list" id="closeActivatedClients150" style="margin-top:12px;">
+                <div class="list" id="closeActivatedClients150" style="margin-top:12px;">
                   <div class="muted">No close agents yet.</div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Achievement Badges</h3>
+              <div class="pill">Gamified</div>
+            </div>
+            <div class="card-body">
+              <div class="badge-grid" id="achievementGrid">
+                <div class="achievement locked"><div class="a-ico">🏁</div><div class="title">First Driver</div><div class="sub">Register your first driver</div></div>
+                <div class="achievement locked"><div class="a-ico">🔥</div><div class="title">10 Clients</div><div class="sub">Reach 10 total clients</div></div>
+                <div class="achievement locked"><div class="a-ico">🚘</div><div class="title">50 Drivers</div><div class="sub">Reach 50 total drivers</div></div>
+                <div class="achievement locked"><div class="a-ico">👑</div><div class="title">Top 3</div><div class="sub">Enter top 3 on any leaderboard</div></div>
               </div>
             </div>
           </div>
         </section>
 
         <section id="notifications" class="section">
-          <div class="support-summary">
-            <div class="support-kpi"><div class="k">Total</div><div class="v" id="supportTotal">0</div></div>
-            <div class="support-kpi"><div class="k">Unread</div><div class="v" id="supportUnread">0</div></div>
-            <div class="support-kpi"><div class="k">Support</div><div class="v" id="supportSupport">0</div></div>
-            <div class="support-kpi"><div class="k">System</div><div class="v" id="supportSystem">0</div></div>
-          </div>
-
-          <div class="support-shell">
+          <div class="grid-2">
             <div class="card">
               <div class="card-header">
-                <h3>Support & Notifications</h3>
+                <h3>Inbox & Notifications</h3>
                 <div class="pill" id="inboxMeta">Messages</div>
               </div>
               <div class="card-body">
-                <div class="support-tabs">
-                  <button class="support-tab active" data-support-filter="all">All</button>
-                  <button class="support-tab" data-support-filter="unread">Unread</button>
-                  <button class="support-tab" data-support-filter="support">Support</button>
-                  <button class="support-tab" data-support-filter="system">System</button>
-                </div>
-
-                <div class="support-thread" id="fullMessageList">
+                <div class="list" id="fullMessageList">
                   <div class="muted">Loading inbox...</div>
                 </div>
               </div>
@@ -1461,38 +1212,29 @@
 
             <div class="card">
               <div class="card-header">
-                <h3>Send Support Message</h3>
-                <div class="pill">Two-way</div>
+                <h3>Support Center</h3>
+                <div class="pill">Live-ready</div>
               </div>
               <div class="card-body">
-                <form id="supportForm" class="form-grid">
-                  <select class="select" id="supportCategory" name="category">
-                    <option value="General">General</option>
-                    <option value="Registration Issue">Registration Issue</option>
-                    <option value="Payment / Wallet">Payment / Wallet</option>
-                    <option value="Driver Problem">Driver Problem</option>
-                    <option value="Client Problem">Client Problem</option>
-                    <option value="Technical Bug">Technical Bug</option>
-                  </select>
-
-                  <select class="select" id="supportPriority" name="priority">
-                    <option value="NORMAL">Normal</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </select>
-
-                  <input class="field full" id="supportSubject" name="subject" placeholder="Subject" required />
-                  <textarea class="textarea full" id="supportMessage" name="message" placeholder="Describe the issue or reply..." required></textarea>
-                  <input type="hidden" id="supportReplyToId" value="" />
-
-                  <div class="full reply-actions">
-                    <button class="btn btn-primary" type="submit">Send Message</button>
-                    <button class="btn btn-soft" type="button" id="supportClearReply">Clear Reply Target</button>
+                <div class="list">
+                  <div class="list-item">
+                    <div class="stack">
+                      <div class="title">Admin messages are working</div>
+                      <div class="sub">Agents can already read notices and mark them as read using the current message routes.</div>
+                    </div>
                   </div>
-                </form>
-
-                <div style="margin-top:14px" class="mini-note" id="supportReplyHint">
-                  New support message.
+                  <div class="list-item">
+                    <div class="stack">
+                      <div class="title">Client activity module</div>
+                      <div class="sub">This section is reserved for future admin updates about client activity tied to your registrations.</div>
+                    </div>
+                  </div>
+                  <div class="list-item">
+                    <div class="stack">
+                      <div class="title">Driver trip module</div>
+                      <div class="sub">This section is reserved for driver trip counts and payout-linked visibility once that backend feed is added.</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2837,291 +2579,3 @@
   });
 })();
 </script>
-
-
-<script>
-(function(){
-  function num(v){ return Number(v || 0); }
-
-  function patchOverviewFromLeaderboard(){
-    try{
-      const driverBody = document.getElementById('driverLeaderTable');
-      const clientBody = document.getElementById('clientLeaderTable');
-      const hero = document.getElementById('heroTitle');
-      if(!driverBody || !clientBody || !hero) return;
-
-      const myName = (hero.textContent || '').replace(/^Welcome,\s*/i, '').trim().toLowerCase();
-
-      function findMyCount(tbody){
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        for(const tr of rows){
-          const tds = tr.querySelectorAll('td');
-          if(tds.length < 4) continue;
-          const name = (tds[1].textContent || '').trim().toLowerCase();
-          const count = parseInt((tds[2].textContent || '0').trim(), 10) || 0;
-          if(name === myName) return count;
-        }
-        return 0;
-      }
-
-      const myDrivers = findMyCount(driverBody);
-      const myClients = findMyCount(clientBody);
-
-      const heroDrivers = document.getElementById('heroDrivers');
-      const heroClients = document.getElementById('heroClients');
-
-      if(heroDrivers && num(heroDrivers.textContent) === 0 && myDrivers > 0){
-        heroDrivers.textContent = String(myDrivers);
-      }
-      if(heroClients && num(heroClients.textContent) === 0 && myClients > 0){
-        heroClients.textContent = String(myClients);
-      }
-    }catch(e){
-      console.error('patchOverviewFromLeaderboard failed', e);
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    setTimeout(patchOverviewFromLeaderboard, 500);
-    setTimeout(patchOverviewFromLeaderboard, 1200);
-
-    document.querySelectorAll('.leader-btn').forEach(btn => {
-      btn.addEventListener('click', function(){
-        setTimeout(patchOverviewFromLeaderboard, 300);
-        setTimeout(patchOverviewFromLeaderboard, 900);
-      });
-    });
-
-    const refreshBtn = document.getElementById('refreshBtn');
-    if(refreshBtn){
-      refreshBtn.addEventListener('click', function(){
-        setTimeout(patchOverviewFromLeaderboard, 500);
-        setTimeout(patchOverviewFromLeaderboard, 1200);
-      });
-    }
-  });
-})();
-</script>
-
-
-
-<script>
-(function(){
-  let supportFilter = 'all';
-  let supportRows = [];
-
-  function esc(v){
-    return String(v ?? "")
-      .replace(/&/g,"&amp;")
-      .replace(/</g,"&lt;")
-      .replace(/>/g,"&gt;")
-      .replace(/"/g,"&quot;");
-  }
-
-  function shortDate(v){
-    if(!v) return '-';
-    const d = new Date(v);
-    if(isNaN(d.getTime())) return String(v);
-    return d.toLocaleString();
-  }
-
-  async function supportGet(url, opts={}){
-    const r = await fetch(url, {credentials:'same-origin', ...opts});
-    const txt = await r.text();
-    let data = {};
-    try{ data = txt ? JSON.parse(txt) : {}; }catch(_){}
-    if(!r.ok){
-      throw new Error(data.error || data.message || txt || ('Request failed: ' + r.status));
-    }
-    return data;
-  }
-
-  function classifyMessage(row){
-    const subject = String(row.subject || '').toUpperCase();
-    if(subject.includes('[AGENT]') || subject.includes('SUPPORT')) return 'support';
-    return 'system';
-  }
-
-  function whoSent(row){
-    const subject = String(row.subject || '').toUpperCase();
-    if(subject.includes('[AGENT]')) return 'agent';
-    if(subject.includes('[ADMIN_REPLY]')) return 'admin';
-    return 'admin';
-  }
-
-  function filteredRows(){
-    const rows = Array.isArray(supportRows) ? supportRows : [];
-    if(supportFilter === 'all') return rows;
-    if(supportFilter === 'unread') return rows.filter(r => String(r.status || '').toUpperCase() !== 'READ');
-    if(supportFilter === 'support') return rows.filter(r => classifyMessage(r) === 'support');
-    if(supportFilter === 'system') return rows.filter(r => classifyMessage(r) === 'system');
-    return rows;
-  }
-
-  function updateSummary(summary){
-    const s = summary || {};
-    const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = String(v || 0); };
-    set('supportTotal', s.total || 0);
-    set('supportUnread', s.unread || 0);
-    set('supportSupport', s.support || 0);
-    set('supportSystem', s.system || 0);
-  }
-
-  function renderSupportRows(){
-    const box = document.getElementById('fullMessageList');
-    const inboxMeta = document.getElementById('inboxMeta');
-    if(!box) return;
-
-    const rows = filteredRows();
-    if(inboxMeta) inboxMeta.textContent = rows.length + ' messages';
-
-    if(!rows.length){
-      box.innerHTML = '<div class="muted">No messages in this filter.</div>';
-      return;
-    }
-
-    box.innerHTML = rows.map(r => {
-      const sender = whoSent(r);
-      const msgType = classifyMessage(r);
-      const isRead = String(r.status || '').toUpperCase() === 'READ';
-      return `
-        <div class="msg-card ${sender}">
-          <div class="msg-meta">
-            <div>
-              <div class="title">${esc(r.subject || 'Message')}</div>
-              <div class="sub">${esc(shortDate(r.created_at))}</div>
-            </div>
-            <div class="msg-badges">
-              <span class="msg-badge">${esc(sender.toUpperCase())}</span>
-              <span class="msg-badge">${esc(msgType.toUpperCase())}</span>
-              <span class="msg-badge">${esc((r.status || 'OPEN').toUpperCase())}</span>
-            </div>
-          </div>
-
-          <div class="sub" style="white-space:pre-wrap">${esc(r.message || '')}</div>
-
-          <div class="reply-actions">
-            ${!isRead ? `<button class="btn btn-soft" onclick="window.markSupportRead('${esc(r.id || '')}')">Mark Read</button>` : ''}
-            <button class="btn btn-soft" onclick="window.replySupportMsg('${esc(r.id || '')}', '${esc((r.subject || '').replace(/'/g, '&#39;'))}')">Reply</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  async function loadSupportSummary(){
-    try{
-      const data = await supportGet('/api/agent/messages/summary');
-      updateSummary(data.summary || {});
-    }catch(e){
-      console.error('support summary failed', e);
-    }
-  }
-
-  async function loadSupportInbox(){
-    try{
-      const data = await supportGet('/api/agent/messages');
-      supportRows = Array.isArray(data.rows) ? data.rows : [];
-      renderSupportRows();
-    }catch(e){
-      console.error('support inbox failed', e);
-      const box = document.getElementById('fullMessageList');
-      if(box) box.innerHTML = '<div class="muted">Could not load support inbox.</div>';
-    }
-  }
-
-  async function refreshSupport(){
-    await Promise.allSettled([loadSupportSummary(), loadSupportInbox()]);
-  }
-
-  window.markSupportRead = async function(messageId){
-    try{
-      await supportGet('/api/agent/messages/' + encodeURIComponent(messageId) + '/read', {
-        method:'POST'
-      });
-      await refreshSupport();
-    }catch(e){
-      alert(e.message);
-    }
-  };
-
-  window.replySupportMsg = function(messageId, subject){
-    const replyId = document.getElementById('supportReplyToId');
-    const sub = document.getElementById('supportSubject');
-    const hint = document.getElementById('supportReplyHint');
-    if(replyId) replyId.value = messageId;
-    if(sub && !sub.value.trim()) sub.value = 'Re: ' + subject.replace(/^Re:\s*/i, '');
-    if(hint) hint.textContent = 'Replying to message #' + messageId;
-    const msg = document.getElementById('supportMessage');
-    if(msg) msg.focus();
-  };
-
-  async function sendSupportMessage(ev){
-    ev.preventDefault();
-    const category = document.getElementById('supportCategory');
-    const priority = document.getElementById('supportPriority');
-    const subject = document.getElementById('supportSubject');
-    const message = document.getElementById('supportMessage');
-    const replyTo = document.getElementById('supportReplyToId');
-    const hint = document.getElementById('supportReplyHint');
-
-    const payload = {
-      category: category ? category.value : 'General',
-      priority: priority ? priority.value : 'NORMAL',
-      subject: subject ? subject.value.trim() : '',
-      message: message ? message.value.trim() : '',
-      reply_to_id: replyTo ? replyTo.value : ''
-    };
-
-    try{
-      await supportGet('/api/agent/messages/send', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-      });
-
-      if(subject) subject.value = '';
-      if(message) message.value = '';
-      if(replyTo) replyTo.value = '';
-      if(hint) hint.textContent = 'New support message.';
-      await refreshSupport();
-    }catch(e){
-      alert(e.message);
-    }
-  }
-
-  function bindSupportTabs(){
-    document.querySelectorAll('[data-support-filter]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('[data-support-filter]').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        supportFilter = btn.dataset.supportFilter || 'all';
-        renderSupportRows();
-      });
-    });
-  }
-
-  function bindSupportForm(){
-    const form = document.getElementById('supportForm');
-    const clearBtn = document.getElementById('supportClearReply');
-    const hint = document.getElementById('supportReplyHint');
-    const replyTo = document.getElementById('supportReplyToId');
-
-    if(form) form.addEventListener('submit', sendSupportMessage);
-    if(clearBtn){
-      clearBtn.addEventListener('click', () => {
-        if(replyTo) replyTo.value = '';
-        if(hint) hint.textContent = 'New support message.';
-      });
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded', function(){
-    bindSupportTabs();
-    bindSupportForm();
-    setTimeout(refreshSupport, 400);
-    setInterval(refreshSupport, 15000);
-  });
-})();
-</script>
-

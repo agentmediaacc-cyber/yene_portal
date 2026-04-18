@@ -650,25 +650,14 @@ document.getElementById("tabs").addEventListener("click", (e)=>{
 async function loadOverview(){
   const j = await apiGET("/api/admin/overview");
   const d = j.data || {};
-
   document.getElementById("k_agents_total").textContent = safe(d.agents_total, "0");
   document.getElementById("k_agents_meta").textContent =
     `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Blocked ${safe(d.agents_blocked,0)}`;
-
-  const driverCount = (Array.isArray(drivers) && drivers.length) ? drivers.length : safe(d.drivers_total, "0");
-  const clientCount = (Array.isArray(clients) && clients.length) ? clients.length : safe(d.clients_total, "0");
-
-  document.getElementById("k_drivers_total").textContent = String(driverCount);
-  document.getElementById("k_clients_total").textContent = String(clientCount);
+  document.getElementById("k_drivers_total").textContent = safe(d.drivers_total, "0");
+  document.getElementById("k_clients_total").textContent = safe(d.clients_total, "0");
   document.getElementById("k_total_paid").textContent = fmtMoney(d.total_paid);
 
   const body = document.getElementById("recentActivity");
-
-  if (Array.isArray(drivers) && drivers.length || Array.isArray(clients) && clients.length) {
-    syncRecentActivityFromLoadedData();
-    return;
-  }
-
   const rows = d.recent_activity || [];
   body.innerHTML = rows.length ? rows.map(r => `
     <tr>
@@ -704,44 +693,14 @@ async function loadAgents(){
 
 async function loadDrivers(){
   const j = await apiGET("/api/admin/drivers");
-
-  if (Array.isArray(j?.data)) {
-    drivers = j.data;
-  } else if (Array.isArray(j?.rows)) {
-    drivers = j.rows;
-  } else {
-    drivers = [];
-  }
-
+  drivers = j.data || [];
   renderDrivers();
-
-  const k = document.getElementById("k_drivers_total");
-  if (k) {
-    k.textContent = String(drivers.length);
-  }
-
-  syncRecentActivityFromLoadedData();
 }
 
 async function loadClients(){
   const j = await apiGET("/api/admin/clients");
-
-  if (Array.isArray(j?.data)) {
-    clients = j.data;
-  } else if (Array.isArray(j?.rows)) {
-    clients = j.rows;
-  } else {
-    clients = [];
-  }
-
+  clients = j.data || [];
   renderClients();
-
-  const k = document.getElementById("k_clients_total");
-  if (k) {
-    k.textContent = String(clients.length);
-  }
-
-  syncRecentActivityFromLoadedData();
 }
 
 async function loadFinance(){
@@ -825,51 +784,6 @@ function renderDrivers(){
       <td>${esc(fmtDate(d.created_at))}</td>
     </tr>
   `).join("") : `<tr><td colspan="6" class="muted">No drivers found</td></tr>`;
-}
-
-
-function syncRecentActivityFromLoadedData(){
-  const body = document.getElementById("recentActivity");
-  if(!body) return;
-
-  const activity = [];
-
-  for (const d of (drivers || [])) {
-    activity.push({
-      created_at: d.created_at,
-      type: "Driver",
-      name: d.full_name || d.name || "",
-      phone: d.phone || d.phone_number || "",
-      town: d.town || "",
-      agent: d.recruiter_name || ""
-    });
-  }
-
-  for (const c of (clients || [])) {
-    activity.push({
-      created_at: c.created_at,
-      type: "Client",
-      name: c.full_name || c.name || "",
-      phone: c.phone || c.phone_number || "",
-      town: c.town || "",
-      agent: c.recruiter_name || ""
-    });
-  }
-
-  activity.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
-
-  const rows = activity.slice(0, 25);
-
-  body.innerHTML = rows.length ? rows.map(r => `
-    <tr>
-      <td>${esc(fmtDate(r.created_at))}</td>
-      <td>${esc(safe(r.type))}</td>
-      <td>${esc(safe(r.name))}</td>
-      <td>${esc(safe(r.phone))}</td>
-      <td>${esc(safe(r.town))}</td>
-      <td>${esc(safe(r.agent))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="6" class="muted">No activity yet</td></tr>`;
 }
 
 function renderClients(){

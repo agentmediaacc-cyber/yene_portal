@@ -127,7 +127,7 @@ def register_admin_final_routes(app, sb_admin):
         return jsonify({"ok": True, "message": "Client updated"})
 
     @app.post("/api/admin/agent/delete")
-    def admin_delete_agent_routes():
+    def admin_delete_agent():
         data = request.get_json(force=True) or {}
         agent_id = str(data.get("id") or "").strip()
         if not agent_id:
