@@ -179,8 +179,12 @@
             <div class="miniValue">{{ stats.clients_registered }}</div>
           </div>
           <div class="miniCard">
-            <div class="miniLabel">Pending Agents</div>
-            <div class="miniValue">{{ stats.agents_pending }}</div>
+            <div class="miniLabel">This Week</div>
+            <div class="miniValue">{{ stats.registrations_this_week }}</div>
+          </div>
+          <div class="miniCard">
+            <div class="miniLabel">Wallet Credits</div>
+            <div class="miniValue">N$ {{ '%.0f'|format(stats.wallet_credits or 0) }}</div>
           </div>
         </div>
       </div>
@@ -206,6 +210,55 @@
             <div class="ruleIcon">📍</div>
             <div><strong>Regional growth model</strong><br>Build teams by town, region, and local network leadership.</div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sectionGrid">
+      <div class="panel">
+        <div class="title">Top Performing Agents</div>
+        <div class="subtitle">Live leaderboard preview from current driver and client ownership.</div>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr><th>Agent</th><th>Town</th><th>Drivers</th><th>Clients</th><th>Score</th></tr>
+            </thead>
+            <tbody>
+              {% if stats.leaderboard %}
+              {% for row in stats.leaderboard %}
+              <tr>
+                <td>{{ row.name }}</td>
+                <td>{{ row.town }}</td>
+                <td>{{ row.drivers }}</td>
+                <td>{{ row.clients }}</td>
+                <td>{{ row.score }}</td>
+              </tr>
+              {% endfor %}
+              {% else %}
+              <tr><td colspan="5">No leaderboard activity yet.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="title">Remote Jobs & Task Alerts</div>
+        <div class="subtitle">Current admin-posted opportunities for agents.</div>
+        <div class="updates">
+          {% if stats.job_alerts %}
+          {% for job in stats.job_alerts %}
+          <div class="updateItem">
+            <div class="updateDate">{{ job.town }} • {{ job.status }}</div>
+            <div class="updateText"><strong>{{ job.title }}</strong><br>{{ job.description }}</div>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div class="updateItem">
+            <div class="updateDate">No active alerts</div>
+            <div class="updateText">New task alerts will appear here when admin publishes them.</div>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>

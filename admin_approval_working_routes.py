@@ -169,8 +169,9 @@ def register_admin_approval_working_routes(app, sb_admin):
         out = []
         for r in rows:
             status = str(r.get("status") or "").upper()
-            if status in ("ACTIVE", "APPROVED", "BLOCKED"):
+            if status in ("ACTIVE", "APPROVED"):
                 continue
+            auth_id = r.get("auth_id") or r.get("user_id")
             out.append({
                 "id": r.get("id"),
                 "full_name": r.get("full_name") or r.get("username") or r.get("email"),
@@ -180,5 +181,10 @@ def register_admin_approval_working_routes(app, sb_admin):
                 "region": r.get("region"),
                 "status": r.get("status") or "PENDING",
                 "created_at": r.get("created_at"),
+                "auth_linked": bool(auth_id),
+                "must_change_password": bool(r.get("must_change_password")),
+                "temp_password": r.get("temp_password"),
+                "last_reset_at": r.get("last_reset_at"),
+                "reset_by_admin": r.get("reset_by_admin"),
             })
         return jsonify({"ok": True, "rows": out})

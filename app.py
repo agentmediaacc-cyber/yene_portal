@@ -172,7 +172,7 @@ def _clean_status(value):
 
 def _is_active_profile(profile):
     status = _clean_status(profile.get("status"))
-    return not status or status in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
+    return not status or status in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED", "PENDING_APPROVAL"}
 
 def _role_is_admin(profile):
     return str(profile.get("role") or "").strip().upper() == "ADMIN"
@@ -220,6 +220,15 @@ def agent_dashboard():
         if _require_admin():
             return redirect("/dashboard/admin")
         return redirect("/login")
+
+    try:
+        email = (session.get("agent_email") or session.get("email") or "").strip().lower()
+        profile = _lookup_profile("agent_profiles", email) if email else None
+        if profile and profile.get("must_change_password"):
+            return redirect("/agent/change-password")
+    except Exception:
+        pass
+
     return render_template("agent_dashboard.html")
 
 
@@ -312,15 +321,34 @@ def homepage_stats(sb_admin):
     ):
         filters = filters or {}
         try:
-            q = sb_admin.table(table).select(cols)
-            for k, v in filters.items():
-                q = q.eq(k, v)
-            if order_col:
-                q = q.order(order_col, desc=desc)
-            if limit:
-                q = q.limit(limit)
-            res = q.execute()
-            return res.data or []
+            all_rows = []
+            page_size = 1000
+            start = 0
+            remaining = int(limit) if limit else None
+
+            while True:
+                batch_size = page_size if remaining is None else min(page_size, remaining)
+                if batch_size <= 0:
+                    break
+
+                q = sb_admin.table(table).select(cols).range(start, start + batch_size - 1)
+                for k, v in filters.items():
+                    q = q.eq(k, v)
+                if order_col:
+                    q = q.order(order_col, desc=desc)
+
+                res = q.execute()
+                batch = res.data or []
+                all_rows.extend(batch)
+
+                if len(batch) < batch_size:
+                    break
+
+                start += batch_size
+                if remaining is not None:
+                    remaining -= len(batch)
+
+            return all_rows
         except Exception:
             return []
 
@@ -332,6 +360,18 @@ def homepage_stats(sb_admin):
 
     def _pending(v):
         return _clean(v).upper() in ("PENDING", "PENDING_APPROVAL", "UNDER_REVIEW")
+
+    def _created_this_week(row):
+        raw = _clean(row.get("created_at"))
+        if not raw:
+            return False
+        try:
+            created = datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+        except Exception:
+            return False
+        today = datetime.utcnow().date()
+        week_start = today - timedelta(days=today.weekday())
+        return week_start <= created <= today
 
     def _official_updates():
         rows = _safe_select("broadcasts", {}, "*", 10, "created_at", True)
@@ -428,6 +468,8 @@ def homepage_stats(sb_admin):
         agents = _safe_select("agents", {}, "*", 10000)
     drivers = _safe_select("drivers", {}, "*", 10000, "created_at", True)
     clients = _safe_select("clients", {}, "*", 10000, "created_at", True)
+    jobs = _safe_select("remote_jobs", {}, "*", 8, "created_at", True)
+    ledger = _safe_select("agent_wallet_ledger", {}, "*", 10000, "created_at", True)
     recent = []
     for d in drivers[:10]:
         recent.append({
@@ -449,6 +491,66 @@ def homepage_stats(sb_admin):
 
     active_agents = [r for r in agents if _approved(r.get("status")) or not _clean(r.get("status"))]
     pending_agents = [r for r in agents if _pending(r.get("status"))]
+    approved_drivers = [r for r in drivers if _approved(r.get("status"))]
+    approved_clients = [r for r in clients if _approved(r.get("status"))]
+    weekly_registrations = len([r for r in drivers + clients if _created_this_week(r)])
+
+    leaderboard = []
+    for agent in active_agents:
+        ids = {
+            _clean(agent.get("id")),
+            _clean(agent.get("auth_id")),
+            _clean(agent.get("user_id")),
+            _clean(agent.get("email")).lower(),
+        }
+        ids.discard("")
+        agent_drivers = [
+            r for r in drivers
+            if _clean(r.get("recruiter_agent_id")) in ids
+            or _clean(r.get("agent_id")) in ids
+            or _clean(r.get("agent_auth_id")) in ids
+            or _clean(r.get("recruiter_email")).lower() in ids
+        ]
+        agent_clients = [
+            r for r in clients
+            if _clean(r.get("recruiter_agent_id")) in ids
+            or _clean(r.get("agent_id")) in ids
+            or _clean(r.get("agent_auth_id")) in ids
+            or _clean(r.get("recruiter_email")).lower() in ids
+        ]
+        score = len(agent_drivers) * 3 + len(agent_clients) * 2
+        if score:
+            leaderboard.append({
+                "name": _clean(agent.get("full_name") or agent.get("username") or agent.get("email")) or "Agent",
+                "town": _clean(agent.get("town") or agent.get("operation_region") or agent.get("region")) or "Namibia",
+                "drivers": len(agent_drivers),
+                "clients": len(agent_clients),
+                "score": score,
+            })
+    leaderboard.sort(key=lambda item: item["score"], reverse=True)
+
+    wallet_credits = sum(
+        float(x.get("amount") or 0)
+        for x in ledger
+        if _clean(x.get("entry_type") or x.get("txn_type") or x.get("type")).lower() in {"credit", "bonus", "earning"}
+    )
+
+    job_alerts = []
+    for job in jobs:
+        status = _clean(job.get("status") or "ACTIVE").upper()
+        if status in {"CLOSED", "ARCHIVED", "INACTIVE"}:
+            continue
+        title = _clean(job.get("title"))
+        description = _clean(job.get("description") or job.get("details"))
+        if title or description:
+            job_alerts.append({
+                "id": _clean(job.get("id")),
+                "title": title or "YENE remote task",
+                "town": _clean(job.get("town") or job.get("region")) or "Namibia",
+                "description": description,
+                "status": status.title(),
+                "created_at": _clean(job.get("created_at")),
+            })
     regions = set()
     for row in agents + drivers + clients:
         region = _clean(row.get("region") or row.get("operation_region"))
@@ -462,10 +564,18 @@ def homepage_stats(sb_admin):
             "agents_total": len(agents),
             "agents_active": len(active_agents),
             "agents_pending": len(pending_agents),
-            "drivers": len(drivers),
-            "drivers_registered": len(drivers),
-            "clients": len(clients),
-            "clients_registered": len(clients),
+            "drivers": len(approved_drivers),
+            "drivers_registered": len(approved_drivers),
+            "drivers_total": len(drivers),
+            "drivers_pending": len([r for r in drivers if _pending(r.get("status"))]),
+            "clients": len(approved_clients),
+            "clients_registered": len(approved_clients),
+            "clients_total": len(clients),
+            "clients_pending": len([r for r in clients if _pending(r.get("status"))]),
+            "registrations_this_week": weekly_registrations,
+            "wallet_credits": round(wallet_credits, 2),
+            "leaderboard": leaderboard[:5],
+            "job_alerts": job_alerts[:5],
             "recent_activity": recent[:12],
         },
         "updates": _official_updates(),

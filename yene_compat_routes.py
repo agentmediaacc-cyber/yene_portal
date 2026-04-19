@@ -49,27 +49,67 @@ def register_yene_compat_routes(app, sb_admin):
     def _safe_select(table, filters=None, cols="*", limit=None, order_col=None, desc=False):
         filters = filters or {}
         try:
-            q = sb_admin.table(table).select(cols)
-            for k, v in filters.items():
-                q = q.eq(k, v)
-            if order_col:
-                q = q.order(order_col, desc=desc)
-            if limit:
-                q = q.limit(limit)
-            rows = q.execute().data or []
-            _debug("_safe_select", table=table, rows=len(rows))
-            return rows
+            all_rows = []
+            page_size = 1000
+            start = 0
+            remaining = int(limit) if limit else None
+
+            while True:
+                batch_size = page_size if remaining is None else min(page_size, remaining)
+                if batch_size <= 0:
+                    break
+
+                q = sb_admin.table(table).select(cols).range(start, start + batch_size - 1)
+                for k, v in filters.items():
+                    q = q.eq(k, v)
+                if order_col:
+                    q = q.order(order_col, desc=desc)
+
+                res = q.execute()
+                batch = res.data or []
+                _debug("_safe_select_batch", table=table, start=start, rows=len(batch))
+                all_rows.extend(batch)
+
+                if len(batch) < batch_size:
+                    break
+
+                start += batch_size
+                if remaining is not None:
+                    remaining -= len(batch)
+
+            _debug("_safe_select", table=table, rows=len(all_rows))
+            return all_rows
         except Exception as e:
             if order_col:
                 try:
-                    q = sb_admin.table(table).select(cols)
-                    for k, v in filters.items():
-                        q = q.eq(k, v)
-                    if limit:
-                        q = q.limit(limit)
-                    rows = q.execute().data or []
-                    _debug("_safe_select_retry_no_order", table=table, rows=len(rows))
-                    return rows
+                    all_rows = []
+                    page_size = 1000
+                    start = 0
+                    remaining = int(limit) if limit else None
+
+                    while True:
+                        batch_size = page_size if remaining is None else min(page_size, remaining)
+                        if batch_size <= 0:
+                            break
+
+                        q = sb_admin.table(table).select(cols).range(start, start + batch_size - 1)
+                        for k, v in filters.items():
+                            q = q.eq(k, v)
+
+                        res = q.execute()
+                        batch = res.data or []
+                        _debug("_safe_select_retry_no_order_batch", table=table, start=start, rows=len(batch))
+                        all_rows.extend(batch)
+
+                        if len(batch) < batch_size:
+                            break
+
+                        start += batch_size
+                        if remaining is not None:
+                            remaining -= len(batch)
+
+                    _debug("_safe_select_retry_no_order", table=table, rows=len(all_rows))
+                    return all_rows
                 except Exception:
                     pass
             app.logger.warning("Supabase select failed table=%s error=%s", table, e)
@@ -152,6 +192,50 @@ def register_yene_compat_routes(app, sb_admin):
         rows = _safe_select("agent_profiles", {"email": email}, "*", 1)
         return rows[0] if rows else None
 
+    def _temp_password_for_agent(agent):
+        base = str((agent or {}).get("phone") or (agent or {}).get("phone_number") or "")[-6:]
+        if not base:
+            base = "123456"
+        return f"Yene@{base}"
+
+    def _link_or_create_auth_user(email, password, full_name="", username=""):
+        try:
+            users = sb_admin.auth.admin.list_users()
+            found = None
+            for u in getattr(users, "users", []) or []:
+                if str(getattr(u, "email", "") or "").strip().lower() == str(email or "").strip().lower():
+                    found = u
+                    break
+
+            if found:
+                uid = getattr(found, "id", None)
+                try:
+                    sb_admin.auth.admin.update_user_by_id(uid, {
+                        "password": password,
+                        "email_confirm": True,
+                        "user_metadata": {
+                            "full_name": full_name or "",
+                            "username": username or "",
+                        }
+                    })
+                except Exception:
+                    pass
+                return uid
+
+            created = sb_admin.auth.admin.create_user({
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "full_name": full_name or "",
+                    "username": username or "",
+                }
+            })
+            return getattr(getattr(created, "user", None), "id", None)
+        except Exception as e:
+            app.logger.warning("link_or_create_auth_user_failed email=%s error=%s", email, e)
+            return None
+
     def _current_agent():
         return _agent_by_email(session.get("email") or session.get("agent_email"))
 
@@ -191,6 +275,8 @@ def register_yene_compat_routes(app, sb_admin):
                 "code": d.get("external_code") or d.get("license_number") or "",
                 "created_at": d.get("created_at"),
                 "status": d.get("status"),
+                "trips_completed": d.get("trips_completed") or 0,
+                "verified_trips": d.get("verified_trips") or 0,
             })
         for c in _clients():
             if not _matches_identity(c, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")):
@@ -318,9 +404,9 @@ def register_yene_compat_routes(app, sb_admin):
             flash(f"Registration failed: {res}")
             return redirect("/register")
 
-        if auth_error:
-            flash("Profile created, but auth user creation needs admin review before login.")
-            return redirect("/login")
+        if not auth_id:
+            flash("Account creation failed. Please try again or contact admin.")
+            return redirect("/register")
 
         session.clear()
         session["email"] = email
@@ -581,6 +667,223 @@ def register_yene_compat_routes(app, sb_admin):
         _safe_update("agents", {"id": agent_id}, {"status": status})
         return jsonify({"ok": True})
 
+    @app.post("/api/admin/approve_agent/<agent_id>")
+    def admin_approve_agent(agent_id):
+        agent = _agent_by_id(agent_id)
+        if not agent:
+            return jsonify({"ok": False, "error": "Agent not found"}), 404
+
+        payload = {
+            "status": "ACTIVE",
+            "must_change_password": False,
+        }
+        _safe_update("agent_profiles", {"id": agent_id}, payload)
+        _safe_update("agents", {"id": agent_id}, {"status": "ACTIVE"})
+        return jsonify({"ok": True, "message": "Agent approved", "agent_id": agent_id})
+
+    @app.post("/api/admin/reset_agent_account/<agent_id>")
+    def admin_reset_agent_account(agent_id):
+        agent = _agent_by_id(agent_id)
+        if not agent:
+            return jsonify({"ok": False, "error": "Agent not found"}), 404
+
+        email = _clean(agent.get("email")).lower()
+        if not email:
+            return jsonify({"ok": False, "error": "Agent email missing"}), 400
+
+        temp_password = _temp_password_for_agent(agent)
+        uid = _link_or_create_auth_user(
+            email=email,
+            password=temp_password,
+            full_name=agent.get("full_name") or "",
+            username=agent.get("username") or "",
+        )
+
+        if not uid:
+            return jsonify({"ok": False, "error": "Could not create or update auth user"}), 500
+
+        payload = {
+            "auth_id": uid,
+            "user_id": uid,
+            "status": "ACTIVE",
+            "must_change_password": True,
+            "temp_password": temp_password,
+            "last_reset_at": _now_iso(),
+            "reset_by_admin": session.get("admin_email") or session.get("email") or "admin",
+        }
+        _safe_update("agent_profiles", {"id": agent_id}, payload)
+        _safe_update("agents", {"id": agent_id}, {"auth_id": uid, "status": "ACTIVE"})
+
+        return jsonify({
+            "ok": True,
+            "message": "Agent account reset successfully",
+            "agent_id": agent_id,
+            "email": email,
+            "temp_password": temp_password,
+            "must_change_password": True,
+        })
+
+    @app.get("/api/admin/agent_account_help/<agent_id>")
+    def admin_agent_account_help(agent_id):
+        agent = _agent_by_id(agent_id)
+        if not agent:
+            return jsonify({"ok": False, "error": "Agent not found"}), 404
+
+        mode, date_from, date_to = _period_from_request()
+        rows = _agent_registration_rows(agent, date_from, date_to)
+        days = {d: {"drivers": 0, "clients": 0} for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}
+        for row in rows:
+            try:
+                day_name = datetime.fromisoformat(str(row.get("created_at")).replace("Z", "+00:00")).strftime("%a")
+            except Exception:
+                continue
+            if day_name in days:
+                key = "drivers" if row.get("type") == "Driver" else "clients"
+                days[day_name][key] += 1
+
+        auth_id = agent.get("auth_id") or agent.get("user_id")
+        safe_agent = dict(agent)
+        safe_agent["auth_linked"] = bool(auth_id)
+        safe_agent["must_change_password"] = bool(agent.get("must_change_password"))
+
+        return jsonify({
+            "ok": True,
+            "agent": safe_agent,
+            "summary": {
+                "mode": mode,
+                "date_from": date_from,
+                "date_to": date_to,
+                "drivers_total": len([r for r in rows if r.get("type") == "Driver"]),
+                "clients_total": len([r for r in rows if r.get("type") == "Client"]),
+                "rows_total": len(rows),
+                "daily": days,
+            },
+        })
+
+    @app.get("/api/public/jobs")
+    def public_jobs():
+        rows = _safe_select("remote_jobs", {}, "*", 20, "created_at", True)
+        out = []
+        for row in rows:
+            status = _clean(row.get("status") or "ACTIVE").upper()
+            if status in {"CLOSED", "ARCHIVED", "INACTIVE"}:
+                continue
+            out.append(row)
+        return jsonify({"ok": True, "rows": out[:10]})
+
+    @app.route("/api/admin/jobs", methods=["GET", "POST"])
+    def admin_jobs():
+        if request.method == "GET":
+            rows = _safe_select("remote_jobs", {}, "*", 200, "created_at", True)
+            return jsonify({"ok": True, "rows": rows})
+
+        data = request.get_json(silent=True) or {}
+        title = _clean(data.get("title"))
+        description = _clean(data.get("description") or data.get("details"))
+        if not title or not description:
+            return jsonify({"ok": False, "error": "title and description required"}), 400
+        payload = {
+            "title": title,
+            "description": description,
+            "town": _clean(data.get("town")),
+            "region": _clean(data.get("region")),
+            "target_count": int(data.get("target_count") or 0),
+            "status": _clean(data.get("status")) or "ACTIVE",
+            "created_by": session.get("admin_email") or session.get("email") or "admin",
+            "created_at": _now_iso(),
+        }
+        res = _safe_insert("remote_jobs", payload)
+        if isinstance(res, Exception):
+            return jsonify({"ok": False, "error": str(res), "hint": "Run sql/yene_upgrade.sql in Supabase."}), 500
+        return jsonify({"ok": True, "row": (res.data or [payload])[0] if hasattr(res, "data") else payload})
+
+    @app.get("/api/agent/jobs")
+    def agent_jobs():
+        rows = _safe_select("remote_jobs", {}, "*", 50, "created_at", True)
+        out = []
+        for row in rows:
+            status = _clean(row.get("status") or "ACTIVE").upper()
+            if status in {"CLOSED", "ARCHIVED", "INACTIVE"}:
+                continue
+            out.append(row)
+        return jsonify({"ok": True, "rows": out[:20]})
+
+    @app.get("/api/agent/group_messages")
+    def agent_group_messages():
+        rows = _safe_select("agent_group_messages", {}, "*", 100, "created_at", True)
+        broadcasts = _safe_select("broadcasts", {}, "*", 50, "created_at", True)
+        out = []
+        for row in rows:
+            out.append(row)
+        for row in broadcasts:
+            out.append({
+                "id": row.get("id"),
+                "author_name": "YENE Admin",
+                "message": row.get("message"),
+                "title": row.get("title") or "Admin notice",
+                "created_at": row.get("created_at"),
+                "source": "broadcasts",
+            })
+        out.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        return jsonify({"ok": True, "rows": out[:100]})
+
+    @app.route("/agent/change-password", methods=["GET", "POST"])
+    def agent_change_password():
+        email = _clean(session.get("agent_email") or session.get("email")).lower()
+        if not email:
+            return redirect("/login")
+
+        agent = _agent_by_email(email)
+        if not agent:
+            session.clear()
+            flash("Agent profile not found")
+            return redirect("/login")
+
+        if request.method == "GET":
+            return render_template("agent_change_password.html", agent=agent)
+
+        current_password = request.form.get("current_password") or ""
+        new_password = request.form.get("new_password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
+
+        if not current_password or not new_password or not confirm_password:
+            flash("All password fields are required")
+            return redirect("/agent/change-password")
+
+        if len(new_password) < 6:
+            flash("New password must be at least 6 characters")
+            return redirect("/agent/change-password")
+
+        if new_password != confirm_password:
+            flash("New password and confirm password do not match")
+            return redirect("/agent/change-password")
+
+        try:
+            _sign_in_supabase(email, current_password)
+        except Exception:
+            flash("Current password is incorrect")
+            return redirect("/agent/change-password")
+
+        uid = agent.get("auth_id") or agent.get("user_id")
+        if not uid:
+            flash("Account auth link missing. Contact admin.")
+            return redirect("/agent/change-password")
+
+        try:
+            sb_admin.auth.admin.update_user_by_id(uid, {"password": new_password})
+        except Exception as e:
+            app.logger.warning("agent_change_password_failed email=%s error=%s", email, e)
+            flash("Could not update password")
+            return redirect("/agent/change-password")
+
+        _safe_update("agent_profiles", {"id": agent.get("id")}, {
+            "must_change_password": False,
+            "temp_password": None,
+        })
+
+        flash("Password changed successfully")
+        return redirect("/agent/dashboard")
+
     @app.post("/api/admin/delete_agent/<agent_id>")
     def admin_delete_agent_alias(agent_id):
         _safe_delete("agent_profiles", {"id": agent_id})
@@ -593,8 +896,48 @@ def register_yene_compat_routes(app, sb_admin):
         default_start = today - timedelta(days=today.weekday())
         start = _parse_date(_clean(request.args.get("week_start")), default_start)
         end = start + timedelta(days=6)
-        rules = _payment_amounts()
-        agents = _all_agents()
+
+        incoming = _payment_rules_latest() or {}
+        json_data = request.get_json(silent=True) or {}
+
+        def _pick_value(*keys, fallback=0):
+            for key in keys:
+                v = request.args.get(key)
+                if v not in (None, ""):
+                    try:
+                        return float(v)
+                    except Exception:
+                        pass
+                v = json_data.get(key)
+                if v not in (None, ""):
+                    try:
+                        return float(v)
+                    except Exception:
+                        pass
+                v = incoming.get(key)
+                if v not in (None, ""):
+                    try:
+                        return float(v)
+                    except Exception:
+                        pass
+            return fallback
+
+        rules = {
+            "source": incoming.get("_source") or "request_or_db",
+            "driver_reg": _pick_value("driver_reg", "driver_amount", fallback=0),
+            "client_reg": _pick_value("client_reg", "client_amount", fallback=0),
+            "daily_5_drivers_bonus": _pick_value("daily_5_drivers_bonus", fallback=0),
+            "daily_5_clients_bonus": _pick_value("daily_5_clients_bonus", fallback=0),
+            "weekly_30_activations_bonus": _pick_value("weekly_30_activations_bonus", fallback=0),
+            "first_trip_bonus": _pick_value("first_trip_bonus", fallback=0),
+        }
+
+        selected_agent_id = _clean(request.args.get("agent_id"))
+        if selected_agent_id:
+            one = _agent_by_id(selected_agent_id)
+            agents = [one] if one else []
+        else:
+            agents = _all_agents()
 
         def registration_payment(row):
             return rules["driver_reg"] if row.get("type") == "Driver" else rules["client_reg"]
@@ -638,6 +981,18 @@ def register_yene_compat_routes(app, sb_admin):
 
             driver_count = len([r for r in rows if r.get("type") == "Driver"])
             client_count = len([r for r in rows if r.get("type") == "Client"])
+            first_trip_count = len([
+                r for r in rows
+                if r.get("type") == "Driver"
+                and (
+                    _safe_float(r.get("verified_trips")) > 0
+                    or _safe_float(r.get("trips_completed")) > 0
+                )
+            ])
+            if first_trip_count and rules["first_trip_bonus"]:
+                first_trip_total = first_trip_count * rules["first_trip_bonus"]
+                bonus_total += first_trip_total
+                bonus_lines.append(f"First trip bonus: {first_trip_count} drivers x {_fmt_money(rules['first_trip_bonus'])} = {_fmt_money(first_trip_total)}")
             if (driver_count + client_count) >= 30 and rules["weekly_30_activations_bonus"]:
                 bonus_total += rules["weekly_30_activations_bonus"]
                 bonus_lines.append(f"Weekly 30 activation bonus {_fmt_money(rules['weekly_30_activations_bonus'])}")
@@ -750,7 +1105,8 @@ def register_yene_compat_routes(app, sb_admin):
 
         c.save()
         buf.seek(0)
-        return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=f"yene_weekly_report_{start.isoformat()}.pdf")
+        report_name = f"yene_weekly_report_{start.isoformat()}.pdf" if not selected_agent_id else f"yene_agent_{selected_agent_id}_{start.isoformat()}.pdf"
+        return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=report_name)
 
     @app.get("/api/admin/agent_center_pdf/<agent_id>")
     def admin_agent_center_pdf(agent_id):

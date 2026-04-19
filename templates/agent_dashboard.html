@@ -907,6 +907,9 @@
         <button class="nav-btn" data-section="notifications">
           <span class="nav-ico">✉</span><span>Support & Notifications</span>
         </button>
+        <button class="nav-btn" data-section="jobs">
+          <span class="nav-ico">◇</span><span>Remote Jobs</span>
+        </button>
         <button class="nav-btn" data-section="insights">
           <span class="nav-ico">▣</span><span>Analytics</span>
         </button>
@@ -977,6 +980,18 @@
               </div>
             </div>
           </div>
+
+          <div class="card" style="margin-top:20px">
+            <div class="card-header">
+              <h3>Remote Jobs & Task Alerts</h3>
+              <div class="pill" id="jobPreviewCount">0 active</div>
+            </div>
+            <div class="card-body tight">
+              <div class="list" id="jobPreviewList">
+                <div class="muted">Loading active jobs...</div>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section id="overview" class="section active">
@@ -1022,7 +1037,7 @@
                 </div>
                 <div class="stat-ico">💼</div>
               </div>
-              <div class="stat-sub">Latest wallet summary reading</div>
+              <div class="stat-sub" id="pendingApprovalSub">Latest wallet summary reading</div>
             </div>
           </div>
 
@@ -1064,9 +1079,9 @@
                 <form id="driverForm" class="form-grid">
                   <input class="field" name="full_name" placeholder="Driver full name" required />
                   <input class="field" name="phone" placeholder="Phone number" required />
-                  <input class="field" name="town" placeholder="Town" />
+                  <input class="field" name="town" placeholder="Town" required />
                   <input class="field" name="car_details" placeholder="Car details" />
-                  <input class="field" name="license_number" placeholder="License number" />
+                  <input class="field" name="license_number" placeholder="PAR / license number" required />
                   <input class="field" name="external_code" placeholder="Referral / external code (optional)" />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Register Driver</button>
@@ -1085,9 +1100,8 @@
                 <form id="clientForm" class="form-grid">
                   <input class="field" name="full_name" placeholder="Client full name" required />
                   <input class="field" name="phone" placeholder="Phone number" required />
-                  <input class="field" name="town" placeholder="Town" />
-                  <input class="field" name="external_code" placeholder="YENE code / external code (optional)" />
-                  <input class="field" name="town" placeholder="Town (optional)" />
+                  <input class="field" name="town" placeholder="Town" required />
+                  <input class="field" name="external_code" placeholder="Customer code" required />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Register Client</button>
                     <div class="mini-note">Phone duplicate checks should also be enforced on backend.</div>
@@ -1122,6 +1136,32 @@
                     <tr><td colspan="5" class="muted">Loading...</td></tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="jobs" class="section">
+          <div class="card">
+            <div class="card-header">
+              <h3>Remote Jobs & Task Alerts</h3>
+              <div class="pill">Admin-posted opportunities</div>
+            </div>
+            <div class="card-body">
+              <div class="list" id="jobList">
+                <div class="muted">Loading active jobs...</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Agent Group Notices</h3>
+              <div class="pill">Team communication</div>
+            </div>
+            <div class="card-body">
+              <div class="list" id="groupMessageList">
+                <div class="muted">Loading group notices...</div>
               </div>
             </div>
           </div>
@@ -1683,6 +1723,8 @@
       walletSummary: null,
       walletHistory: [],
       withdraws: [],
+      jobs: [],
+      groupMessages: [],
       teamSummary: null,
       leaderboardError: "",
       currentPeriod: "week",
@@ -1843,6 +1885,7 @@
       $("driversThisWeek").textContent = Number(summary.drivers_this_week || summary.week_drivers || summary.drivers_week || 0);
       $("clientsThisWeek").textContent = Number(summary.clients_this_week || summary.week_clients || summary.clients_week || 0);
       $("walletBalanceMain").textContent = money(wallet.balance || wallet.total || wallet.available_balance || summary.wallet_balance || 0);
+      $("pendingApprovalSub").textContent = Number(summary.pending_approvals || 0) + " pending approvals not counted in earnings";
 
       $("refCodeBig").textContent = safe(me.referral_code || me.code || "-");
       $("setName").value = safe(me.full_name || me.name || "", "");
@@ -2246,6 +2289,37 @@
         toast(e.message);
       }
     }
+
+    function renderJobs(){
+      const rows = state.jobs || [];
+      const html = rows.length ? rows.slice(0,10).map(r => `
+        <div class="list-item">
+          <div class="stack">
+            <div class="title">${esc(safe(r.title || "YENE task"))}</div>
+            <div class="sub">${esc(safe(r.town || r.region || "Namibia"))} • ${esc(safe(r.status || "ACTIVE"))}</div>
+            <div class="sub">${esc(safe(r.description || r.details || ""))}</div>
+          </div>
+          <div class="pill">${esc(safe(r.target_count || 0))} target</div>
+        </div>
+      `).join("") : '<div class="muted">No active job alerts right now.</div>';
+      if($("jobPreviewList")) $("jobPreviewList").innerHTML = html;
+      if($("jobList")) $("jobList").innerHTML = html;
+      if($("jobPreviewCount")) $("jobPreviewCount").textContent = rows.length + " active";
+    }
+
+    function renderGroupMessages(){
+      const rows = state.groupMessages || [];
+      if(!$("groupMessageList")) return;
+      $("groupMessageList").innerHTML = rows.length ? rows.slice(0,20).map(r => `
+        <div class="list-item">
+          <div class="stack">
+            <div class="title">${esc(safe(r.title || r.subject || "Group notice"))}</div>
+            <div class="sub">${esc(safe(r.author_name || r.agent_name || "YENE Admin"))} • ${esc(shortDate(r.created_at))}</div>
+            <div class="sub">${esc(safe(r.message || r.body || ""))}</div>
+          </div>
+        </div>
+      `).join("") : '<div class="muted">No group notices yet.</div>';
+    }
     window.markMessageRead = markMessageRead;
 
     async function loadMe(){
@@ -2309,6 +2383,24 @@
         state.teamSummary = data.summary || data.data || data || {};
       }catch(_){
         state.teamSummary = {};
+      }
+    }
+
+    async function loadJobs(){
+      try{
+        const data = await jget('/api/agent/jobs');
+        state.jobs = guessRows(data);
+      }catch(_){
+        state.jobs = [];
+      }
+    }
+
+    async function loadGroupMessages(){
+      try{
+        const data = await jget('/api/agent/group_messages');
+        state.groupMessages = guessRows(data);
+      }catch(_){
+        state.groupMessages = [];
       }
     }
 
@@ -2431,6 +2523,8 @@
 
     async function submitDriver(ev){
       ev.preventDefault();
+      const btn = ev.target.querySelector('button[type="submit"]');
+      if(btn){ btn.disabled = true; btn.textContent = 'Saving driver...'; }
       const fd = new FormData(ev.target);
       const raw = Object.fromEntries(fd.entries());
 
@@ -2450,16 +2544,21 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        toast('Driver registered');
+        const agentName = state.me?.full_name || state.me?.profile?.full_name || 'Agent';
+        toast(`Thank you, ${agentName}. Driver submitted for approval.`);
         await refreshAll(false);
       }catch(e){
         console.error('register_driver_v4 payload rejected:', payload, e);
         toast('Driver registration failed: ' + e.message);
+      }finally{
+        if(btn){ btn.disabled = false; btn.textContent = 'Register Driver'; }
       }
     }
 
     async function submitClient(ev){
       ev.preventDefault();
+      const btn = ev.target.querySelector('button[type="submit"]');
+      if(btn){ btn.disabled = true; btn.textContent = 'Saving client...'; }
       const fd = new FormData(ev.target);
       const raw = Object.fromEntries(fd.entries());
 
@@ -2477,11 +2576,14 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        toast('Client registered');
+        const agentName = state.me?.full_name || state.me?.profile?.full_name || 'Agent';
+        toast(`Thank you, ${agentName}. Client submitted for approval.`);
         await refreshAll(false);
       }catch(e){
         console.error('register_client_v4 payload rejected:', payload, e);
         toast('Client registration failed: ' + e.message);
+      }finally{
+        if(btn){ btn.disabled = false; btn.textContent = 'Register Client'; }
       }
     }
 
@@ -2580,6 +2682,7 @@
         loadAndRender("messages", loadMessages, null),
         loadAndRender("wallet", loadWallet, () => { updateHero(); renderWallet(); }),
         loadAndRender("team", loadTeam, renderTeam),
+        loadAndRender("jobs", async () => { await loadJobs(); await loadGroupMessages(); }, () => { renderJobs(); renderGroupMessages(); }),
         loadAndRender("leaderboard", () => loadLeaderboard(state.leaderboardPeriod), () => {
           renderLeaderboard();
           if(window.loadLeaderboardOverride) window.loadLeaderboardOverride();

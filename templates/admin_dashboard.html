@@ -1,1510 +1,212 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>YENE Admin Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
-      --bg:#081225;
-      --panel:#0c1b36;
-      --panel2:#0b1730;
-      --border:#163464;
-      --text:#e9f2ff;
-      --muted:#a6c4ff;
-      --brand:#67c3ff;
-      --ok:#25d366;
-      --warn:#ffb020;
-      --bad:#ff4d4d;
+      --bg:#f6f8fb;--panel:#ffffff;--panel2:#eef4fb;--text:#112033;--muted:#64748b;
+      --line:#d9e2ec;--brand:#0ea5e9;--brand2:#0369a1;--ok:#16a34a;--warn:#b45309;--bad:#dc2626;
+      --shadow:0 18px 44px rgba(15,23,42,.10);--radius:8px;
     }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      background:linear-gradient(180deg,#071126,#081225);
-      color:var(--text);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-    }
-    a{color:var(--brand);text-decoration:none}
-    header{
-      position:sticky;top:0;z-index:10;
-      display:flex;align-items:center;justify-content:space-between;
-      padding:14px 16px;background:rgba(12,27,54,.92);
-      backdrop-filter:blur(10px);
-      border-bottom:1px solid var(--border);
-    }
-    .left,.right,.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .logo{
-      width:38px;height:38px;border-radius:12px;
-      background:linear-gradient(135deg,#67c3ff,#1f57ff);
-      display:grid;place-items:center;font-weight:900;color:#fff;
-    }
-    .title h1{font-size:14px;margin:0}
-    .title p{margin:0;font-size:12px;color:var(--muted)}
-    .wrap{max-width:1300px;margin:0 auto;padding:16px}
-    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 16px}
-    .tab{
-      padding:10px 12px;border-radius:999px;border:1px solid var(--border);
-      background:rgba(11,23,48,.7);color:var(--text);cursor:pointer;
-      font-weight:700;font-size:12px;
-    }
-    .tab.active{background:rgba(103,195,255,.18);border-color:rgba(103,195,255,.6)}
-    .section{display:none}
-    .section.active{display:block}
-    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    @media(max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:560px){.grid{grid-template-columns:1fr}}
-    .card{
-      background:linear-gradient(180deg,rgba(12,27,54,.92),rgba(11,23,48,.92));
-      border:1px solid var(--border);border-radius:16px;padding:14px;
-      box-shadow:0 18px 40px rgba(0,0,0,.25);
-      margin-bottom:12px;
-    }
-    .card h3{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:800}
-    .big{font-size:26px;font-weight:900}
-    .small{font-size:12px;color:var(--muted)}
-    .btn{
-      border:1px solid rgba(103,195,255,.55);
-      background:rgba(103,195,255,.18);
-      color:var(--text);
-      padding:10px 12px;border-radius:12px;cursor:pointer;
-      font-weight:800;font-size:12px;
-    }
-    .btn:hover{filter:brightness(1.08)}
-    .btn.ok{border-color:rgba(37,211,102,.55);background:rgba(37,211,102,.14)}
-    .btn.bad{border-color:rgba(255,77,77,.55);background:rgba(255,77,77,.14)}
-    .btn.ghost{border-color:var(--border);background:rgba(8,18,37,.4)}
-    .pill{
-      display:inline-flex;gap:8px;align-items:center;padding:6px 10px;
-      border-radius:999px;border:1px solid var(--border);
-      background:rgba(8,18,37,.6);font-size:12px;color:var(--muted)
-    }
-    .dot{width:10px;height:10px;border-radius:999px;background:var(--ok)}
-    .muted{color:var(--muted)}
-    .hr{height:1px;background:rgba(22,52,100,.6);margin:12px 0}
-    .table-wrap{overflow:auto;max-height:560px}
-    table{
-      width:100%;border-collapse:separate;border-spacing:0;
-      border:1px solid var(--border);border-radius:14px;overflow:hidden;
-      background:rgba(11,23,48,.75)
-    }
-    th,td{
-      padding:10px;border-bottom:1px solid rgba(22,52,100,.55);
-      text-align:left;font-size:12px;vertical-align:top
-    }
-    th{
-      font-size:12px;color:var(--muted);
-      background:rgba(12,27,54,.85);position:sticky;top:0
-    }
-    tr:last-child td{border-bottom:none}
-    input, textarea{
-      width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--border);
-      background:rgba(8,18,37,.65);color:var(--text);outline:none
-    }
-    textarea{min-height:110px;resize:vertical}
-    .toast{
-      position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
-      background:rgba(8,18,37,.95);border:1px solid var(--border);
-      padding:10px 12px;border-radius:14px;display:none;z-index:9999;
-      max-width:92vw
-    }
-    .admin-menu-btn,.tabs-close{display:none}
-    .admin-backdrop{
-      position:fixed;
-      inset:0;
-      z-index:49;
-      background:rgba(0,0,0,.5);
-      opacity:0;
-      pointer-events:none;
-      transition:opacity .2s ease;
-      backdrop-filter:blur(3px);
-    }
-    .admin-backdrop.show{opacity:1;pointer-events:auto}
-    body.menu-open{overflow:hidden}
-    @media(max-width:760px){
-      header{z-index:60}
-      .right{gap:8px}
-      .admin-menu-btn{
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-      }
-      .tabs{
-        position:fixed;
-        top:0;
-        left:0;
-        bottom:0;
-        width:min(86vw,320px);
-        margin:0;
-        padding:16px;
-        z-index:70;
-        flex-direction:column;
-        align-items:stretch;
-        background:linear-gradient(180deg,rgba(12,27,54,.98),rgba(8,18,37,.98));
-        border-right:1px solid var(--border);
-        box-shadow:20px 0 45px rgba(0,0,0,.38);
-        transform:translateX(-105%);
-        transition:transform .22s ease;
-      }
-      .tabs.open{transform:translateX(0)}
-      .tabs-close{
-        display:block;
-        margin:0 0 10px auto;
-      }
-      .tab{width:100%;text-align:left;border-radius:12px}
-      .wrap{padding:12px}
-    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    a{color:inherit;text-decoration:none} button,input,select,textarea{font:inherit}
+    .top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+    .top-inner{max-width:1440px;margin:0 auto;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:8px;background:linear-gradient(135deg,var(--brand),#22c55e);color:#fff;display:grid;place-items:center;font-weight:900}
+    .brand h1{font-size:17px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}
+    .actions,.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.wrap{max-width:1440px;margin:0 auto;padding:18px}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tab{border:1px solid var(--line);background:#fff;color:var(--text);border-radius:8px;padding:10px 12px;font-weight:800;cursor:pointer}
+    .tab.active{background:#e0f2fe;border-color:#7dd3fc;color:#075985}.section{display:none}.section.active{display:block}
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;margin-bottom:12px;min-width:0}.soft{background:var(--panel2)}
+    .title{font-size:20px;font-weight:900;margin:0}.sub{color:var(--muted);font-size:13px;margin-top:4px}.k{font-size:12px;color:var(--muted);font-weight:900;text-transform:uppercase}.v{font-size:30px;font-weight:950;margin-top:6px}
+    .btn{border:1px solid #bae6fd;background:#e0f2fe;color:#075985;border-radius:8px;padding:10px 12px;font-weight:900;cursor:pointer}.btn.ok{border-color:#bbf7d0;background:#dcfce7;color:#166534}.btn.bad{border-color:#fecaca;background:#fee2e2;color:#991b1b}.btn.ghost{border-color:var(--line);background:#fff;color:var(--text)}
+    input,select,textarea{width:100%;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);padding:10px 12px;outline:none}textarea{min-height:100px;resize:vertical}label{font-size:12px;color:var(--muted);font-weight:900}
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff;max-height:520px}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:12px;vertical-align:top}th{position:sticky;top:0;background:#f8fafc;color:#475569;font-weight:900}tr:last-child td{border-bottom:none}
+    .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#f8fafc;border-radius:999px;padding:5px 8px;font-size:12px;font-weight:800}.pill.ok{background:#dcfce7;border-color:#bbf7d0;color:#166534}.pill.bad{background:#fee2e2;border-color:#fecaca;color:#991b1b}.pill.warn{background:#fef3c7;border-color:#fde68a;color:#92400e}
+    .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0f172a;color:#fff;border-radius:8px;padding:10px 14px;display:none;z-index:200;max-width:92vw}.mobile-menu{display:none}
+    @media(max-width:980px){.grid{grid-template-columns:repeat(2,1fr)}.grid2,.grid3{grid-template-columns:1fr}.hide-sm{display:none}}
+    @media(max-width:680px){.top-inner{align-items:flex-start}.actions{width:100%}.mobile-menu{display:inline-flex}.tabs{position:fixed;inset:0 auto 0 0;width:min(86vw,330px);z-index:90;background:#fff;border-right:1px solid var(--line);padding:16px;flex-direction:column;transform:translateX(-105%);transition:.2s}.tabs.open{transform:translateX(0)}.tab{text-align:left}.grid{grid-template-columns:1fr}.wrap{padding:12px}.v{font-size:25px}}
   </style>
 </head>
 <body>
-<header>
-  <div class="left">
-    <div class="logo">Y</div>
-    <div class="title">
-      <h1>YENE ADMIN</h1>
-      <p>Clean Command Center</p>
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand"><div class="logo">Y</div><div><h1>YENE Admin</h1><p>Control center, approvals, finance, reports</p></div></div>
+      <div class="actions">
+        <button class="btn ghost mobile-menu" id="menuBtn">Menu</button>
+        <button class="btn ghost" onclick="refreshAll()">Refresh</button>
+        <a class="btn ghost" href="/">Home</a>
+        <a class="btn bad" href="/logout">Logout</a>
+      </div>
     </div>
-    <span class="pill"><span class="dot"></span><span id="liveText">Live</span></span>
-  </div>
-  <div class="right">
-    <button class="btn ghost admin-menu-btn" id="adminMenuBtn" type="button" aria-controls="tabs" aria-expanded="false">Menu</button>
-    <a class="btn ghost" href="/">Home</a>
-    <button class="btn ghost" onclick="refreshAll()">Refresh</button>
-    <a class="btn bad" href="/logout">Logout</a>
-  </div>
-</header>
+  </header>
 
-<div class="wrap">
-  <div class="tabs" id="tabs">
-    <button class="btn ghost tabs-close" id="adminTabsClose" type="button">Close</button>
-    <button class="tab active" data-tab="overview">Overview</button>
-    <button class="tab" data-tab="agents">Agents</button>
-    <button class="tab" data-tab="agent-center">Agent Center</button>
-    <button class="tab" data-tab="drivers">Drivers</button>
-    <button class="tab" data-tab="clients">Clients</button>
-    <button class="tab" data-tab="finance">Finance</button>
-    <button class="tab" data-tab="pricing">Pricing</button>
-    <button class="tab" data-tab="broadcasts">Broadcasts</button>
-    <button class="tab" data-tab="audit">Audit</button>
-  </div>
-  <div class="admin-backdrop" id="adminMenuBackdrop" aria-hidden="true"></div>
+  <main class="wrap">
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="agent-center">Agent Center</button>
+      <button class="tab" data-tab="approvals">Approvals</button>
+      <button class="tab" data-tab="finance">Finance</button>
+      <button class="tab" data-tab="reports">Reports</button>
+      <button class="tab" data-tab="jobs">Remote Jobs</button>
+      <button class="tab" data-tab="broadcasts">Broadcasts</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
 
-  <section class="section active" id="overview">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
+    <section class="section active" id="overview">
+      <div class="card soft"><div class="row" style="justify-content:space-between"><div><div class="title">Live Overview</div><div class="sub">All totals come from Supabase reads, not hardcoded counters.</div></div><button class="btn ok" onclick="downloadWeeklyPdf(false)">Generate All-Agent PDF</button></div></div>
+      <div class="grid">
+        <div class="card"><div class="k">Agents</div><div class="v" id="kAgents">0</div><div class="sub" id="kAgentsMeta">Loading</div></div>
+        <div class="card"><div class="k">Drivers</div><div class="v" id="kDrivers">0</div><div class="sub" id="kDriversMeta">Loading</div></div>
+        <div class="card"><div class="k">Clients</div><div class="v" id="kClients">0</div><div class="sub" id="kClientsMeta">Loading</div></div>
+        <div class="card"><div class="k">Total Paid</div><div class="v" id="kPaid">N$ 0.00</div><div class="sub">Ledger debits</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">Recent Activity</div><div class="sub">Latest registrations</div></div></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Type</th><th>Name</th><th>Phone</th><th>Town</th><th>Agent</th></tr></thead><tbody id="recentRows"><tr><td colspan="6">Loading...</td></tr></tbody></table></div></div>
+        <div class="card"><div class="title">Leaderboard Preview</div><div class="sub">Based on loaded driver/client ownership</div><div class="table-wrap"><table><thead><tr><th>Agent</th><th>Drivers</th><th>Clients</th><th>Score</th></tr></thead><tbody id="leaderRows"><tr><td colspan="4">Loading...</td></tr></tbody></table></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="agent-center">
+      <div class="grid2">
+        <div class="card">
+          <div class="row" style="justify-content:space-between"><div><div class="title">All Agents</div><div class="sub">Select an account for detailed help, reset, profile, or report.</div></div><input id="agentSearch" placeholder="Search agents" oninput="renderAgents()"></div>
+          <div class="table-wrap"><table><thead><tr><th>Name</th><th>Status</th><th>Email</th><th>Drivers</th><th>Clients</th><th>Open</th></tr></thead><tbody id="agentRows"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+        </div>
         <div>
-          <div class="big">Admin Overview</div>
-          <div class="muted">Stable dashboard using working endpoints only</div>
-        </div>
-        <div class="row">
-          <button class="btn" onclick="exportCSV('agents')">Export Agents CSV</button>
-          <button class="btn" onclick="exportCSV('drivers')">Export Drivers CSV</button>
-          <button class="btn" onclick="exportCSV('clients')">Export Clients CSV</button>
-          <button class="btn ok" onclick="downloadWeeklyPDF()">Download Weekly PDF</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h3>Agents</h3>
-        <div class="big" id="k_agents_total">—</div>
-        <div class="small" id="k_agents_meta">—</div>
-      </div>
-      <div class="card">
-        <h3>Drivers Registered</h3>
-        <div class="big" id="k_drivers_total">—</div>
-        <div class="small">With timestamps + recruiter</div>
-      </div>
-      <div class="card">
-        <h3>Clients Registered</h3>
-        <div class="big" id="k_clients_total">—</div>
-        <div class="small">With timestamps + recruiter</div>
-      </div>
-      <div class="card">
-        <h3>Total Paid (N$)</h3>
-        <div class="big" id="k_total_paid">—</div>
-        <div class="small">Ledger totals</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="big" style="font-size:18px">Recent Activity</div>
-          <div class="muted">Last 25 registrations across the network</div>
-        </div>
-      </div>
-      <div class="hr"></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Type</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Town</th>
-              <th>Agent</th>
-            </tr>
-          </thead>
-          <tbody id="recentActivity">
-            <tr><td colspan="6" class="muted">No activity yet</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="agents">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="big">Agents</div>
-          <div class="muted">Status and counts</div>
-        </div>
-        <input id="agentSearch" placeholder="Search agents..." oninput="renderAgents()" style="max-width:320px">
-      </div>
-      <div class="hr"></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Drivers</th>
-              <th>Clients</th>
-              <th>Created</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="agentsTable">
-            <tr><td colspan="8" class="muted">Loading...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-
-  <section class="section" id="agent-center">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="big">Agent Center</div>
-          <div class="muted">Click any agent to see weekly registrations and full details</div>
-        </div>
-        <div class="row">
-          <select id="agentCenterMode">
-            <option value="day">Day</option>
-            <option value="current_week">Current Week</option>
-            <option value="previous_week">Previous Week</option>
-            <option value="all_time">All Time</option>
-            <option value="custom">Custom Range</option>
-          </select>
-          <input id="agentCenterWeek" type="date">
-          <input id="agentCenterDay" type="date" style="display:none">
-          <input id="agentCenterFrom" type="date" style="display:none">
-          <input id="agentCenterTo" type="date" style="display:none">
-          <button class="btn ghost" onclick="loadSelectedAgentCenter()">Load Selected Agent</button>
-          <button class="btn ok" onclick="downloadSelectedAgentPDF()">Download Selected Agent PDF</button>
-        </div>
-      </div>
-      <div class="hr"></div>
-
-      <div class="row" style="align-items:flex-start">
-        <div style="flex:1;min-width:320px">
-          <div class="table-wrap" style="max-height:520px">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Status</th>
-                  <th>Open</th>
-                </tr>
-              </thead>
-              <tbody id="agentCenterList">
-                <tr><td colspan="4" class="muted">Load agents first</td></tr>
-              </tbody>
-            </table>
+          <div class="card">
+            <div class="title">Selected Agent</div><div class="sub" id="selectedAgentMeta">No agent selected.</div>
+            <div class="row" style="margin-top:12px"><button class="btn ok" onclick="approveSelectedAgent()">Approve</button><button class="btn" onclick="resetSelectedAgent()">Reset Account</button><button class="btn bad" onclick="blockSelectedAgent()">Block</button><button class="btn ghost" onclick="openSelectedProfile()">Open Profile</button></div>
+            <div class="sub" id="accountResult" style="margin-top:10px"></div>
+            <div id="accountHelpGrid" class="grid2" style="margin-top:12px"></div>
           </div>
-        </div>
-
-        <div style="flex:1.2;min-width:420px">
-          <div class="card" style="margin-bottom:12px">
-            <div class="big" style="font-size:18px">Selected Agent</div>
-            <div id="selectedAgentMeta" class="muted" style="margin-top:8px">No agent selected</div>
-          </div>
-
-          <div class="card" style="margin-bottom:12px">
-            <div class="big" style="font-size:18px">Weekly Summary</div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th>Drivers</th>
-                    <th>Clients</th>
-                  </tr>
-                </thead>
-                <tbody id="selectedAgentWeekTable">
-                  <tr><td colspan="3" class="muted">No weekly data loaded</td></tr>
-                </tbody>
-              </table>
+          <div class="card">
+            <div class="row" style="justify-content:space-between"><div><div class="title">Agent Period</div><div class="sub">Daily, weekly, custom, or all-time registration breakdown.</div></div></div>
+            <div class="grid3">
+              <div><label>Mode</label><select id="periodMode" onchange="togglePeriodInputs()"><option value="current_week">Current Week</option><option value="day">Day</option><option value="custom">Custom</option><option value="all_time">All Time</option></select></div>
+              <div><label>Week Start / Day</label><input id="periodDate" type="date"></div>
+              <div><label>To</label><input id="periodTo" type="date"></div>
             </div>
-          </div>
-
-          
-          <div class="card" style="margin-bottom:12px">
-            <div class="big" style="font-size:18px">Message Agent About Registration</div>
-            <div class="muted" style="margin-top:8px">Send a note to the selected agent about a client or driver registration problem.</div>
-            <div style="height:12px"></div>
-
-            <label class="muted">Registration Type</label>
-            <select id="agentMsgType">
-              <option value="Client">Client</option>
-              <option value="Driver">Driver</option>
-              <option value="Other">Other</option>
-            </select>
-
-            <div style="height:10px"></div>
-            <label class="muted">Registration ID / Code</label>
-            <input id="agentMsgRegistrationId" placeholder="Client code, driver code, phone, or record id">
-
-            <div style="height:10px"></div>
-            <label class="muted">Subject</label>
-            <input id="agentMsgSubject" placeholder="Example: Missing client phone number">
-
-            <div style="height:10px"></div>
-            <label class="muted">Message</label>
-            <textarea id="agentMsgBody" placeholder="Write the issue for the agent..."></textarea>
-
-            <div class="row" style="margin-top:10px">
-              <button class="btn ok" onclick="sendMessageToSelectedAgent()">Send Message</button>
-              <button class="btn ghost" onclick="loadSelectedAgentMessages()">Refresh Messages</button>
-            </div>
-          </div>
-
-          <div class="card" style="margin-bottom:12px">
-            <div class="big" style="font-size:18px">Agent Communication History</div>
-            <div class="table-wrap" style="max-height:240px">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Registration</th>
-                    <th>Subject</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="selectedAgentMessages">
-                  <tr><td colspan="5" class="muted">No messages loaded</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-<div class="card">
-            <div class="big" style="font-size:18px">Registration Details</div>
-            <div class="table-wrap" style="max-height:420px">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Town</th>
-                    <th>Code</th>
-                  </tr>
-                </thead>
-                <tbody id="selectedAgentRows">
-                  <tr><td colspan="6" class="muted">No detailed rows loaded</td></tr>
-                </tbody>
-              </table>
-            </div>
+            <div class="row" style="margin-top:12px"><button class="btn" onclick="loadSelectedAgentCenter()">Load Summary</button><button class="btn ok" onclick="downloadWeeklyPdf(true)">Selected PDF</button></div>
+            <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Day</th><th>Drivers</th><th>Clients</th></tr></thead><tbody id="agentDayRows"><tr><td colspan="3">No summary loaded.</td></tr></tbody></table></div>
+            <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Time</th><th>Type</th><th>Name</th><th>Phone</th><th>Town</th><th>Status</th></tr></thead><tbody id="agentDetailRows"><tr><td colspan="6">No rows loaded.</td></tr></tbody></table></div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
+    <section class="section" id="approvals">
+      <div class="grid3">
+        <div class="card"><div class="title">Pending Agents</div><div class="sub">Approve, block, or reset auth linkage.</div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Status</th><th>Auth</th><th>Select</th></tr></thead><tbody id="pendingAgentRows"><tr><td colspan="4">Loading...</td></tr></tbody></table></div></div>
+        <div class="card"><div class="title">Driver Approvals</div><div class="sub">Approvals feed payout/report logic.</div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Town</th><th>Agent</th><th>Action</th></tr></thead><tbody id="pendingDriverRows"><tr><td colspan="4">Loading...</td></tr></tbody></table></div></div>
+        <div class="card"><div class="title">Client Approvals</div><div class="sub">Use filters in the all-client table for town/agent review.</div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Town</th><th>Agent</th><th>Action</th></tr></thead><tbody id="pendingClientRows"><tr><td colspan="4">Loading...</td></tr></tbody></table></div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">Drivers</div><div class="sub">Filter by town, agent, status, date text.</div></div><input id="driverSearch" placeholder="Search drivers" oninput="renderDrivers()"></div><div class="table-wrap"><table><thead><tr><th>Status</th><th>Name</th><th>Phone</th><th>Town</th><th>Agent</th><th>Created</th></tr></thead><tbody id="driverRows"></tbody></table></div></div>
+        <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">Clients</div><div class="sub">Filter by town, agent, status, date text.</div></div><input id="clientSearch" placeholder="Search clients" oninput="renderClients()"></div><div class="table-wrap"><table><thead><tr><th>Status</th><th>Name</th><th>Phone</th><th>Town</th><th>Agent</th><th>Created</th></tr></thead><tbody id="clientRows"></tbody></table></div></div>
+      </div>
+    </section>
 
-  <section class="section" id="drivers">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="big">Drivers</div>
-          <div class="muted">All registered drivers</div>
+    <section class="section" id="finance">
+      <div class="grid2">
+        <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">Finance Center</div><div class="sub">Wallet ledger, wallets, withdrawal requests.</div></div><input id="financeSearch" placeholder="Search finance" oninput="renderFinance()"></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Agent/User</th><th>Type</th><th>Status</th><th>Amount</th><th>Details</th></tr></thead><tbody id="financeRows"><tr><td colspan="6">Loading...</td></tr></tbody></table></div></div>
+        <div class="card"><div class="title">Payout Batch</div><div class="sub">Select agents to include or exclude, then mark paid from the selected total.</div><div id="payoutRows" class="table-wrap"><table><thead><tr><th>Include</th><th>Agent</th><th>Due</th><th>Paid</th></tr></thead><tbody><tr><td colspan="4">Loading...</td></tr></tbody></table></div><div class="row" style="margin-top:12px"><button class="btn ok" onclick="markSelectedPaid()">Mark Selected Paid</button><span class="pill" id="payoutTotal">N$ 0.00 selected</span></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="reports">
+      <div class="card">
+        <div class="title">Weekly Payment Builder</div><div class="sub">Set values before generating selected-agent or all-agent PDFs.</div>
+        <div class="grid3" style="margin-top:12px">
+          <div><label>Driver Registration Pay</label><input id="payDriver" type="number" step="0.01"></div>
+          <div><label>Client Registration Pay</label><input id="payClient" type="number" step="0.01"></div>
+          <div><label>Week Start</label><input id="reportWeek" type="date"></div>
+          <div><label>Daily Driver Bonus</label><input id="payDailyDriver" type="number" step="0.01"></div>
+          <div><label>Daily Client Bonus</label><input id="payDailyClient" type="number" step="0.01"></div>
+          <div><label>Weekly Activation Bonus</label><input id="payWeekly" type="number" step="0.01"></div>
+          <div><label>First Trip Bonus</label><input id="payFirstTrip" type="number" step="0.01"></div>
         </div>
-        <input id="driverSearch" placeholder="Search drivers..." oninput="renderDrivers()" style="max-width:320px">
+        <div class="row" style="margin-top:12px"><button class="btn ok" onclick="downloadWeeklyPdf(false)">All Agents PDF</button><button class="btn" onclick="downloadWeeklyPdf(true)">Selected Agent PDF</button></div>
       </div>
-      <div class="hr"></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Town</th>
-              <th>Recruiter</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody id="driversTable">
-            <tr><td colspan="6" class="muted">Loading...</td></tr>
-          </tbody>
-        </table>
+    </section>
+
+    <section class="section" id="jobs">
+      <div class="grid2">
+        <div class="card"><div class="title">Post Remote Job / Task</div><div class="sub">Real alerts for agents and homepage preview.</div><div class="grid2" style="margin-top:12px"><input id="jobTitle" placeholder="Need 10 agents in Windhoek"><input id="jobTown" placeholder="Town / region"><input id="jobTarget" type="number" min="0" placeholder="Target count"><select id="jobStatus"><option>ACTIVE</option><option>PAUSED</option><option>CLOSED</option></select></div><textarea id="jobDescription" placeholder="Task details" style="margin-top:10px"></textarea><div class="row" style="margin-top:10px"><button class="btn ok" onclick="createJob()">Post Job</button><button class="btn ghost" onclick="loadJobs()">Reload</button></div></div>
+        <div class="card"><div class="title">Active Job Alerts</div><div class="table-wrap"><table><thead><tr><th>Created</th><th>Title</th><th>Town</th><th>Status</th><th>Target</th></tr></thead><tbody id="jobRows"><tr><td colspan="5">Loading...</td></tr></tbody></table></div></div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="section" id="clients">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="big">Clients</div>
-          <div class="muted">All registered clients</div>
-        </div>
-        <input id="clientSearch" placeholder="Search clients..." oninput="renderClients()" style="max-width:320px">
+    <section class="section" id="broadcasts">
+      <div class="grid2">
+        <div class="card"><div class="title">Broadcasts</div><div class="sub">Send platform announcements.</div><input id="broadcastTitle" placeholder="Title" style="margin-top:10px"><textarea id="broadcastMessage" placeholder="Message" style="margin-top:10px"></textarea><div class="row" style="margin-top:10px"><button class="btn ok" onclick="createBroadcast()">Send Broadcast</button><button class="btn ghost" onclick="loadBroadcasts()">Reload</button></div></div>
+        <div class="card"><div class="title">Recent Broadcasts</div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Title</th><th>Message</th></tr></thead><tbody id="broadcastRows"><tr><td colspan="3">Loading...</td></tr></tbody></table></div></div>
       </div>
-      <div class="hr"></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Recruiter</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody id="clientsTable">
-            <tr><td colspan="5" class="muted">Loading...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="finance">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="big">Finance Ledger</div>
-          <div class="muted">Ledger data</div>
-        </div>
-        <input id="financeSearch" placeholder="Search finance..." oninput="renderFinance()" style="max-width:320px">
-      </div>
-      <div class="hr"></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Type</th>
-              <th>User</th>
-              <th>Amount</th>
-              <th>Meta</th>
-            </tr>
-          </thead>
-          <tbody id="financeTable">
-            <tr><td colspan="5" class="muted">Loading...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="pricing">
-    <div class="card">
-      <div class="big">Pricing Rules</div>
-      <div class="muted">Create and update payment rules</div>
-      <div class="hr"></div>
-
-      <div class="row" style="align-items:flex-start">
-        <div style="flex:1;min-width:300px">
-          <label class="muted">Region</label>
-          <input id="pr_region" placeholder="e.g. Khomas">
-          <div style="height:10px"></div>
-          <label class="muted">Town</label>
-          <input id="pr_town" placeholder="e.g. Windhoek">
-          <div style="height:10px"></div>
-          <label class="muted">Rule JSON</label>
-          <textarea id="pr_json" placeholder='{"driver_reg":10,"client_reg":10,"status":"Active"}'></textarea>
-          <div class="row" style="margin-top:10px">
-            <button class="btn ok" onclick="savePricingRule()">Save Rule</button>
-            <button class="btn ghost" onclick="loadPricingRules()">Reload</button>
-          </div>
-        </div>
-
-        <div style="flex:1;min-width:320px">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Region</th>
-                  <th>Town</th>
-                  <th>Data</th>
-                </tr>
-              </thead>
-              <tbody id="pricingTable">
-                <tr><td colspan="3" class="muted">Loading...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="broadcasts">
-    <div class="card">
-      <div class="big">Broadcasts</div>
-      <div class="muted">Send and edit platform announcements</div>
-      <div class="hr"></div>
-
-      <label class="muted">New broadcast message</label>
-      <textarea id="bc_new_message" placeholder="Type your message..."></textarea>
-      <div class="row" style="margin-top:10px">
-        <button class="btn ok" onclick="createBroadcast()">Send Broadcast</button>
-        <button class="btn ghost" onclick="loadBroadcasts()">Reload</button>
-      </div>
-
-      <div class="hr"></div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Created</th>
-              <th>Message</th>
-              <th>Target</th>
-              <th>ID</th>
-            </tr>
-          </thead>
-          <tbody id="broadcastsTable">
-            <tr><td colspan="4" class="muted">Loading...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="audit">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <div class="big">Audit Logs</div>
-          <div class="muted">Recent system activity</div>
-        </div>
-        <button class="btn ghost" onclick="loadAudit()">Reload</button>
-      </div>
-      <div class="hr"></div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Event</th>
-              <th>Description</th>
-              <th>User</th>
-              <th>IP</th>
-            </tr>
-          </thead>
-          <tbody id="auditTable">
-            <tr><td colspan="5" class="muted">Loading...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script>
-let agents = [];
-let agentCounts = {};
-let drivers = [];
-let clients = [];
-let finance = [];
-let pricingRules = [];
-let broadcasts = [];
-let selectedAgentId = null;
-let selectedAgentWeekData = null;
-
-function toast(msg){
-  const el = document.getElementById("toast");
-  el.textContent = msg;
-  el.style.display = "block";
-  setTimeout(()=> el.style.display = "none", 2500);
-}
-function esc(s){
-  return String(s || "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
-}
-function safe(v, fallback="—"){
-  return (v === null || v === undefined || v === "") ? fallback : v;
-}
-function fmtDate(x){
-  if(!x) return "—";
-  try { return new Date(x).toLocaleString(); } catch(e){ return String(x); }
-}
-function fmtMoney(n){
-  let num = Number(n || 0);
-  if (Number.isNaN(num)) num = 0;
-  return "N$ " + num.toFixed(2);
-}
-
-async function apiGET(url, timeoutMs=15000){
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const r = await fetch(url, {credentials:"same-origin", signal: controller.signal}).finally(() => clearTimeout(timer));
-  const j = await r.json().catch(()=> ({}));
-  if(!r.ok || j.success === false || j.ok === false){
-    throw new Error(j.error || ("Request failed: " + r.status));
-  }
-  return j;
-}
-
-async function apiJSON(url, method, body, timeoutMs=15000){
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const r = await fetch(url, {
-    method,
-    credentials:"same-origin",
-    signal: controller.signal,
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify(body || {})
-  }).finally(() => clearTimeout(timer));
-  const j = await r.json().catch(()=> ({}));
-  if(!r.ok || j.success === false || j.ok === false){
-    throw new Error(j.error || ("Request failed: " + r.status));
-  }
-  return j;
-}
-
-function openAdminMenu(){
-  const tabs = document.getElementById("tabs");
-  const backdrop = document.getElementById("adminMenuBackdrop");
-  const btn = document.getElementById("adminMenuBtn");
-  if(tabs) tabs.classList.add("open");
-  if(backdrop) backdrop.classList.add("show");
-  document.body.classList.add("menu-open");
-  document.body.style.overflow = "hidden";
-  if(btn) btn.setAttribute("aria-expanded", "true");
-}
-
-function closeAdminMenu(){
-  const tabs = document.getElementById("tabs");
-  const backdrop = document.getElementById("adminMenuBackdrop");
-  const btn = document.getElementById("adminMenuBtn");
-  if(tabs) tabs.classList.remove("open");
-  if(backdrop) backdrop.classList.remove("show");
-  document.body.classList.remove("menu-open");
-  document.body.style.overflow = "";
-  if(btn) btn.setAttribute("aria-expanded", "false");
-}
-
-function setTableLoading(id, cols, label){
-  const el = document.getElementById(id);
-  if(el) el.innerHTML = `<tr><td colspan="${cols}" class="muted">Loading ${label}...</td></tr>`;
-}
-
-async function safeLoad(label, fn){
-  try{
-    await fn();
-    return true;
-  }catch(e){
-    console.error(label + " failed", e);
-    toast(label + " failed: " + e.message);
-    return false;
-  }
-}
-
-function bindAdminMenu(){
-  const tabsEl = document.getElementById("tabs");
-  if(tabsEl){
-    tabsEl.addEventListener("click", (e)=>{
-      const btn = e.target.closest(".tab");
-      if(!btn) return;
-      document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-      btn.classList.add("active");
-      document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-      const section = document.getElementById(btn.dataset.tab);
-      if(section) section.classList.add("active");
-      closeAdminMenu();
-      if (btn.dataset.tab === "agent-center") {
-        loadAgentCenterListDirect();
-      }
-    });
-  }
-
-  document.getElementById("adminMenuBtn")?.addEventListener("click", () => {
-    const tabs = document.getElementById("tabs");
-    if(tabs?.classList.contains("open")) closeAdminMenu();
-    else openAdminMenu();
-  });
-  document.getElementById("adminTabsClose")?.addEventListener("click", closeAdminMenu);
-  document.getElementById("adminMenuBackdrop")?.addEventListener("click", closeAdminMenu);
-  document.addEventListener("keydown", (event) => {
-    if(event.key === "Escape") closeAdminMenu();
-  });
-  window.addEventListener("resize", () => {
-    if(window.innerWidth > 760) closeAdminMenu();
-  });
-}
-
-bindAdminMenu();
-
-async function loadOverview(){
-  const j = await apiGET("/api/admin/overview");
-  const d = j.data || {};
-
-  document.getElementById("k_agents_total").textContent = safe(d.agents_total, "0");
-  document.getElementById("k_agents_meta").textContent =
-    `Active ${safe(d.agents_active,0)} • Pending ${safe(d.agents_pending,0)} • Blocked ${safe(d.agents_blocked,0)}`;
-
-  const driverCount = (Array.isArray(drivers) && drivers.length) ? drivers.length : safe(d.drivers_total, "0");
-  const clientCount = (Array.isArray(clients) && clients.length) ? clients.length : safe(d.clients_total, "0");
-
-  document.getElementById("k_drivers_total").textContent = String(driverCount);
-  document.getElementById("k_clients_total").textContent = String(clientCount);
-  document.getElementById("k_total_paid").textContent = fmtMoney(d.total_paid);
-
-  const body = document.getElementById("recentActivity");
-
-  if (Array.isArray(drivers) && drivers.length || Array.isArray(clients) && clients.length) {
-    syncRecentActivityFromLoadedData();
-    return;
-  }
-
-  const rows = d.recent_activity || [];
-  body.innerHTML = rows.length ? rows.map(r => `
-    <tr>
-      <td>${esc(fmtDate(r.created_at))}</td>
-      <td>${esc(safe(r.type))}</td>
-      <td>${esc(safe(r.name))}</td>
-      <td>${esc(safe(r.phone))}</td>
-      <td>${esc(safe(r.town))}</td>
-      <td>${esc(safe(r.agent))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="6" class="muted">No activity yet</td></tr>`;
-}
-
-async function loadAgents(){
-  const j = await apiGET("/api/admin/agents");
-  console.log("AGENTS API RESPONSE", j);
-
-  agents = Array.isArray(j?.rows) ? j.rows : [];
-  agentCounts = {};
-
-  for (const a of agents) {
-    if (a && a.id) {
-      agentCounts[a.id] = {
-        drivers: Number(a.drivers || 0),
-        clients: Number(a.clients || 0)
-      };
-    }
-  }
-
-  renderAgents();
-  renderAgentCenterList();
-}
-
-async function loadDrivers(){
-  const j = await apiGET("/api/admin/drivers");
-
-  if (Array.isArray(j?.data)) {
-    drivers = j.data;
-  } else if (Array.isArray(j?.rows)) {
-    drivers = j.rows;
-  } else {
-    drivers = [];
-  }
-
-  renderDrivers();
-
-  const k = document.getElementById("k_drivers_total");
-  if (k) {
-    k.textContent = String(drivers.length);
-  }
-
-  syncRecentActivityFromLoadedData();
-}
-
-async function loadClients(){
-  const j = await apiGET("/api/admin/clients");
-
-  if (Array.isArray(j?.data)) {
-    clients = j.data;
-  } else if (Array.isArray(j?.rows)) {
-    clients = j.rows;
-  } else {
-    clients = [];
-  }
-
-  renderClients();
-
-  const k = document.getElementById("k_clients_total");
-  if (k) {
-    k.textContent = String(clients.length);
-  }
-
-  syncRecentActivityFromLoadedData();
-}
-
-async function loadFinance(){
-  const j = await apiGET("/api/admin/finance");
-  finance = j.data || [];
-  renderFinance();
-}
-
-async function loadPricingRules(){
-  const j = await apiGET("/api/admin/payment_rules");
-  pricingRules = j.data || [];
-  renderPricing();
-}
-
-async function loadBroadcasts(){
-  const j = await apiGET("/api/admin/broadcasts");
-  broadcasts = j.data || j.rows || [];
-  renderBroadcasts();
-}
-
-async function loadAudit(){
-  const j = await apiGET("/api/admin/audit_logs");
-  const logs = j.data || [];
-  const tb = document.getElementById("auditTable");
-  tb.innerHTML = logs.length ? logs.map(x => `
-    <tr>
-      <td>${esc(fmtDate(x.created_at))}</td>
-      <td>${esc(safe(x.event_type))}</td>
-      <td>${esc(safe(x.description))}</td>
-      <td>${esc(safe(x.user_id))}</td>
-      <td>${esc(safe(x.ip_address))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="5" class="muted">No logs</td></tr>`;
-}
-
-function renderAgents(){
-  const q = (document.getElementById("agentSearch").value || "").toLowerCase().trim();
-  const list = agents.filter(a => {
-    if(!q) return true;
-    const hay = `${a.full_name||""} ${a.email||""} ${a.phone||a.phone_number||""}`.toLowerCase();
-    return hay.includes(q);
-  });
-
-  const tb = document.getElementById("agentsTable");
-  tb.innerHTML = list.length ? list.map(a => {
-    const c = agentCounts[a.id] || {drivers:0, clients:0};
-    return `
-      <tr>
-        <td>${esc(safe(a.status))}</td>
-        <td>${esc(safe(a.full_name))}</td>
-        <td>${esc(safe(a.email))}</td>
-        <td>${esc(safe(a.phone || a.phone_number))}</td>
-        <td>${esc(c.drivers || 0)}</td>
-        <td>${esc(c.clients || 0)}</td>
-        <td>${esc(fmtDate(a.created_at))}</td>
-        <td class="row">
-          <button class="btn ok" onclick="setAgentStatus('${a.id}','ACTIVE')">Activate</button>
-          <button class="btn bad" onclick="setAgentStatus('${a.id}','BLOCKED')">Block</button>
-        </td>
-      </tr>
-    `;
-  }).join("") : `<tr><td colspan="8" class="muted">No agents found</td></tr>`;
-}
-
-function renderDrivers(){
-  const q = (document.getElementById("driverSearch").value || "").toLowerCase().trim();
-  const list = drivers.filter(d => {
-    if(!q) return true;
-    const hay = `${d.full_name||""} ${d.phone||d.phone_number||""} ${d.town||""} ${d.recruiter_name||""}`.toLowerCase();
-    return hay.includes(q);
-  });
-
-  const tb = document.getElementById("driversTable");
-  tb.innerHTML = list.length ? list.map(d => `
-    <tr>
-      <td>${esc(safe(d.status))}</td>
-      <td>${esc(safe(d.full_name))}</td>
-      <td>${esc(safe(d.phone || d.phone_number))}</td>
-      <td>${esc(safe(d.town))}</td>
-      <td>${esc(safe(d.recruiter_name))}</td>
-      <td>${esc(fmtDate(d.created_at))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="6" class="muted">No drivers found</td></tr>`;
-}
-
-
-function syncRecentActivityFromLoadedData(){
-  const body = document.getElementById("recentActivity");
-  if(!body) return;
-
-  const activity = [];
-
-  for (const d of (drivers || [])) {
-    activity.push({
-      created_at: d.created_at,
-      type: "Driver",
-      name: d.full_name || d.name || "",
-      phone: d.phone || d.phone_number || "",
-      town: d.town || "",
-      agent: d.recruiter_name || ""
-    });
-  }
-
-  for (const c of (clients || [])) {
-    activity.push({
-      created_at: c.created_at,
-      type: "Client",
-      name: c.full_name || c.name || "",
-      phone: c.phone || c.phone_number || "",
-      town: c.town || "",
-      agent: c.recruiter_name || ""
-    });
-  }
-
-  activity.sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
-
-  const rows = activity.slice(0, 25);
-
-  body.innerHTML = rows.length ? rows.map(r => `
-    <tr>
-      <td>${esc(fmtDate(r.created_at))}</td>
-      <td>${esc(safe(r.type))}</td>
-      <td>${esc(safe(r.name))}</td>
-      <td>${esc(safe(r.phone))}</td>
-      <td>${esc(safe(r.town))}</td>
-      <td>${esc(safe(r.agent))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="6" class="muted">No activity yet</td></tr>`;
-}
-
-function renderClients(){
-  const q = (document.getElementById("clientSearch").value || "").toLowerCase().trim();
-  const list = clients.filter(c => {
-    if(!q) return true;
-    const hay = `${c.full_name||""} ${c.phone||c.phone_number||""} ${c.recruiter_name||""}`.toLowerCase();
-    return hay.includes(q);
-  });
-
-  const tb = document.getElementById("clientsTable");
-  tb.innerHTML = list.length ? list.map(c => `
-    <tr>
-      <td>${esc(safe(c.status))}</td>
-      <td>${esc(safe(c.full_name))}</td>
-      <td>${esc(safe(c.phone || c.phone_number))}</td>
-      <td>${esc(safe(c.recruiter_name))}</td>
-      <td>${esc(fmtDate(c.created_at))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="5" class="muted">No clients found</td></tr>`;
-}
-
-function renderFinance(){
-  const q = (document.getElementById("financeSearch").value || "").toLowerCase().trim();
-  const list = finance.filter(x => !q || JSON.stringify(x || {}).toLowerCase().includes(q));
-  const tb = document.getElementById("financeTable");
-  tb.innerHTML = list.length ? list.map(x => `
-    <tr>
-      <td>${esc(fmtDate(x.created_at))}</td>
-      <td>${esc(safe(x.type || x.event_type || x.category))}</td>
-      <td>${esc(safe(x.user_id || x.email || x.actor))}</td>
-      <td>${esc(fmtMoney(x.amount))}</td>
-      <td>${esc(JSON.stringify(x.meta || x.details || {}))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="5" class="muted">No finance data</td></tr>`;
-}
-
-function renderPricing(){
-  const tb = document.getElementById("pricingTable");
-  tb.innerHTML = pricingRules.length ? pricingRules.map(r => `
-    <tr onclick='loadRuleToEditor(${JSON.stringify(r)})' style="cursor:pointer">
-      <td>${esc(r.region || "")}</td>
-      <td>${esc(r.town || "")}</td>
-      <td>${esc(JSON.stringify(r))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="3" class="muted">No pricing rules</td></tr>`;
-}
-
-function renderBroadcasts(){
-  const tb = document.getElementById("broadcastsTable");
-  tb.innerHTML = broadcasts.length ? broadcasts.map(bc => `
-    <tr>
-      <td>${esc(fmtDate(bc.created_at))}</td>
-      <td>${esc(safe(bc.message))}</td>
-      <td>${esc(safe(bc.target_region || "ALL"))}</td>
-      <td>${esc(safe(bc.id))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="4" class="muted">No broadcasts</td></tr>`;
-}
-
-async function setAgentStatus(agentId, status){
-  try{
-    await apiJSON("/api/admin/approve_agent", "POST", {agent_id: agentId, status});
-    toast("Agent updated");
-    await loadAgents();
-    renderAgentCenterList();
-    renderAgentCenterList();
-    await loadAgentCenterListDirect();
-    initAgentCenterWeek();
-    bindAgentCenterControls();
-    await loadOverview();
-  }catch(e){
-    toast(e.message);
-  }
-}
-
-async function savePricingRule(){
-  const region = (document.getElementById("pr_region").value || "").trim();
-  const town = (document.getElementById("pr_town").value || "").trim();
-  const raw = (document.getElementById("pr_json").value || "").trim();
-
-  if(!region || !town){
-    toast("Region and town are required");
-    return;
-  }
-
-  let payload = {};
-  if(raw){
-    try{ payload = JSON.parse(raw); }
-    catch(e){ toast("Invalid rule JSON"); return; }
-  }
-
-  payload.region = region;
-  payload.town = town;
-
-  try{
-    await apiJSON("/api/admin/payment_rules", "POST", payload);
-    toast("Pricing rule saved");
-    await loadPricingRules();
-  }catch(e){
-    toast(e.message);
-  }
-}
-
-function loadRuleToEditor(rule){
-  document.getElementById("pr_region").value = rule.region || "";
-  document.getElementById("pr_town").value = rule.town || "";
-  const clone = {...rule};
-  delete clone.id;
-  document.getElementById("pr_json").value = JSON.stringify(clone, null, 2);
-}
-
-async function createBroadcast(){
-  const message = (document.getElementById("bc_new_message").value || "").trim();
-  if(!message){
-    toast("Message required");
-    return;
-  }
-  try{
-    await apiJSON("/api/admin/broadcast", "POST", {message});
-    document.getElementById("bc_new_message").value = "";
-    toast("Broadcast sent");
-    await loadBroadcasts();
-  }catch(e){
-    toast(e.message);
-  }
-}
-
-function exportCSV(type){
-  let rows = [];
-  if(type === "agents") rows = agents;
-  if(type === "drivers") rows = drivers;
-  if(type === "clients") rows = clients;
-  if(!rows.length){ toast("Nothing loaded yet"); return; }
-
-  const cols = Object.keys(rows[0] || {});
-  const csv = [
-    cols.join(","),
-    ...rows.map(r => cols.map(c => {
-      const v = r[c];
-      const s = (v === null || v === undefined) ? "" : (typeof v === "object" ? JSON.stringify(v) : String(v));
-      return `"${s.replaceAll('"','""')}"`;
-    }).join(","))
-  ].join("\\n");
-
-  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `yene_${type}_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
-function downloadWeeklyPDF(){
-  const today = new Date();
-  const day = today.getDay();
-  const diff = (day === 0 ? -6 : 1 - day);
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-  const weekStart = monday.toISOString().slice(0,10);
-  window.location.href = `/api/admin/weekly_agent_report_pdf?week_start=${weekStart}`;
-}
-
-
-
-
-function maybeAutoLoadAgentCenter(){
-  if (!selectedAgentId) return;
-
-  const mode = document.getElementById("agentCenterMode")?.value || "current_week";
-  const week = document.getElementById("agentCenterWeek")?.value || "";
-  const day = document.getElementById("agentCenterDay")?.value || "";
-  const from = document.getElementById("agentCenterFrom")?.value || "";
-  const to = document.getElementById("agentCenterTo")?.value || "";
-
-  if (mode === "custom") {
-    if (from && to) loadSelectedAgentCenter();
-    return;
-  }
-
-  if (mode === "day") {
-    if (day) loadSelectedAgentCenter();
-    return;
-  }
-
-  if (mode === "all_time") {
-    loadSelectedAgentCenter();
-    return;
-  }
-
-  if (week) loadSelectedAgentCenter();
-}
-
-function toggleAgentCenterDateInputs(){
-  const mode = document.getElementById("agentCenterMode")?.value || "current_week";
-  const week = document.getElementById("agentCenterWeek");
-  const day = document.getElementById("agentCenterDay");
-  const from = document.getElementById("agentCenterFrom");
-  const to = document.getElementById("agentCenterTo");
-
-  if (!week || !day || !from || !to) return;
-
-  if (mode === "day") {
-    week.style.display = "none";
-    day.style.display = "";
-    from.style.display = "none";
-    to.style.display = "none";
-  } else if (mode === "custom") {
-    week.style.display = "none";
-    day.style.display = "none";
-    from.style.display = "";
-    to.style.display = "";
-  } else if (mode === "all_time") {
-    week.style.display = "none";
-    day.style.display = "none";
-    from.style.display = "none";
-    to.style.display = "none";
-  } else {
-    week.style.display = "";
-    day.style.display = "none";
-    from.style.display = "none";
-    to.style.display = "none";
-  }
-}
-
-
-function bindAgentCenterControls(){
-  const mode = document.getElementById("agentCenterMode");
-  const week = document.getElementById("agentCenterWeek");
-  const day = document.getElementById("agentCenterDay");
-  const from = document.getElementById("agentCenterFrom");
-  const to = document.getElementById("agentCenterTo");
-
-  if (mode && !mode.dataset.bound) {
-    mode.addEventListener("change", () => {
-      toggleAgentCenterDateInputs();
-      maybeAutoLoadAgentCenter();
-    });
-    mode.dataset.bound = "1";
-  }
-
-  const bindDate = (el) => {
-    if (!el || el.dataset.bound) return;
-    el.addEventListener("change", () => {
-      maybeAutoLoadAgentCenter();
-    });
-    el.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        maybeAutoLoadAgentCenter();
-      }
-    });
-    el.dataset.bound = "1";
-  };
-
-  bindDate(week);
-  bindDate(day);
-  bindDate(from);
-  bindDate(to);
-}
-
-function initAgentCenterWeek(){
-  const el = document.getElementById("agentCenterWeek");
-  const dayEl = document.getElementById("agentCenterDay");
-  const from = document.getElementById("agentCenterFrom");
-  const to = document.getElementById("agentCenterTo");
-  if(!el) return;
-
-  const today = new Date();
-  const weekday = today.getDay();
-  const diff = (weekday === 0 ? -6 : 1 - weekday);
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-
-  el.value = monday.toISOString().slice(0,10);
-  if (dayEl) dayEl.value = today.toISOString().slice(0,10);
-  if (from) from.value = monday.toISOString().slice(0,10);
-
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  if (to) to.value = sunday.toISOString().slice(0,10);
-
-  toggleAgentCenterDateInputs();
-  bindAgentCenterControls();
-}
-
-function renderAgentCenterList(){
-  const body = document.getElementById("agentCenterList");
-  if(!body) return;
-
-  console.log("RENDER AGENT CENTER", agents.length, agents);
-
-  if (!agents || !agents.length) {
-    body.innerHTML = `<tr><td colspan="4" class="muted">No agents found</td></tr>`;
-    return;
-  }
-
-  body.innerHTML = agents.map(a => `
-    <tr>
-      <td>${esc(safe(a.full_name || a.username || a.name || "-"))}</td>
-      <td>${esc(safe(a.email || "-"))}</td>
-      <td>${esc(safe(a.status || "-"))}</td>
-      <td><button class="btn" onclick="openAgentCenter('${a.id}')">Open</button></td>
-    </tr>
-  `).join("");
-}
-
-function openAgentCenter(agentId){
-  selectedAgentId = agentId;
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  document.querySelector('.tab[data-tab="agent-center"]').classList.add("active");
-  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
-  document.getElementById("agent-center").classList.add("active");
-  maybeAutoLoadAgentCenter();
-}
-
-async function loadSelectedAgentCenter(){
-  if(!selectedAgentId){
-    toast("Select an agent first");
-    return;
-  }
-  const mode = document.getElementById("agentCenterMode")?.value || "current_week";
-  const weekStart = document.getElementById("agentCenterWeek")?.value || "";
-  const dayDate = document.getElementById("agentCenterDay")?.value || "";
-  const dateFrom = document.getElementById("agentCenterFrom")?.value || "";
-  const dateTo = document.getElementById("agentCenterTo")?.value || "";
-
-  let qs = `mode=${encodeURIComponent(mode)}`;
-  if (mode === "custom") {
-    qs += `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`;
-  } else if (mode === "day") {
-    qs += `&date_day=${encodeURIComponent(dayDate)}`;
-  } else if (mode !== "all_time") {
-    qs += `&week_start=${encodeURIComponent(weekStart)}`;
-  }
-
-  const j = await apiGET(`/api/admin/agent_center/${encodeURIComponent(selectedAgentId)}?${qs}`);
-  const d = j.data || {};
-  selectedAgentWeekData = d;
-
-  const a = d.agent || {};
-  document.getElementById("selectedAgentMeta").innerHTML =
-    `<b>${esc(safe(a.full_name))}</b><br>` +
-    `Email: ${esc(safe(a.email))}<br>` +
-    `Phone: ${esc(safe(a.phone))}<br>` +
-    `Town: ${esc(safe(a.town))} | Region: ${esc(safe(a.region))}<br>` +
-    `Status: ${esc(safe(a.status))}<br>` +
-    `Mode: ${esc(safe(d.mode || "current_week"))}<br>` +
-    `Period: ${d.date_from ? esc(safe(d.date_from)) : "All Time"} ${d.date_to ? "to " + esc(safe(d.date_to)) : ""}<br>` +
-    `Drivers Total: ${esc(safe(d.drivers_total,0))} | Clients Total: ${esc(safe(d.clients_total,0))}`;
-
-  const weekBody = document.getElementById("selectedAgentWeekTable");
-  const days = d.days || {};
-  const order = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-  weekBody.innerHTML = order.map(day => `
-    <tr>
-      <td>${day}</td>
-      <td>${esc(safe(days[day]?.drivers,0))}</td>
-      <td>${esc(safe(days[day]?.clients,0))}</td>
-    </tr>
-  `).join("");
-
-  loadSelectedAgentMessages();
-
-  const rowsBody = document.getElementById("selectedAgentRows");
-  const rows = d.rows || [];
-  rowsBody.innerHTML = rows.length ? rows.map(r => `
-    <tr>
-      <td>${esc(fmtDate(r.created_at))}</td>
-      <td>${esc(safe(r.type))}</td>
-      <td>${esc(safe(r.name))}</td>
-      <td>${esc(safe(r.phone))}</td>
-      <td>${esc(safe(r.town))}</td>
-      <td>${esc(safe(r.code))}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="6" class="muted">No weekly rows for this agent</td></tr>`;
-}
-
-
-async function loadSelectedAgentMessages(){
-  if(!selectedAgentId){
-    return;
-  }
-  try{
-    const j = await apiGET(`/api/admin/agent_messages/${encodeURIComponent(selectedAgentId)}`);
-    const rows = Array.isArray(j?.rows) ? j.rows : [];
-    const body = document.getElementById("selectedAgentMessages");
-    if(!body) return;
-
-    body.innerHTML = rows.length ? rows.map(r => `
-      <tr>
-        <td>${esc(fmtDate(r.created_at))}</td>
-        <td>${esc(safe(r.registration_type))}</td>
-        <td>${esc(safe(r.registration_id))}</td>
-        <td>${esc(safe(r.subject))}</td>
-        <td>${esc(safe(r.status))}</td>
-      </tr>
-    `).join("") : `<tr><td colspan="5" class="muted">No messages yet</td></tr>`;
-  }catch(e){
-    const body = document.getElementById("selectedAgentMessages");
-    if(body){
-      body.innerHTML = `<tr><td colspan="5" class="muted">Failed to load messages</td></tr>`;
-    }
-  }
-}
-
-async function sendMessageToSelectedAgent(){
-  if(!selectedAgentId || !selectedAgentWeekData?.agent){
-    toast("Select an agent first");
-    return;
-  }
-
-  const agent = selectedAgentWeekData.agent;
-  const registration_type = document.getElementById("agentMsgType")?.value || "";
-  const registration_id = document.getElementById("agentMsgRegistrationId")?.value || "";
-  const subject = document.getElementById("agentMsgSubject")?.value || "";
-  const message = document.getElementById("agentMsgBody")?.value || "";
-
-  try{
-    await apiJSON("/api/admin/agent_messages", "POST", {
-      agent_id: agent.id,
-      agent_name: agent.full_name || agent.username || "",
-      registration_type,
-      registration_id,
-      subject,
-      message
-    });
-
-    toast("Message sent to agent");
-    document.getElementById("agentMsgRegistrationId").value = "";
-    document.getElementById("agentMsgSubject").value = "";
-    document.getElementById("agentMsgBody").value = "";
-    await loadSelectedAgentMessages();
-  }catch(e){
-    toast(e.message);
-  }
-}
-
-function downloadSelectedAgentPDF(){
-  if(!selectedAgentId){
-    toast("Select an agent first");
-    return;
-  }
-  const mode = document.getElementById("agentCenterMode")?.value || "current_week";
-  const weekStart = document.getElementById("agentCenterWeek")?.value || "";
-  const dayDate = document.getElementById("agentCenterDay")?.value || "";
-  const dateFrom = document.getElementById("agentCenterFrom")?.value || "";
-  const dateTo = document.getElementById("agentCenterTo")?.value || "";
-
-  let qs = `mode=${encodeURIComponent(mode)}`;
-  if (mode === "custom") {
-    qs += `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`;
-  } else if (mode === "day") {
-    qs += `&date_day=${encodeURIComponent(dayDate)}`;
-  } else if (mode !== "all_time") {
-    qs += `&week_start=${encodeURIComponent(weekStart)}`;
-  }
-
-  window.location.href = `/api/admin/agent_center_pdf/${encodeURIComponent(selectedAgentId)}?${qs}`;
-}
-
-
-async function loadAgentCenterListDirect(){
-  const body = document.getElementById("agentCenterList");
-  if(!body) return;
-
-  body.innerHTML = `<tr><td colspan="4" class="muted">Loading agents...</td></tr>`;
-
-  try{
-    const j = await apiGET("/api/admin/agents");
-    const rows = Array.isArray(j?.rows) ? j.rows : [];
-
-    body.innerHTML = rows.length ? rows.map(a => `
-      <tr>
-        <td>${esc(safe(a.full_name || a.username || a.name || "-"))}</td>
-        <td>${esc(safe(a.email || "-"))}</td>
-        <td>${esc(safe(a.status || "-"))}</td>
-        <td><button class="btn" onclick="openAgentCenter('${a.id}')">Open</button></td>
-      </tr>
-    `).join("") : `<tr><td colspan="4" class="muted">No agents found</td></tr>`;
-  }catch(e){
-    body.innerHTML = `<tr><td colspan="4" class="muted">Failed to load agents</td></tr>`;
-    console.error("Agent Center list error:", e);
-  }
-}
-
-async function refreshAll(){
-  setTableLoading("recentActivity", 6, "overview");
-  setTableLoading("agentsTable", 8, "agents");
-  setTableLoading("driversTable", 6, "drivers");
-  setTableLoading("clientsTable", 5, "clients");
-
-  await safeLoad("Overview", loadOverview);
-
-  await Promise.allSettled([
-    safeLoad("Agents", async () => {
-      await loadAgents();
-      renderAgentCenterList();
-    }),
-    safeLoad("Drivers", loadDrivers),
-    safeLoad("Clients", loadClients)
-  ]);
-
-  syncRecentActivityFromLoadedData();
-  await safeLoad("Agent center list", loadAgentCenterListDirect);
-  initAgentCenterWeek();
-  bindAgentCenterControls();
-
-  await Promise.allSettled([
-    safeLoad("Finance", loadFinance),
-    safeLoad("Pricing", loadPricingRules),
-    safeLoad("Broadcasts", loadBroadcasts),
-    safeLoad("Audit", loadAudit)
-  ]);
-
-  toast("Refreshed");
-}
-
-refreshAll();
-</script>
+    </section>
+
+    <section class="section" id="settings">
+      <div class="card"><div class="title">Account Settings</div><div class="sub">Admin account settings remain routed through the existing auth/session layer. Use account reset controls in Agent Center for agent login support.</div></div>
+    </section>
+  </main>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let agents=[], drivers=[], clients=[], finance=[], jobs=[], broadcasts=[], payouts=[], selectedAgent=null;
+    const $=id=>document.getElementById(id);
+    const money=n=>"N$ "+(Number(n||0)||0).toFixed(2);
+    const esc=s=>String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+    const val=(x,f="—")=>(x===null||x===undefined||x==="")?f:x;
+    const date=x=>{try{return x?new Date(x).toLocaleString():"—"}catch(e){return String(x||"—")}};
+    function toast(msg){$("toast").textContent=msg;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2600)}
+    async function get(url){const r=await fetch(url,{credentials:"same-origin"});const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||"Request failed");return j}
+    async function post(url,body={}){const r=await fetch(url,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||"Request failed");return j}
+    function statusPill(s){const u=String(s||"").toUpperCase();let c=u.includes("APPROV")||u==="ACTIVE"?"ok":(u.includes("PEND")?"warn":(u.includes("BLOCK")||u.includes("REJECT")?"bad":""));return `<span class="pill ${c}">${esc(s||"-")}</span>`}
+    function setSelected(id){selectedAgent=agents.find(a=>String(a.id)===String(id))||null;renderSelectedAgent();loadAccountHelp();loadSelectedAgentCenter()}
+    function agentIdentity(a){return [a.id,a.auth_id,a.user_id,(a.email||"").toLowerCase()].filter(Boolean).map(String)}
+    function owns(row,a){const ids=agentIdentity(a);return ["recruiter_agent_id","agent_id","agent_auth_id","recruiter_auth_id","recruiter_email"].some(k=>ids.includes(String(row[k]||"").toLowerCase()))}
+    function agentCounts(a){return {drivers:drivers.filter(d=>owns(d,a)).length,clients:clients.filter(c=>owns(c,a)).length}}
+    function bindTabs(){document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));btn.classList.add("active");document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));$(btn.dataset.tab).classList.add("active");$("tabs").classList.remove("open")}));$("menuBtn").addEventListener("click",()=>$("tabs").classList.toggle("open"))}
+    function initDates(){const now=new Date();const d=now.getDay();const monday=new Date(now);monday.setDate(now.getDate()+(d===0?-6:1-d));const iso=monday.toISOString().slice(0,10);["periodDate","reportWeek"].forEach(id=>$(id).value=iso);const sun=new Date(monday);sun.setDate(monday.getDate()+6);$("periodTo").value=sun.toISOString().slice(0,10)}
+    async function loadOverview(){const j=await get("/api/admin/overview");const d=j.data||{};$("kAgents").textContent=d.agents_total||agents.length||0;$("kAgentsMeta").textContent=`Active ${d.agents_active||0} • Pending ${d.agents_pending||0} • Blocked ${d.agents_blocked||0}`;$("kDrivers").textContent=drivers.length||d.drivers_total||0;$("kDriversMeta").textContent=`Pending ${drivers.filter(x=>String(x.status||"").toUpperCase().includes("PEND")).length}`;$("kClients").textContent=clients.length||d.clients_total||0;$("kClientsMeta").textContent=`Pending ${clients.filter(x=>String(x.status||"").toUpperCase().includes("PEND")).length}`;$("kPaid").textContent=money(d.total_paid);renderRecent(d.recent_activity||[]);renderLeaderboard()}
+    async function loadAgents(){const j=await get("/api/admin/agents");agents=j.rows||j.data||[];renderAgents();renderLeaderboard()}
+    async function loadDrivers(){const j=await get("/api/admin/drivers");drivers=j.rows||j.data||[];renderDrivers();renderApprovals();renderLeaderboard()}
+    async function loadClients(){const j=await get("/api/admin/clients");clients=j.rows||j.data||[];renderClients();renderApprovals();renderLeaderboard()}
+    async function loadFinance(){const j=await get("/api/admin/finance");finance=j.rows||j.data||[];renderFinance();loadPayouts()}
+    async function loadPayouts(){try{const j=await get("/api/admin/payout_workflow?scope=weekly");payouts=j.rows||[];renderPayouts()}catch(e){$("payoutRows").innerHTML="<table><tbody><tr><td>Could not load payout workflow.</td></tr></tbody></table>"}}
+    async function loadJobs(){try{const j=await get("/api/admin/jobs");jobs=j.rows||[];renderJobs()}catch(e){$("jobRows").innerHTML=`<tr><td colspan="5">Jobs table unavailable. Run sql/yene_upgrade.sql.</td></tr>`}}
+    async function loadBroadcasts(){const j=await get("/api/admin/broadcasts");broadcasts=j.rows||j.data||[];renderBroadcasts()}
+    function renderRecent(rows){if(!rows.length){rows=[...drivers.map(d=>({created_at:d.created_at,type:"Driver",name:d.full_name,phone:d.phone||d.phone_number,town:d.town,agent:d.recruiter_name})),...clients.map(c=>({created_at:c.created_at,type:"Client",name:c.full_name,phone:c.phone||c.phone_number,town:c.town,agent:c.recruiter_name}))].sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||""))).slice(0,25)}$("recentRows").innerHTML=rows.length?rows.slice(0,25).map(r=>`<tr><td>${date(r.created_at)}</td><td>${esc(r.type)}</td><td>${esc(val(r.name))}</td><td>${esc(val(r.phone))}</td><td>${esc(val(r.town))}</td><td>${esc(val(r.agent))}</td></tr>`).join(""):`<tr><td colspan="6">No activity yet.</td></tr>`}
+    function renderLeaderboard(){const rows=agents.map(a=>{const c=agentCounts(a);return {a,...c,score:c.drivers*3+c.clients*2}}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,10);$("leaderRows").innerHTML=rows.length?rows.map(x=>`<tr><td>${esc(x.a.full_name||x.a.username||x.a.email||"Agent")}</td><td>${x.drivers}</td><td>${x.clients}</td><td>${x.score}</td></tr>`).join(""):`<tr><td colspan="4">No leaderboard activity yet.</td></tr>`}
+    function renderAgents(){const q=($("agentSearch").value||"").toLowerCase();const rows=agents.filter(a=>JSON.stringify(a).toLowerCase().includes(q));$("agentRows").innerHTML=rows.length?rows.map(a=>{const c=agentCounts(a);return `<tr><td>${esc(a.full_name||a.username||"Agent")}</td><td>${statusPill(a.status)}</td><td>${esc(a.email||"")}</td><td>${c.drivers}</td><td>${c.clients}</td><td><button class="btn" onclick="setSelected('${esc(a.id)}')">Select</button></td></tr>`}).join(""):`<tr><td colspan="6">No agents found.</td></tr>`}
+    function renderDrivers(){const q=($("driverSearch").value||"").toLowerCase();const rows=drivers.filter(r=>JSON.stringify(r).toLowerCase().includes(q));$("driverRows").innerHTML=rows.length?rows.map(d=>`<tr><td>${statusPill(d.status)}</td><td>${esc(val(d.full_name||d.name))}</td><td>${esc(val(d.phone||d.phone_number))}</td><td>${esc(val(d.town))}</td><td>${esc(val(d.recruiter_name))}</td><td>${date(d.created_at)}</td></tr>`).join(""):`<tr><td colspan="6">No drivers.</td></tr>`}
+    function renderClients(){const q=($("clientSearch").value||"").toLowerCase();const rows=clients.filter(r=>JSON.stringify(r).toLowerCase().includes(q));$("clientRows").innerHTML=rows.length?rows.map(c=>`<tr><td>${statusPill(c.status)}</td><td>${esc(val(c.full_name||c.name))}</td><td>${esc(val(c.phone||c.phone_number))}</td><td>${esc(val(c.town))}</td><td>${esc(val(c.recruiter_name))}</td><td>${date(c.created_at)}</td></tr>`).join(""):`<tr><td colspan="6">No clients.</td></tr>`}
+    function renderApprovals(){const pendingAgent=agents.filter(a=>!["ACTIVE","APPROVED"].includes(String(a.status||"").toUpperCase()));$("pendingAgentRows").innerHTML=pendingAgent.length?pendingAgent.map(a=>`<tr><td>${esc(a.full_name||a.email||"Agent")}</td><td>${statusPill(a.status||"PENDING")}</td><td>${a.auth_id||a.user_id?"Linked":"Missing"}</td><td><button class="btn" onclick="setSelected('${esc(a.id)}')">Select</button></td></tr>`).join(""):`<tr><td colspan="4">No pending agents.</td></tr>`;const pendingDrivers=drivers.filter(d=>!["ACTIVE","APPROVED","VERIFIED","ADMIN_APPROVED"].includes(String(d.status||"").toUpperCase())).slice(0,50);$("pendingDriverRows").innerHTML=pendingDrivers.length?pendingDrivers.map(d=>`<tr><td>${esc(d.full_name||"Driver")}</td><td>${esc(d.town||"")}</td><td>${esc(d.recruiter_name||"")}</td><td><button class="btn ok" onclick="approveRow('driver','${esc(d.id)}')">Approve</button></td></tr>`).join(""):`<tr><td colspan="4">No pending drivers.</td></tr>`;const pendingClients=clients.filter(c=>!["ACTIVE","APPROVED","VERIFIED","ADMIN_APPROVED"].includes(String(c.status||"").toUpperCase())).slice(0,50);$("pendingClientRows").innerHTML=pendingClients.length?pendingClients.map(c=>`<tr><td>${esc(c.full_name||"Client")}</td><td>${esc(c.town||"")}</td><td>${esc(c.recruiter_name||"")}</td><td><button class="btn ok" onclick="approveRow('client','${esc(c.id)}')">Approve</button></td></tr>`).join(""):`<tr><td colspan="4">No pending clients.</td></tr>`}
+    function renderSelectedAgent(){if(!selectedAgent){$("selectedAgentMeta").textContent="No agent selected.";return}const c=agentCounts(selectedAgent);$("selectedAgentMeta").innerHTML=`<b>${esc(selectedAgent.full_name||selectedAgent.email||"Agent")}</b><br>${esc(selectedAgent.email||"")} • ${esc(selectedAgent.phone||selectedAgent.phone_number||"")}<br>${statusPill(selectedAgent.status)} Drivers ${c.drivers} • Clients ${c.clients}`}
+    async function loadAccountHelp(){if(!selectedAgent)return;$("accountResult").textContent="Loading account help...";try{const j=await get(`/api/admin/agent_account_help/${encodeURIComponent(selectedAgent.id)}`);const a=j.agent||{};const s=j.summary||{};$("accountResult").textContent="Account loaded.";$("accountHelpGrid").innerHTML=[["Auth linked",a.auth_linked?"Yes":"No"],["Must change password",a.must_change_password?"Yes":"No"],["Temp password",a.temp_password||"None"],["Last reset",a.last_reset_at||"Never"],["Reset by",a.reset_by_admin||"-"],["Rows",s.rows_total||0]].map(x=>`<div class="card soft"><div class="k">${x[0]}</div><div class="sub">${esc(x[1])}</div></div>`).join("")}catch(e){$("accountResult").textContent=e.message}}
+    function periodParams(){const mode=$("periodMode").value;const p=new URLSearchParams({mode});if(mode==="day")p.set("date_day",$("periodDate").value);else if(mode==="custom"){p.set("date_from",$("periodDate").value);p.set("date_to",$("periodTo").value)}else if(mode!=="all_time")p.set("week_start",$("periodDate").value);return p}
+    function togglePeriodInputs(){$("periodTo").style.display=$("periodMode").value==="custom"?"":"none"}
+    async function loadSelectedAgentCenter(){if(!selectedAgent)return;const j=await get(`/api/admin/agent_center/${encodeURIComponent(selectedAgent.id)}?${periodParams().toString()}`);const d=j.data||{};const days=d.days||{};$("agentDayRows").innerHTML=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(day=>`<tr><td>${day}</td><td>${days[day]?.drivers||0}</td><td>${days[day]?.clients||0}</td></tr>`).join("");const rows=d.rows||[];$("agentDetailRows").innerHTML=rows.length?rows.map(r=>`<tr><td>${date(r.created_at)}</td><td>${esc(r.type)}</td><td>${esc(r.name)}</td><td>${esc(r.phone)}</td><td>${esc(r.town)}</td><td>${statusPill(r.status)}</td></tr>`).join(""):`<tr><td colspan="6">No rows for period.</td></tr>`}
+    async function approveSelectedAgent(){if(!selectedAgent)return toast("Select an agent first");await post(`/api/admin/approve_agent/${encodeURIComponent(selectedAgent.id)}`);toast("Agent approved");await refreshCore();setSelected(selectedAgent.id)}
+    async function resetSelectedAgent(){if(!selectedAgent)return toast("Select an agent first");const j=await post(`/api/admin/reset_agent_account/${encodeURIComponent(selectedAgent.id)}`);toast(`Temporary password: ${j.temp_password||"-"}`);alert(`Email: ${j.email||"-"}\nTemporary password: ${j.temp_password||"-"}`);await refreshCore();setSelected(selectedAgent.id)}
+    async function blockSelectedAgent(){if(!selectedAgent)return toast("Select an agent first");await post(`/api/admin/agent_set_status/${encodeURIComponent(selectedAgent.id)}`,{status:"BLOCKED"});toast("Agent blocked");await refreshCore();setSelected(selectedAgent.id)}
+    function openSelectedProfile(){if(selectedAgent)location.href=`/admin/agent/${encodeURIComponent(selectedAgent.id)}`}
+    async function approveRow(kind,id){await post(`/api/admin/approve_${kind}`,{id});toast(`${kind} approved`);await refreshCore()}
+    function reportParams(selected){const p=new URLSearchParams({week_start:$("reportWeek").value||$("periodDate").value,driver_reg:$("payDriver").value,client_reg:$("payClient").value,daily_5_drivers_bonus:$("payDailyDriver").value,daily_5_clients_bonus:$("payDailyClient").value,weekly_30_activations_bonus:$("payWeekly").value,first_trip_bonus:$("payFirstTrip").value});if(selected){if(!selectedAgent)return toast("Select an agent first");p.set("agent_id",selectedAgent.id)}return p}
+    function downloadWeeklyPdf(selected){const p=reportParams(selected);if(p)window.open(`/api/admin/weekly_agent_report_pdf?${p.toString()}`,"_blank")}
+    function renderFinance(){const q=($("financeSearch").value||"").toLowerCase();const rows=finance.filter(x=>JSON.stringify(x).toLowerCase().includes(q)).slice(0,300);$("financeRows").innerHTML=rows.length?rows.map(x=>`<tr><td>${date(x.created_at||x.updated_at)}</td><td>${esc(x.agent_name||x.agent_email||x.email||x.user_id||"")}</td><td>${esc(x.entry_type||x.txn_type||x.type||"")}</td><td>${statusPill(x.status)}</td><td>${money(x.amount||x.request_amount||x.balance)}</td><td>${esc(x.description||x.request_note||"")}</td></tr>`).join(""):`<tr><td colspan="6">No finance rows.</td></tr>`}
+    function renderPayouts(){const rows=payouts.slice(0,200);$("payoutRows").innerHTML=`<table><thead><tr><th>Include</th><th>Agent</th><th>Due</th><th>Paid</th></tr></thead><tbody>${rows.length?rows.map((r,i)=>`<tr><td><input type="checkbox" class="paycheck" data-i="${i}" checked onchange="calcPayoutTotal()"></td><td>${esc(r.agent||r.email||"Agent")}</td><td>${money(r.total_bonus||r.amount_due)}</td><td>${money(r.total_paid)}</td></tr>`).join(""):`<tr><td colspan="4">No payout rows.</td></tr>`}</tbody></table>`;calcPayoutTotal()}
+    function calcPayoutTotal(){let total=0;document.querySelectorAll(".paycheck:checked").forEach(cb=>{const r=payouts[Number(cb.dataset.i)]||{};total+=Number(r.total_bonus||r.amount_due||0)});$("payoutTotal").textContent=money(total)+" selected"}
+    async function markSelectedPaid(){const checks=[...document.querySelectorAll(".paycheck:checked")];for(const cb of checks){const r=payouts[Number(cb.dataset.i)]||{};const amount=Number(r.total_bonus||r.amount_due||0);if(r.agent_id&&amount>0)await post("/api/admin/mark_paid",{agent_id:r.agent_id,amount})}toast("Selected payouts marked paid");await loadFinance()}
+    function renderJobs(){$("jobRows").innerHTML=jobs.length?jobs.map(j=>`<tr><td>${date(j.created_at)}</td><td>${esc(j.title)}</td><td>${esc(j.town||j.region||"")}</td><td>${statusPill(j.status)}</td><td>${esc(j.target_count||0)}</td></tr>`).join(""):`<tr><td colspan="5">No job alerts yet.</td></tr>`}
+    async function createJob(){await post("/api/admin/jobs",{title:$("jobTitle").value,description:$("jobDescription").value,town:$("jobTown").value,target_count:$("jobTarget").value,status:$("jobStatus").value});$("jobTitle").value=$("jobDescription").value=$("jobTown").value=$("jobTarget").value="";toast("Job posted");await loadJobs()}
+    function renderBroadcasts(){$("broadcastRows").innerHTML=broadcasts.length?broadcasts.map(b=>`<tr><td>${date(b.created_at)}</td><td>${esc(b.title||"Broadcast")}</td><td>${esc(b.message||"")}</td></tr>`).join(""):`<tr><td colspan="3">No broadcasts.</td></tr>`}
+    async function createBroadcast(){await post("/api/admin/broadcast",{title:$("broadcastTitle").value,message:$("broadcastMessage").value});$("broadcastTitle").value=$("broadcastMessage").value="";toast("Broadcast sent");await loadBroadcasts()}
+    async function refreshCore(){await Promise.allSettled([loadAgents(),loadDrivers(),loadClients()]);renderApprovals();await loadOverview()}
+    async function refreshAll(){await refreshCore();await Promise.allSettled([loadFinance(),loadJobs(),loadBroadcasts()]);toast("Refreshed")}
+    bindTabs();initDates();togglePeriodInputs();refreshAll();
+  </script>
 </body>
 </html>

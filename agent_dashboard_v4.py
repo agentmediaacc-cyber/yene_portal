@@ -91,6 +91,9 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 return True
         return False
 
+    def _approved(row):
+        return str((row or {}).get("status") or "").strip().upper() in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
+
     def _select_all(table, limit=10000, order_col="created_at", desc=True):
         try:
             q = sb_admin.table(table).select("*")
@@ -324,6 +327,33 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 continue
         return False, None, None
 
+    def _duplicate_value_exists(table, value, columns):
+        value = str(value or "").strip()
+        if not value:
+            return False, None, None
+        for column in columns:
+            try:
+                rows = (
+                    _execute_with_retry(
+                        f"{table}_duplicate_{column}",
+                        lambda column=column: sb_admin.table(table).select("id").eq(column, value).limit(1),
+                        retries=1,
+                    ).data or []
+                )
+                if rows:
+                    return True, column, None
+            except Exception as exc:
+                app.logger.warning(
+                    "registration_duplicate_value_check_failed table=%s column=%s error=%s",
+                    table,
+                    column,
+                    exc,
+                )
+                if _is_transient_error(exc):
+                    return False, column, exc
+                continue
+        return False, None, None
+
     def driver_rows(agent_or_id, start=None, end=None):
         if isinstance(agent_or_id, dict):
             values = _identity_values(agent_or_id)
@@ -489,10 +519,13 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         all_d = driver_rows(agent)
         all_c = client_rows(agent)
         team = team_agents(agent)
+        approved_wk_d = [r for r in wk_d if _approved(r)]
+        approved_wk_c = [r for r in wk_c if _approved(r)]
+        pending_approvals = len([r for r in wk_d + wk_c if not _approved(r)])
 
         earnings_week = (
-            len(wk_c) * safe_float(rates["client_register_amount"]) +
-            len(wk_d) * safe_float(rates["driver_register_amount"])
+            len(approved_wk_c) * safe_float(rates["client_register_amount"]) +
+            len(approved_wk_d) * safe_float(rates["driver_register_amount"])
         )
         debug(
             "agent_summary_v4",
@@ -510,6 +543,9 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "week_end": we.date().isoformat(),
             "drivers_week": len(wk_d),
             "clients_week": len(wk_c),
+            "approved_drivers_week": len(approved_wk_d),
+            "approved_clients_week": len(approved_wk_c),
+            "pending_approvals": pending_approvals,
             "drivers_all": len(all_d),
             "clients_all": len(all_c),
             "earnings_week": round(earnings_week, 2),
@@ -705,8 +741,8 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         car_details = (data.get("car_details") or "").strip()
         external_code = (data.get("external_code") or "").strip()
 
-        if not full_name or not phone or not license_number or not car_details:
-            return jsonify({"ok": False, "error": "Full name, phone, license number and car details are required"}), 400
+        if not full_name or not phone or not town or not license_number:
+            return jsonify({"ok": False, "error": "Full name, phone, town and PAR/license number are required"}), 400
 
         app.logger.info(
             "agent_register_driver_v4 payload agent=%s fields=%s phone_present=%s",
@@ -731,6 +767,26 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         )
         if duplicate:
             return jsonify({"ok": False, "error": "Driver phone already exists"}), 400
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_value_exists(
+            "drivers",
+            license_number,
+            ("license_number", "external_code", "driver_code", "par_number"),
+        )
+        if duplicate_error:
+            return jsonify({"ok": False, "error": "Could not validate driver code. Please try again."}), 503
+        if duplicate:
+            return jsonify({"ok": False, "error": f"Driver already exists with this {duplicate_column}"}), 400
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_value_exists(
+            "drivers",
+            full_name,
+            ("full_name", "name"),
+        )
+        if duplicate_error:
+            return jsonify({"ok": False, "error": "Could not validate driver name. Please try again."}), 503
+        if duplicate:
+            return jsonify({"ok": False, "error": "A driver with this name already exists"}), 400
 
         payload = {
             "full_name": full_name,
@@ -789,8 +845,8 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         town = (data.get("town") or "").strip()
         external_code = (data.get("external_code") or "").strip()
 
-        if not phone:
-            return jsonify({"ok": False, "error": "Phone number is required"}), 400
+        if not full_name or not phone or not town or not external_code:
+            return jsonify({"ok": False, "error": "Full name, phone, town and customer code are required"}), 400
 
         app.logger.info(
             "agent_register_client_v4 payload agent=%s fields=%s phone_present=%s",
@@ -815,6 +871,26 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         )
         if duplicate:
             return jsonify({"ok": False, "error": "Client phone already exists"}), 400
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_value_exists(
+            "clients",
+            external_code,
+            ("external_code", "yene_code", "customer_code", "client_code"),
+        )
+        if duplicate_error:
+            return jsonify({"ok": False, "error": "Could not validate client code. Please try again."}), 503
+        if duplicate:
+            return jsonify({"ok": False, "error": f"Client already exists with this {duplicate_column}"}), 400
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_value_exists(
+            "clients",
+            full_name,
+            ("full_name", "name"),
+        )
+        if duplicate_error:
+            return jsonify({"ok": False, "error": "Could not validate client name. Please try again."}), 503
+        if duplicate:
+            return jsonify({"ok": False, "error": "A client with this name already exists"}), 400
 
         payload = {
             "phone_number": phone,
