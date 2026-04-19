@@ -1,6 +1,16 @@
+import base64
 import time
 from datetime import datetime, timedelta, timezone
 from flask import jsonify, request, session, redirect
+from yene_shared import (
+    agent_quality_score,
+    identity_values as shared_identity_values,
+    matches_identity as shared_matches_identity,
+    normalize_phone,
+    profile_completion,
+    profile_missing,
+    profile_photo,
+)
 
 def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_event=None):
     UTC = timezone.utc
@@ -78,37 +88,44 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         return dt.astimezone(UTC).isoformat()
 
     def _identity_values(agent):
-        vals = []
-        for key in ("id", "auth_id", "user_id", "email"):
-            val = str(agent.get(key) or "").strip()
-            if val and val not in vals:
-                vals.append(val)
-        return vals
+        return shared_identity_values(agent)
 
     def _matches_identity(row, values, fields):
-        for field in fields:
-            if str(row.get(field) or "").strip() in values:
-                return True
-        return False
+        return shared_matches_identity(row, values, fields)
 
     def _approved(row):
         return str((row or {}).get("status") or "").strip().upper() in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
 
+    def _profile_photo(agent):
+        return profile_photo(agent)
+
     def _profile_missing(agent):
-        missing = []
-        checks = [
-            ("profile picture", agent.get("profile_picture_url") or agent.get("profile_pic_path")),
-            ("full name", agent.get("full_name")),
-            ("username", agent.get("username")),
-            ("phone number", agent.get("phone") or agent.get("phone_number")),
-            ("town", agent.get("town")),
-            ("region of operation", agent.get("operation_region") or agent.get("region")),
-            ("residential address", agent.get("residential_address") or agent.get("address")),
-        ]
-        for label, value in checks:
-            if not str(value or "").strip() or str(value or "").strip().lower() in {"none", "pending", "n/a"}:
-                missing.append(label)
-        return missing
+        return profile_missing(agent)
+
+    def _profile_completion(agent):
+        return profile_completion(agent)
+
+    def _normalize_phone(phone):
+        return normalize_phone(phone)
+
+    def _fallback_insert(table, payload, optional_keys):
+        attempts = [payload]
+        slim = dict(payload)
+        for key in optional_keys:
+            slim.pop(key, None)
+        attempts.append(slim)
+        last_exc = None
+        for body in attempts:
+            try:
+                return _execute_with_retry(
+                    f"{table}_insert",
+                    lambda body=body: sb_admin.table(table).insert(body),
+                    retries=2,
+                )
+            except Exception as exc:
+                last_exc = exc
+                app.logger.warning("%s insert attempt failed keys=%s error=%s", table, sorted(body.keys()), exc)
+        raise last_exc
 
     def _select_all(table, limit=10000, order_col="created_at", desc=True):
         try:
@@ -318,6 +335,26 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         ranked.sort(key=lambda item: item["count"], reverse=True)
         return ranked[:20], unmatched
 
+    def _same_period_last_week(rows):
+        ws, we = week_range()
+        prev_start = ws - timedelta(days=7)
+        prev_end = we - timedelta(days=7)
+        return _filter_created(rows, prev_start, prev_end)
+
+    def _daily_counts(rows):
+        days = {name: {"drivers": 0, "clients": 0} for name in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}
+        for row in rows:
+            raw = row.get("created_at")
+            try:
+                day = datetime.fromisoformat(str(raw).replace("Z", "+00:00")).strftime("%a")
+            except Exception:
+                continue
+            if day not in days:
+                continue
+            key = "drivers" if str(row.get("subject_type") or row.get("type") or "").lower() == "driver" else "clients"
+            days[day][key] += 1
+        return days
+
     def _duplicate_phone_exists(table, phone):
         for column in ("phone_number", "phone"):
             try:
@@ -447,12 +484,19 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 child = str(r.get("child_agent_id") or r.get("agent_id") or "").strip()
                 if child:
                     child_ids.add(child)
-                    rows.append({
-                        "child_agent_id": child,
-                        "full_name": r.get("child_agent_name") or "",
-                        "email": r.get("child_agent_email") or "",
-                        "joined_at": r.get("created_at"),
-                    })
+                rows.append({
+                    "child_agent_id": child,
+                    "full_name": r.get("child_agent_name") or "",
+                    "email": r.get("child_agent_email") or "",
+                    "username": r.get("child_agent_username") or "",
+                    "phone": r.get("child_agent_phone") or "",
+                    "town": r.get("child_agent_town") or "",
+                    "region": r.get("child_agent_region") or "",
+                    "status": r.get("status") or "",
+                    "profile_picture_url": r.get("child_profile_picture_url") or "",
+                    "joined_at": r.get("created_at"),
+                    "created_at": r.get("created_at"),
+                })
 
         leader_code = str(agent.get("referral_code") or "").strip()
         all_agents = _select_all("agent_profiles", 5000)
@@ -469,8 +513,15 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 rows.append({
                     "child_agent_id": child_id,
                     "full_name": child.get("full_name") or child.get("username") or "",
+                    "username": child.get("username") or "",
                     "email": child.get("email") or "",
+                    "phone": child.get("phone") or child.get("phone_number") or "",
+                    "town": child.get("town") or "",
+                    "region": child.get("region") or child.get("operation_region") or "",
+                    "status": child.get("status") or "",
+                    "profile_picture_url": _profile_photo(child) or "",
                     "joined_at": child.get("created_at"),
+                    "created_at": child.get("created_at"),
                 })
 
         ds, de = day_range()
@@ -507,20 +558,32 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 "id": agent.get("id"),
                 "full_name": agent.get("full_name"),
                 "email": agent.get("email"),
-                "phone": agent.get("phone"),
+                "phone": agent.get("phone") or agent.get("phone_number"),
+                "phone_number": agent.get("phone_number"),
+                "gender": agent.get("gender"),
+                "date_of_birth": agent.get("date_of_birth") or agent.get("dob"),
+                "national_id": agent.get("national_id") or agent.get("id_number"),
+                "id_number": agent.get("id_number"),
+                "next_of_kin_name": agent.get("next_of_kin_name"),
+                "next_of_kin_phone": agent.get("next_of_kin_phone"),
+                "bio": agent.get("bio") or agent.get("about"),
+                "about": agent.get("about"),
+                "status": agent.get("status"),
                 "town": agent.get("town"),
                 "region": agent.get("region") or agent.get("operation_region"),
                 "badge": agent.get("badge") or agent.get("role"),
                 "referral_code": agent.get("referral_code"),
                 "username": agent.get("username"),
-                "profile_picture_url": agent.get("profile_picture_url"),
+                "profile_picture_url": _profile_photo(agent),
                 "profile_pic_path": agent.get("profile_pic_path"),
                 "residential_address": agent.get("residential_address") or agent.get("address"),
+                "address": agent.get("address"),
                 "operation_region": agent.get("operation_region"),
                 "pin": agent.get("pin"),
                 "must_change_password": bool(agent.get("must_change_password")),
                 "profile_complete": not bool(_profile_missing(agent)),
                 "missing_profile_fields": _profile_missing(agent),
+                "profile_completion_percent": _profile_completion(agent),
             }
         })
 
@@ -547,6 +610,19 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             len(approved_wk_c) * safe_float(rates["client_register_amount"]) +
             len(approved_wk_d) * safe_float(rates["driver_register_amount"])
         )
+        previous_week_total = len(_same_period_last_week(all_d)) + len(_same_period_last_week(all_c))
+        this_week_total = len(wk_d) + len(wk_c)
+        quality_score = agent_quality_score(agent, all_d, all_c, team)
+        alerts = []
+        missing = _profile_missing(agent)
+        if missing:
+            alerts.append({"type": "profile", "level": "warning", "message": "Complete profile: " + ", ".join(missing)})
+        if pending_approvals:
+            alerts.append({"type": "approvals", "level": "info", "message": f"{pending_approvals} registrations are still pending approval"})
+        if this_week_total == 0:
+            alerts.append({"type": "activity", "level": "info", "message": "No registrations recorded this week yet"})
+        if len(all_d) >= 45 and len(all_d) < 50:
+            alerts.append({"type": "milestone", "level": "success", "message": f"{50 - len(all_d)} drivers left to reach 50"})
         debug(
             "agent_summary_v4",
             {"agent_id": agent.get("id"), "email": agent.get("email")},
@@ -571,6 +647,11 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "earnings_week": round(earnings_week, 2),
             "wallet_balance": round(get_wallet(agent), 2),
             "team_agents_count": len(team),
+            "previous_week_registrations": previous_week_total,
+            "week_delta": this_week_total - previous_week_total,
+            "quality_score": quality_score,
+            "alerts": alerts,
+            "daily": _daily_counts(activity(agent, "week")),
             "referral_link": f"/join?ref={agent.get('referral_code') or agent.get('email') or ''}",
             "matched_agent": {
                 "id": agent.get("id"),
@@ -579,6 +660,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             },
             "profile_complete": not bool(_profile_missing(agent)),
             "missing_profile_fields": _profile_missing(agent),
+            "profile_completion_percent": _profile_completion(agent),
         })
 
     @app.route("/api/agent/activity_v4", methods=["GET"], endpoint="agent_activity_v4")
@@ -713,6 +795,9 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 "drivers_all": drivers_all,
                 "clients_all": clients_all,
             }
+            ,
+            "rows": team[:100],
+            "team": team[:100],
         })
 
     @app.route("/api/agent/settings_v4", methods=["POST"], endpoint="agent_settings_v4")
@@ -727,7 +812,16 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "full_name": (data.get("full_name") or "").strip() or agent.get("full_name"),
             "username": (data.get("username") or "").strip() or agent.get("username"),
             "phone": (data.get("phone") or "").strip() or agent.get("phone"),
-            "email": (data.get("email") or "").strip() or agent.get("email"),
+            "phone_number": (data.get("phone") or "").strip() or agent.get("phone_number") or agent.get("phone"),
+            "email": agent.get("email"),
+            "gender": (data.get("gender") or "").strip() or agent.get("gender"),
+            "date_of_birth": (data.get("date_of_birth") or data.get("dob") or "").strip() or agent.get("date_of_birth"),
+            "national_id": (data.get("national_id") or data.get("id_number") or "").strip() or agent.get("national_id"),
+            "id_number": (data.get("id_number") or data.get("national_id") or "").strip() or agent.get("id_number"),
+            "next_of_kin_name": (data.get("next_of_kin_name") or "").strip() or agent.get("next_of_kin_name"),
+            "next_of_kin_phone": (data.get("next_of_kin_phone") or "").strip() or agent.get("next_of_kin_phone"),
+            "bio": (data.get("bio") or data.get("about") or "").strip() or agent.get("bio"),
+            "about": (data.get("about") or data.get("bio") or "").strip() or agent.get("about"),
             "town": (data.get("town") or "").strip() or agent.get("town"),
             "region": (data.get("region") or "").strip() or agent.get("region"),
             "operation_region": (
@@ -741,12 +835,67 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 updates[optional_key] = (data.get(optional_key) or "").strip()
 
         try:
-            sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
+            try:
+                sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
+            except Exception:
+                fallback = dict(updates)
+                for key in ("date_of_birth", "national_id", "id_number", "next_of_kin_name", "next_of_kin_phone", "bio", "about", "phone_number"):
+                    fallback.pop(key, None)
+                sb_admin.table("agent_profiles").update(fallback).eq("id", agent.get("id")).execute()
             session["email"] = updates["email"]
             session["agent_email"] = updates["email"]
             return jsonify({"ok": True, "success": True})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.route("/api/agent/profile_photo_v4", methods=["POST"], endpoint="agent_profile_photo_v4")
+    @require_login("AGENT")
+    def agent_profile_photo_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+
+        data = request.get_json(silent=True) or {}
+        image_data = str(data.get("image_data") or "")
+        if "," in image_data and image_data.startswith("data:"):
+            header, encoded = image_data.split(",", 1)
+            mime = header.split(";")[0].replace("data:", "") or "image/jpeg"
+        else:
+            encoded = image_data
+            mime = data.get("mime_type") or "image/jpeg"
+        if not encoded:
+            return jsonify({"ok": False, "error": "image_data required"}), 400
+        if mime not in {"image/jpeg", "image/png", "image/webp"}:
+            return jsonify({"ok": False, "error": "Only JPG, PNG, or WEBP photos are supported"}), 400
+        try:
+            raw = base64.b64decode(encoded, validate=True)
+        except Exception:
+            return jsonify({"ok": False, "error": "Invalid image data"}), 400
+        if len(raw) > 5 * 1024 * 1024:
+            return jsonify({"ok": False, "error": "Photo must be 5MB or smaller"}), 400
+
+        bucket = "agent-profile-photos"
+        ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[mime]
+        path = f"agents/{agent.get('id') or agent.get('email')}/profile.{ext}"
+        try:
+            storage = sb_admin.storage.from_(bucket)
+            try:
+                storage.upload(path, raw, {"content-type": mime, "upsert": True})
+            except TypeError:
+                storage.upload(path, raw, file_options={"content-type": mime, "upsert": True})
+            public_url = storage.get_public_url(path)
+            updates = {"profile_picture_url": public_url, "profile_pic_path": public_url}
+            try:
+                sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
+            except Exception:
+                sb_admin.table("agent_profiles").update({"profile_picture_url": public_url}).eq("id", agent.get("id")).execute()
+            return jsonify({"ok": True, "url": public_url, "path": path})
+        except Exception as exc:
+            app.logger.warning("profile_photo_upload_failed agent_id=%s error=%s", agent.get("id"), exc)
+            return jsonify({
+                "ok": False,
+                "error": "Could not upload profile photo. Create a public Supabase Storage bucket named agent-profile-photos.",
+            }), 500
 
     @app.route("/api/agent/register_driver_v4", methods=["POST"], endpoint="agent_register_driver_v4")
     @require_login("AGENT")
@@ -765,12 +914,14 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
 
         data = request.get_json(silent=True) or {}
         full_name = (data.get("full_name") or "").strip()
-        phone = (data.get("phone") or "").strip()
+        phone, phone_error = _normalize_phone(data.get("phone"))
         town = (data.get("town") or "").strip()
         license_number = (data.get("license_number") or "").strip()
         car_details = (data.get("car_details") or "").strip()
         external_code = (data.get("external_code") or "").strip()
 
+        if phone_error:
+            return jsonify({"ok": False, "error": phone_error}), 400
         if not full_name or not phone or not town or not license_number:
             return jsonify({"ok": False, "error": "Full name, phone, town and PAR/license number are required"}), 400
 
@@ -829,6 +980,10 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "trips_completed": 0,
             "verified_trips": 0,
             "recruiter_agent_id": str(agent.get("id") or ""),
+            "agent_id": str(agent.get("id") or ""),
+            "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "recruiter_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "recruiter_email": agent.get("email") or "",
             "recruiter_name": agent.get("full_name") or agent.get("email"),
         }
 
@@ -836,11 +991,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             payload["external_code"] = external_code
 
         try:
-            res = _execute_with_retry(
-                "drivers_insert",
-                lambda: sb_admin.table("drivers").insert(payload),
-                retries=2,
-            )
+            res = _fallback_insert("drivers", payload, ("phone", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email", "external_code"))
             inserted = res.data or []
             safe_log("REGISTER_DRIVER", f"Agent {agent.get('email')} registered driver {full_name}")
             app.logger.info(
@@ -878,10 +1029,12 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
 
         data = request.get_json(silent=True) or {}
         full_name = (data.get("full_name") or "").strip()
-        phone = (data.get("phone") or "").strip()
+        phone, phone_error = _normalize_phone(data.get("phone"))
         town = (data.get("town") or "").strip()
         external_code = (data.get("external_code") or "").strip()
 
+        if phone_error:
+            return jsonify({"ok": False, "error": phone_error}), 400
         if not full_name or not phone or not town or not external_code:
             return jsonify({"ok": False, "error": "Full name, phone, town and customer code are required"}), 400
 
@@ -936,6 +1089,10 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "status": "pending_approval",
             "trips_completed": 0,
             "recruiter_agent_id": str(agent.get("id") or ""),
+            "agent_id": str(agent.get("id") or ""),
+            "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "recruiter_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "recruiter_email": agent.get("email") or "",
             "recruiter_name": agent.get("full_name") or agent.get("email"),
         }
 
@@ -947,11 +1104,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             payload["external_code"] = external_code
 
         try:
-            res = _execute_with_retry(
-                "clients_insert",
-                lambda: sb_admin.table("clients").insert(payload),
-                retries=2,
-            )
+            res = _fallback_insert("clients", payload, ("phone", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email", "external_code"))
             inserted = res.data or []
             safe_log("REGISTER_CLIENT", f"Agent {agent.get('email')} registered client {phone}")
             app.logger.info(

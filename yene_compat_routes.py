@@ -4,8 +4,10 @@ import os
 import uuid
 
 from flask import flash, jsonify, redirect, render_template, request, send_file, session
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from yene_shared import agent_quality_score, parse_datetime, profile_completion, profile_missing
 
 
 def register_yene_compat_routes(app, sb_admin):
@@ -180,6 +182,22 @@ def register_yene_compat_routes(app, sb_admin):
             "first_trip_bonus": _safe_float(rules.get("first_trip_bonus")),
         }
 
+    def _row_date(row):
+        dt = parse_datetime((row or {}).get("created_at"))
+        return dt.date() if dt else None
+
+    def _this_week(row):
+        today = datetime.utcnow().date()
+        start = today - timedelta(days=today.weekday())
+        end = start + timedelta(days=6)
+        day = _row_date(row)
+        return bool(day and start <= day <= end)
+
+    def _this_month(row):
+        today = datetime.utcnow().date()
+        day = _row_date(row)
+        return bool(day and day.year == today.year and day.month == today.month)
+
     def _all_agents():
         return _safe_select("agent_profiles", {}, "*", 5000, "created_at", True)
 
@@ -191,6 +209,16 @@ def register_yene_compat_routes(app, sb_admin):
         email = _clean(email).lower()
         rows = _safe_select("agent_profiles", {"email": email}, "*", 1)
         return rows[0] if rows else None
+
+    def _agent_by_ref(ref):
+        ref = _clean(ref)
+        if not ref:
+            return None
+        for col in ("referral_code", "email", "id"):
+            rows = _safe_select("agent_profiles", {col: ref}, "*", 1)
+            if rows:
+                return rows[0]
+        return None
 
     def _temp_password_for_agent(agent):
         base = str((agent or {}).get("phone") or (agent or {}).get("phone_number") or "")[-6:]
@@ -308,6 +336,40 @@ def register_yene_compat_routes(app, sb_admin):
         _debug("_agent_registration_rows", {"ids": values[:3]}, rows=len(rows))
         return rows
 
+    def _team_rows_for_agent(agent):
+        if not agent:
+            return []
+        leader_id = _clean(agent.get("id"))
+        leader_code = _clean(agent.get("referral_code"))
+        rows = []
+        for child in _all_agents():
+            child_id = _clean(child.get("id"))
+            if not child_id or child_id == leader_id:
+                continue
+            if (
+                _clean(child.get("team_leader_id")) == leader_id
+                or _clean(child.get("referred_by")) == leader_id
+                or _clean(child.get("referred_by_id")) == leader_id
+                or (leader_code and _clean(child.get("referred_by_code")) == leader_code)
+            ):
+                activity = _agent_registration_rows(child_id)
+                rows.append({
+                    "id": child_id,
+                    "full_name": child.get("full_name") or child.get("username") or child.get("email"),
+                    "username": child.get("username"),
+                    "email": child.get("email"),
+                    "phone": child.get("phone") or child.get("phone_number"),
+                    "town": child.get("town"),
+                    "region": child.get("region") or child.get("operation_region"),
+                    "status": child.get("status"),
+                    "created_at": child.get("created_at"),
+                    "profile_picture_url": child.get("profile_picture_url") or child.get("profile_pic_path"),
+                    "drivers_all": len([r for r in activity if r.get("type") == "Driver"]),
+                    "clients_all": len([r for r in activity if r.get("type") == "Client"]),
+                })
+        rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        return rows
+
     def _period_from_request():
         mode = _clean(request.args.get("mode")) or "current_week"
         today = datetime.utcnow().date()
@@ -352,6 +414,9 @@ def register_yene_compat_routes(app, sb_admin):
 
     @app.route("/register", methods=["GET", "POST"])
     def register_agent_public():
+        incoming_ref = _clean(request.args.get("ref") or request.args.get("code"))
+        if incoming_ref:
+            session["agent_ref"] = incoming_ref
         if request.method == "GET":
             return render_template("register.html")
 
@@ -384,6 +449,7 @@ def register_yene_compat_routes(app, sb_admin):
             auth_error = str(e)
 
         agent_id = str(uuid.uuid4())
+        leader = _agent_by_ref(session.get("agent_ref"))
         payload = {
             "id": agent_id,
             "auth_id": auth_id,
@@ -398,11 +464,33 @@ def register_yene_compat_routes(app, sb_admin):
             "status": "PENDING_APPROVAL",
             "created_at": _now_iso(),
         }
+        if leader:
+            payload.update({
+                "team_leader_id": leader.get("id"),
+                "team_leader_name": leader.get("full_name") or leader.get("username") or leader.get("email"),
+                "referred_by": leader.get("id"),
+                "referred_by_code": leader.get("referral_code") or leader.get("email"),
+            })
 
         res = _safe_insert("agent_profiles", payload)
         if isinstance(res, Exception):
-            flash(f"Registration failed: {res}")
-            return redirect("/register")
+            fallback = dict(payload)
+            for key in ("team_leader_id", "team_leader_name", "referred_by", "referred_by_code", "auth_id", "user_id", "created_at"):
+                fallback.pop(key, None)
+            res = _safe_insert("agent_profiles", fallback)
+            if isinstance(res, Exception):
+                flash(f"Registration failed: {res}")
+                return redirect("/register")
+
+        if leader:
+            _safe_insert("agent_referrals", {
+                "parent_agent_id": leader.get("id"),
+                "parent_agent_email": leader.get("email"),
+                "child_agent_id": agent_id,
+                "child_agent_email": email,
+                "child_agent_name": full_name,
+                "created_at": _now_iso(),
+            })
 
         if not auth_id:
             flash("Account creation failed. Please try again or contact admin.")
@@ -505,12 +593,73 @@ def register_yene_compat_routes(app, sb_admin):
         drivers = _drivers()
         clients = _clients()
         ledger = _safe_select("agent_wallet_ledger", {}, "*", 10000, "created_at", True)
+        rules = _payment_amounts()
         recent = []
         for d in drivers[:20]:
             recent.append({"type": "Driver", "name": d.get("full_name"), "phone": d.get("phone") or d.get("phone_number"), "town": d.get("town"), "agent": d.get("recruiter_name"), "created_at": d.get("created_at")})
         for c in clients[:20]:
             recent.append({"type": "Client", "name": c.get("full_name"), "phone": c.get("phone") or c.get("phone_number"), "town": c.get("town"), "agent": c.get("recruiter_name"), "created_at": c.get("created_at")})
         recent.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+
+        def by_place(rows, key):
+            out = {}
+            for row in rows:
+                place = _clean(row.get(key) or row.get("operation_region")) or "Unknown"
+                item = out.setdefault(place, {"name": place, "drivers": 0, "clients": 0, "total": 0})
+                if row.get("_type") == "driver":
+                    item["drivers"] += 1
+                else:
+                    item["clients"] += 1
+                item["total"] += 1
+            return sorted(out.values(), key=lambda x: x["total"], reverse=True)[:12]
+
+        typed_rows = [dict(d, _type="driver") for d in drivers] + [dict(c, _type="client") for c in clients]
+        region_breakdown = by_place(typed_rows, "region")
+        town_breakdown = by_place(typed_rows, "town")
+        approved_drivers = [d for d in drivers if _approved(d)]
+        approved_clients = [c for c in clients if _approved(c)]
+        credits = sum(_safe_float(x.get("amount")) for x in ledger if str(x.get("entry_type") or x.get("txn_type") or "").lower() in {"credit", "bonus", "earning"})
+        debits = sum(_safe_float(x.get("amount")) for x in ledger if str(x.get("entry_type") or x.get("txn_type") or "").lower() in {"debit", "payout", "withdrawal"})
+        estimated_liability = max(0.0, credits - debits)
+        if not estimated_liability and (rules["driver_reg"] or rules["client_reg"]):
+            estimated_liability = (len(approved_drivers) * rules["driver_reg"]) + (len(approved_clients) * rules["client_reg"])
+
+        duplicate_phones = {}
+        for row in drivers + clients:
+            phone = _clean(row.get("phone") or row.get("phone_number"))
+            if phone:
+                duplicate_phones[phone] = duplicate_phones.get(phone, 0) + 1
+        duplicate_count = len([p for p, count in duplicate_phones.items() if count > 1])
+
+        agent_quality = []
+        for agent in agents:
+            rows = _agent_registration_rows(agent)
+            team = _team_rows_for_agent(agent)
+            agent_quality.append({
+                "agent_id": agent.get("id"),
+                "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                "score": agent_quality_score(
+                    agent,
+                    [r for r in rows if r.get("type") == "Driver"],
+                    [r for r in rows if r.get("type") == "Client"],
+                    team,
+                ),
+                "profile_completion": profile_completion(agent),
+                "missing_profile_fields": profile_missing(agent),
+            })
+        agent_quality.sort(key=lambda x: x["score"], reverse=True)
+        alerts = []
+        incomplete = [a for a in agents if profile_missing(a)]
+        if incomplete:
+            alerts.append({"level": "warning", "message": f"{len(incomplete)} agents have incomplete profiles"})
+        if duplicate_count:
+            alerts.append({"level": "danger", "message": f"{duplicate_count} duplicate phone patterns need review"})
+        if not rules["driver_reg"] and not rules["client_reg"]:
+            alerts.append({"level": "warning", "message": "Finance payment rules are missing"})
+        low_activity = len([a for a in agents if not _agent_registration_rows(a)])
+        if low_activity:
+            alerts.append({"level": "info", "message": f"{low_activity} agents have no recorded registrations"})
+
         data = {
             "agents_total": len(agents),
             "agents_active": len([a for a in agents if _approved(a)]),
@@ -520,7 +669,16 @@ def register_yene_compat_routes(app, sb_admin):
             "drivers_registered": len(drivers),
             "clients_total": len(clients),
             "clients_registered": len(clients),
-            "total_paid": sum(_safe_float(x.get("amount")) for x in ledger if str(x.get("entry_type") or x.get("txn_type") or "").lower() == "debit"),
+            "weekly_registrations": len([r for r in drivers + clients if _this_week(r)]),
+            "month_registrations": len([r for r in drivers + clients if _this_month(r)]),
+            "team_growth": len([a for a in agents if _clean(a.get("team_leader_id") or a.get("referred_by") or a.get("referred_by_code"))]),
+            "estimated_liabilities": round(estimated_liability, 2),
+            "total_paid": debits,
+            "ledger_credits": credits,
+            "region_breakdown": region_breakdown,
+            "town_breakdown": town_breakdown,
+            "agent_quality": agent_quality[:12],
+            "smart_alerts": alerts,
             "recent_activity": recent[:25],
         }
         _debug("admin_overview", agent_profiles=len(agents), drivers=len(drivers), clients=len(clients), agent_wallet_ledger=len(ledger))
@@ -608,8 +766,12 @@ def register_yene_compat_routes(app, sb_admin):
             "date_to": date_to,
             "drivers_total": len([r for r in rows if r["type"] == "Driver"]),
             "clients_total": len([r for r in rows if r["type"] == "Client"]),
+            "approved_drivers_total": len([r for r in rows if r["type"] == "Driver" and _approved(r.get("status"))]),
+            "approved_clients_total": len([r for r in rows if r["type"] == "Client" and _approved(r.get("status"))]),
             "days": days,
             "rows": rows,
+            "team": _team_rows_for_agent(agent),
+            "payment_rules": _payment_amounts(),
         }
         _debug("admin_agent_center", {"agent_id": agent_id}, rows=len(rows))
         return jsonify({"ok": True, "data": data})
@@ -649,15 +811,62 @@ def register_yene_compat_routes(app, sb_admin):
     def admin_agent_profile_alias(agent_id):
         agent = _agent_by_id(agent_id)
         if not agent:
-            return jsonify({"ok": False, "error": "Agent not found"}), 404
-        rows = _agent_registration_rows(agent_id)
-        return jsonify({"ok": True, "agent": agent, "rows": rows})
+            return jsonify({"ok": False, "success": False, "error": "Agent not found"}), 404
+        rows = _agent_registration_rows(agent)
+        drivers = []
+        clients = []
+        for row in rows:
+            shaped = dict(row)
+            shaped.setdefault("full_name", row.get("name"))
+            if row.get("type") == "Driver":
+                drivers.append(shaped)
+            elif row.get("type") == "Client":
+                clients.append(shaped)
+
+        values = _identity_values(agent)
+        ledger = []
+        seen = set()
+        for field in ("agent_id", "user_id", "agent_email", "email"):
+            for value in values:
+                for row in _safe_select("agent_wallet_ledger", {field: value}, "*", 200, "created_at", True):
+                    row_id = str(row.get("id") or f"{field}:{value}:{row.get('created_at')}:{row.get('amount')}")
+                    if row_id not in seen:
+                        ledger.append(row)
+                        seen.add(row_id)
+        wallet_balance = 0.0
+        for row in ledger:
+            amount = _safe_float(row.get("amount"))
+            kind = str(row.get("entry_type") or row.get("txn_type") or row.get("type") or "").lower()
+            if kind in {"debit", "payout", "withdrawal"}:
+                wallet_balance -= amount
+            else:
+                wallet_balance += amount
+
+        return jsonify({
+            "ok": True,
+            "success": True,
+            "agent": agent,
+            "rows": rows,
+            "drivers": drivers,
+            "clients": clients,
+            "wallet_rows": ledger[:100],
+            "wallet_balance": wallet_balance,
+        })
 
     @app.post("/api/admin/agent_reset_pin/<agent_id>")
     def admin_agent_reset_pin(agent_id):
-        pin = str(uuid.uuid4().int)[0:6]
+        agent = _agent_by_id(agent_id) or {}
+        data = request.get_json(silent=True) or {}
+        pin = _clean(data.get("new_pin")) or str(uuid.uuid4().int)[0:6]
         _safe_update("agent_profiles", {"id": agent_id}, {"pin": pin})
-        return jsonify({"ok": True, "pin": pin})
+        return jsonify({
+            "ok": True,
+            "success": True,
+            "pin": pin,
+            "temporary_pin": pin,
+            "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+            "agent_email": agent.get("email") or "",
+        })
 
     @app.post("/api/admin/agent_set_status/<agent_id>")
     def admin_agent_set_status(agent_id):
@@ -665,7 +874,7 @@ def register_yene_compat_routes(app, sb_admin):
         status = _clean(data.get("status")) or "ACTIVE"
         _safe_update("agent_profiles", {"id": agent_id}, {"status": status})
         _safe_update("agents", {"id": agent_id}, {"status": status})
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "success": True})
 
     @app.post("/api/admin/approve_agent/<agent_id>")
     def admin_approve_agent(agent_id):
@@ -745,6 +954,8 @@ def register_yene_compat_routes(app, sb_admin):
         safe_agent = dict(agent)
         safe_agent["auth_linked"] = bool(auth_id)
         safe_agent["must_change_password"] = bool(agent.get("must_change_password"))
+        safe_agent["profile_picture_url"] = agent.get("profile_picture_url") or agent.get("profile_pic_path")
+        safe_agent["residential_address"] = agent.get("residential_address") or agent.get("address")
 
         return jsonify({
             "ok": True,
@@ -757,6 +968,8 @@ def register_yene_compat_routes(app, sb_admin):
                 "clients_total": len([r for r in rows if r.get("type") == "Client"]),
                 "rows_total": len(rows),
                 "daily": days,
+                "team": _team_rows_for_agent(agent),
+                "payment_rules": _payment_amounts(),
             },
         })
 
@@ -888,7 +1101,7 @@ def register_yene_compat_routes(app, sb_admin):
     def admin_delete_agent_alias(agent_id):
         _safe_delete("agent_profiles", {"id": agent_id})
         _safe_delete("agents", {"id": agent_id})
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "success": True})
 
     @app.get("/api/admin/weekly_agent_report_pdf")
     def admin_weekly_agent_report_pdf():
@@ -1018,8 +1231,30 @@ def register_yene_compat_routes(app, sb_admin):
         buf = BytesIO()
         c = canvas.Canvas(buf, pagesize=A4)
         w, h = A4
+        left = 38
+        right = w - 38
+        primary = colors.HexColor("#0f766e")
+        dark = colors.HexColor("#142231")
+        muted = colors.HexColor("#64748b")
+        soft = colors.HexColor("#eef6fd")
+        line = colors.HexColor("#d9e2ec")
 
-        def new_page(title=False):
+        def text_fit(value, chars):
+            value = str(value or "-")
+            return value if len(value) <= chars else value[: max(0, chars - 1)] + "..."
+
+        def draw_text(x, y, value, size=8, bold=False, color=dark):
+            c.setFillColor(color)
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+            c.drawString(x, y, str(value or "-"))
+            c.setFillColor(dark)
+
+        def draw_money(x, y, value, size=8, bold=False):
+            c.setFillColor(dark)
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+            c.drawRightString(x, y, _fmt_money(value))
+
+        def new_page():
             c.showPage()
             draw_header()
             return h - 108
@@ -1030,78 +1265,88 @@ def register_yene_compat_routes(app, sb_admin):
             return y
 
         def draw_header():
-            c.setFont("Helvetica-Bold", 16)
-            c.drawString(40, h - 42, "YENE Weekly Agent Payment Report")
+            c.setFillColor(primary)
+            c.rect(0, h - 92, w, 92, fill=1, stroke=0)
+            c.setFillColor(colors.white)
+            c.setFont("Helvetica-Bold", 18)
+            c.drawString(left, h - 38, "YENE Weekly Agent Payment Report")
             c.setFont("Helvetica", 9)
-            c.drawString(40, h - 58, f"Week: {start.isoformat()} to {end.isoformat()}")
-            c.drawString(40, h - 72, f"Rate source: {rules['source']} | Driver {_fmt_money(rules['driver_reg'])} | Client {_fmt_money(rules['client_reg'])}")
-            c.line(40, h - 82, w - 40, h - 82)
+            c.drawString(left, h - 56, f"Report week: {start.isoformat()} to {end.isoformat()}")
+            c.drawString(left, h - 72, f"Rates: Driver {_fmt_money(rules['driver_reg'])} | Client {_fmt_money(rules['client_reg'])} | Source {rules['source']}")
+            c.setFillColor(dark)
+
+        def draw_table_header(y):
+            c.setFillColor(soft)
+            c.rect(left, y - 4, right - left, 18, fill=1, stroke=0)
+            c.setStrokeColor(line)
+            c.line(left, y - 4, right, y - 4)
+            draw_text(left + 8, y, "Date", 7, True)
+            draw_text(left + 66, y, "Type", 7, True)
+            draw_text(left + 114, y, "Registered person", 7, True)
+            draw_text(left + 270, y, "Phone", 7, True)
+            draw_text(left + 360, y, "Town", 7, True)
+            c.setFont("Helvetica-Bold", 7)
+            c.drawRightString(right - 8, y, "Due")
+            return y - 16
 
         draw_header()
         y = h - 108
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(40, y, f"Agents with activity: {len(report_rows)}")
-        c.drawString(220, y, f"Drivers: {grand_drivers}")
-        c.drawString(310, y, f"Clients: {grand_clients}")
-        c.drawString(400, y, f"Grand Total Due: {_fmt_money(grand_total)}")
-        y -= 24
+        c.setFillColor(soft)
+        c.roundRect(left, y - 34, right - left, 42, 6, fill=1, stroke=0)
+        draw_text(left + 12, y - 4, f"Agents with approved activity: {len(report_rows)}", 10, True)
+        draw_text(left + 210, y - 4, f"Drivers: {grand_drivers}", 10, True)
+        draw_text(left + 300, y - 4, f"Clients: {grand_clients}", 10, True)
+        draw_text(left + 390, y - 4, f"Grand total: {_fmt_money(grand_total)}", 10, True, primary)
+        y -= 58
 
         if not report_rows:
-            c.setFont("Helvetica", 10)
-            c.drawString(40, y, "No approved weekly registration activity found for this period.")
+            draw_text(left, y, "No approved weekly registration activity found for this period.", 10)
         for item in report_rows:
-            y = ensure_space(y, 120)
+            y = ensure_space(y, 150)
             agent = item["agent"]
-            c.setFont("Helvetica-Bold", 12)
-            c.drawString(40, y, str(agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent")[:70])
-            y -= 14
-            c.setFont("Helvetica", 9)
-            c.drawString(40, y, f"Email: {agent.get('email') or '-'} | ID: {agent.get('id') or '-'} | Town: {agent.get('town') or '-'}")
-            y -= 14
-            c.drawString(40, y, f"Drivers: {item['driver_count']} | Clients: {item['client_count']} | Base: {_fmt_money(item['base_total'])} | Bonuses: {_fmt_money(item['bonus_total'])} | Total: {_fmt_money(item['agent_total'])}")
-            y -= 16
+            c.setFillColor(colors.white)
+            c.roundRect(left, y - 58, right - left, 66, 6, fill=1, stroke=1)
+            c.setStrokeColor(line)
+            draw_text(left + 12, y - 8, text_fit(agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent", 76), 12, True, primary)
+            draw_text(left + 12, y - 24, f"Email: {agent.get('email') or '-'}", 8)
+            draw_text(left + 12, y - 38, f"Town/Region: {agent.get('town') or '-'} / {agent.get('region') or agent.get('operation_region') or '-'}", 8)
+            draw_text(left + 300, y - 24, f"Drivers: {item['driver_count']} | Clients: {item['client_count']}", 8, True)
+            draw_text(left + 300, y - 38, f"Base: {_fmt_money(item['base_total'])} | Bonuses: {_fmt_money(item['bonus_total'])}", 8)
+            draw_text(left + 300, y - 52, f"Total due: {_fmt_money(item['agent_total'])}", 10, True, primary)
+            y -= 80
 
-            c.setFont("Helvetica-Bold", 8)
-            c.drawString(48, y, "Date")
-            c.drawString(116, y, "Type")
-            c.drawString(170, y, "Name")
-            c.drawString(318, y, "Phone")
-            c.drawString(400, y, "Town")
-            c.drawRightString(w - 42, y, "Due")
-            y -= 10
-            c.setFont("Helvetica", 8)
-            for row in item["rows"][:80]:
-                y = ensure_space(y, 60)
-                c.drawString(48, y, str(row.get("created_at") or "")[:10])
-                c.drawString(116, y, str(row.get("type") or "")[:12])
-                c.drawString(170, y, str(row.get("name") or "")[:28])
-                c.drawString(318, y, str(row.get("phone") or "")[:16])
-                c.drawString(400, y, str(row.get("town") or "")[:18])
-                c.drawRightString(w - 42, y, _fmt_money(row.get("payment_due")))
-                y -= 10
+            y = draw_table_header(y)
+            for row in item["rows"]:
+                y = ensure_space(y, 54)
+                draw_text(left + 8, y, str(row.get("created_at") or "")[:10], 7)
+                draw_text(left + 66, y, text_fit(row.get("type"), 9), 7)
+                draw_text(left + 114, y, text_fit(row.get("name"), 30), 7)
+                draw_text(left + 270, y, text_fit(row.get("phone"), 17), 7)
+                draw_text(left + 360, y, text_fit(row.get("town"), 20), 7)
+                draw_money(right - 8, y, row.get("payment_due"), 7)
+                c.setStrokeColor(colors.HexColor("#edf2f7"))
+                c.line(left, y - 4, right, y - 4)
+                y -= 12
 
-            if len(item["rows"]) > 80:
-                c.drawString(48, y, f"... {len(item['rows']) - 80} more rows not shown in detail")
-                y -= 10
-
-            y -= 4
-            c.setFont("Helvetica-Bold", 8)
-            c.drawString(48, y, "Daily totals")
-            y -= 10
-            c.setFont("Helvetica", 8)
+            y -= 6
+            y = ensure_space(y, 70)
+            draw_text(left + 8, y, "Daily totals", 8, True)
+            y -= 12
             for day, values in sorted(item["daily"].items()):
                 y = ensure_space(y, 50)
-                c.drawString(58, y, f"{day}: drivers {values['drivers']} | clients {values['clients']} | base {_fmt_money(values['amount'])}")
-                y -= 10
+                draw_text(left + 18, y, f"{day}: drivers {values['drivers']} | clients {values['clients']} | base {_fmt_money(values['amount'])}", 7)
+                y -= 11
+            if item["bonus_lines"]:
+                y = ensure_space(y, 50)
+                draw_text(left + 8, y, "Bonus lines", 8, True)
+                y -= 12
             for line in item["bonus_lines"]:
                 y = ensure_space(y, 50)
-                c.drawString(58, y, line[:100])
-                y -= 10
-            y -= 12
+                draw_text(left + 18, y, text_fit(line, 105), 7)
+                y -= 11
+            y -= 16
             if y < 90:
-                c.showPage()
-                draw_header()
-                y = h - 108
+                y = new_page()
 
         c.save()
         buf.seek(0)

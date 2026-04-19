@@ -1,6 +1,7 @@
 ﻿import csv
 import datetime
 import io
+import json
 
 # -----------------------------
 # Supabase token auth (Agent API)
@@ -75,12 +76,6 @@ def _sb_get_user_id_from_token(access_token: str):
 
 
 
-
-def _agent_session_email():
-    return session.get("agent_email")
-
-def _require_admin():
-    return bool(session.get("admin_email")) and session.get("role") == "ADMIN"
 
 def require_login(required_role=None):
     """Early temporary session-based login guard for legacy modules."""
@@ -170,9 +165,26 @@ def _current_dashboard_for_session():
 def _clean_status(value):
     return str(value or "").strip().upper()
 
+BLOCKED_PROFILE_STATUSES = {"BLOCKED", "REJECTED", "SUSPENDED", "DISABLED", "BANNED"}
+APPROVED_PROFILE_STATUSES = {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
+WORKING_AGENT_STATUSES = APPROVED_PROFILE_STATUSES | {"PENDING", "PENDING_APPROVAL", "UNDER_REVIEW", "ONBOARDING"}
+
 def _is_active_profile(profile):
+    """Allow agents in onboarding to work, while blocking rejected/suspended accounts."""
+    if not profile:
+        return False
     status = _clean_status(profile.get("status"))
-    return not status or status in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED", "PENDING_APPROVAL"}
+    if status in BLOCKED_PROFILE_STATUSES:
+        return False
+    return not status or status in WORKING_AGENT_STATUSES
+
+def _is_approved_profile(profile):
+    if not profile:
+        return False
+    status = _clean_status(profile.get("status"))
+    if status in BLOCKED_PROFILE_STATUSES:
+        return False
+    return not status or status in APPROVED_PROFILE_STATUSES
 
 def _role_is_admin(profile):
     return str(profile.get("role") or "").strip().upper() == "ADMIN"
@@ -214,6 +226,24 @@ def admin_dashboard():
     return render_template("admin_dashboard.html")
 
 
+@app.route("/dashboard")
+def dashboard_router():
+    dashboard = _current_dashboard_for_session()
+    if dashboard:
+        return redirect(dashboard)
+    return redirect("/login")
+
+
+@app.route("/admin/dashboard")
+def admin_dashboard_alias():
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/agent")
+def agent_root_alias():
+    return redirect(url_for("agent_dashboard"))
+
+
 @app.route("/agent/dashboard")
 def agent_dashboard():
     if (session.get("role") or "").upper() != "AGENT" or not session.get("agent_email"):
@@ -224,7 +254,11 @@ def agent_dashboard():
     try:
         email = (session.get("agent_email") or session.get("email") or "").strip().lower()
         profile = _lookup_profile("agent_profiles", email) if email else None
-        if profile and profile.get("must_change_password"):
+        if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
+            session.clear()
+            flash("Your agent account is not available for working access")
+            return redirect("/login")
+        if profile.get("must_change_password"):
             return redirect("/agent/change-password")
     except Exception:
         pass
@@ -270,8 +304,31 @@ def protect_role_scoped_api_routes():
 
     if request.path.startswith("/api/agent/"):
         role = (session.get("role") or "").upper()
-        if role != "AGENT" or not session.get("email"):
+        email = (session.get("agent_email") or session.get("email") or "").strip().lower()
+        if role != "AGENT" or not email:
             return jsonify({"ok": False, "error": "Agent login required"}), 401
+        profile = _lookup_profile("agent_profiles", email)
+        if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
+            return jsonify({"ok": False, "error": "Agent account is blocked or unavailable"}), 403
+
+
+@app.after_request
+def normalize_api_json_response(response):
+    if not request.path.startswith("/api/") or not response.is_json:
+        return response
+    data = response.get_json(silent=True)
+    if not isinstance(data, dict) or "ok" not in data or "success" in data:
+        return response
+    data["success"] = bool(data.get("ok"))
+    normalized = app.response_class(
+        json.dumps(data, default=str),
+        status=response.status_code,
+        mimetype=response.mimetype,
+    )
+    for key, value in response.headers.items():
+        if key.lower() not in {"content-length", "content-type"}:
+            normalized.headers[key] = value
+    return normalized
 
 URL = os.getenv("SUPABASE_URL", "").strip()
 ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "").strip()
@@ -672,7 +729,7 @@ def login():
     profile = _lookup_profile("agent_profiles", email)
     if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
         session.clear()
-        flash("No approved agent profile found for this account")
+        flash("No working agent profile found for this account")
         return redirect("/login")
 
     _set_agent_session(email)
@@ -703,7 +760,7 @@ def admin_login():
         return redirect("/admin/login")
 
     profile = _lookup_profile("admin_profiles", email)
-    if not profile or not _is_active_profile(profile):
+    if not profile or not _is_approved_profile(profile):
         session.clear()
         app.logger.warning("admin_login_profile_rejected email=%s profile_found=%s", email, bool(profile))
         flash("No approved admin profile found for this account")

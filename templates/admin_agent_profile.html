@@ -23,7 +23,7 @@
     a{color:#9ec0ff}
   </style>
 </head>
-<body>
+<body data-agent-id="{{ agent_id }}">
   <div class="wrap">
     <div class="row">
       <button class="btn btn-dark" onclick="window.location.href='/admin'">← Back to Admin</button>
@@ -88,7 +88,7 @@
   </div>
 
 <script>
-const AGENT_ID = {{ agent_id|tojson }};
+const AGENT_ID = document.body.dataset.agentId || "";
 
 function money(v){ return 'N$ ' + Number(v || 0).toFixed(2); }
 

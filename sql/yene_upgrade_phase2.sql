@@ -6,8 +6,15 @@ create extension if not exists pgcrypto;
 
 alter table if exists agent_profiles
   add column if not exists profile_picture_url text,
+  add column if not exists profile_photo_url text,
   add column if not exists residential_address text,
   add column if not exists operation_region text,
+  add column if not exists date_of_birth date,
+  add column if not exists id_number text,
+  add column if not exists next_of_kin_name text,
+  add column if not exists next_of_kin_phone text,
+  add column if not exists bio text,
+  add column if not exists about text,
   add column if not exists must_change_password boolean default false,
   add column if not exists temp_password text,
   add column if not exists last_reset_at timestamptz,
@@ -155,3 +162,9 @@ create index if not exists idx_agent_profiles_email on agent_profiles(email);
 create index if not exists idx_remote_jobs_status on remote_jobs(status);
 create index if not exists idx_agent_group_messages_created on agent_group_messages(created_at desc);
 create index if not exists idx_agent_wallet_ledger_agent_id on agent_wallet_ledger(agent_id);
+
+-- Supabase Storage requirement:
+-- Create a public bucket named agent-profile-photos for browser-captured agent photos.
+-- In Supabase Dashboard: Storage -> New bucket -> agent-profile-photos -> Public.
+-- If your project uses private buckets, create signed URL policies and adjust
+-- /api/agent/profile_photo_v4 accordingly.

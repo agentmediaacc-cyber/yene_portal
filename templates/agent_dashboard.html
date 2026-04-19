@@ -922,6 +922,37 @@
       width:84px;height:84px;border-radius:8px;object-fit:cover;
       border:1px solid rgba(20,36,54,.14);background:#edf6fd;
     }
+    .camera-box{
+      display:grid;
+      gap:10px;
+      margin:12px 0 16px;
+      padding:12px;
+      border:1px solid rgba(20,36,54,.12);
+      border-radius:8px;
+      background:#f8fafc;
+    }
+    .camera-preview{
+      width:100%;
+      max-height:280px;
+      border-radius:8px;
+      background:#142231;
+      object-fit:cover;
+      display:none;
+    }
+    .completion-bar{
+      height:10px;
+      border-radius:999px;
+      background:#e2e8f0;
+      overflow:hidden;
+      margin-top:8px;
+    }
+    .completion-fill{
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg,#0ea5e9,#22c55e);
+      transition:width .25s ease;
+    }
+    .btn[disabled]{opacity:.55;cursor:not-allowed;transform:none}
   </style>
 </head>
 <body>
@@ -976,7 +1007,7 @@
       </div>
 
       <div class="side-footer">
-        Live Supabase dashboard shell connected to the current agent routes. Extra trip/client-activity modules can plug in later.
+        Live YENE workspace with profile, registrations, wallet, team, jobs, support, and reports connected to Supabase.
       </div>
     </aside>
     <div class="menu-backdrop" id="menuBackdrop" aria-hidden="true"></div>
@@ -1087,6 +1118,16 @@
               </div>
               <div class="stat-sub" id="pendingApprovalSub">Latest wallet summary reading</div>
             </div>
+            <div class="card stat spark">
+              <div class="stat-top">
+                <div>
+                  <div class="label">Quality Score</div>
+                  <div class="stat-value" id="qualityScore">0</div>
+                </div>
+                <div class="stat-ico">✓</div>
+              </div>
+              <div class="stat-sub" id="weekDeltaSub">Week-over-week activity</div>
+            </div>
           </div>
 
           <div class="grid-2">
@@ -1113,6 +1154,17 @@
                 </div>
               </div>
             </div>
+            <div class="card">
+              <div class="card-header">
+                <h3>Smart Alerts</h3>
+                <div class="pill">Live</div>
+              </div>
+              <div class="card-body tight">
+                <div class="list" id="agentAlertList">
+                  <div class="muted">Loading alerts...</div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1124,7 +1176,7 @@
             <div class="card">
               <div class="card-header">
                 <h3>Register Driver</h3>
-                <div class="pill">v4 live route</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body">
                 <form id="driverForm" class="form-grid">
@@ -1136,7 +1188,7 @@
                   <input class="field" name="external_code" placeholder="Referral / external code (optional)" />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Register Driver</button>
-                    <div class="mini-note">Strong duplicate scan needs backend validation too.</div>
+                    <div class="mini-note">Phone and licence details are checked before saving.</div>
                   </div>
                 </form>
               </div>
@@ -1145,7 +1197,7 @@
             <div class="card">
               <div class="card-header">
                 <h3>Register Client</h3>
-                <div class="pill">v4 live route</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body">
                 <form id="clientForm" class="form-grid">
@@ -1155,7 +1207,7 @@
                   <input class="field" name="external_code" placeholder="Customer code" required />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Register Client</button>
-                    <div class="mini-note">Phone duplicate checks should also be enforced on backend.</div>
+                    <div class="mini-note">Phone and customer code are checked before saving.</div>
                   </div>
                 </form>
               </div>
@@ -1228,7 +1280,7 @@
                 </div>
                 <div class="stat-ico">💎</div>
               </div>
-              <div class="stat-sub">Reading from current wallet summary route</div>
+              <div class="stat-sub">Approved, pending, and ledger-backed balance view</div>
             </div>
             <div class="card stat">
               <div class="stat-top">
@@ -1326,7 +1378,7 @@
             <div class="card">
               <div class="card-header">
                 <h3>Referral Team Summary</h3>
-                <div class="pill">Current live read</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body">
                 <div class="list" id="teamSummaryList">
@@ -1351,13 +1403,13 @@
                   <div class="list-item">
                     <div class="stack">
                       <div class="title">Activate strong agents</div>
-                      <div class="sub">The goal is a quality team, not just signups. Activated drivers and active agents improve future earnings logic.</div>
+                      <div class="sub">The goal is a quality team, not just signups. Team activity is counted from real driver and client registrations.</div>
                     </div>
                   </div>
                   <div class="list-item">
                     <div class="stack">
                       <div class="title">Reach batch of 10</div>
-                      <div class="sub">This UI is ready for team-leader logic once your admin rules expose it live.</div>
+                      <div class="sub">Your progress uses the agents currently linked to your referral code.</div>
                     </div>
                   </div>
                 </div>
@@ -1504,7 +1556,7 @@
             <div class="card">
               <div class="card-header">
                 <h3>First to 50 Drivers</h3>
-                <div class="pill">N$ 1000</div>
+                <div class="pill">Milestone</div>
               </div>
               <div class="card-body">
                 <div class="metric-box">
@@ -1521,7 +1573,7 @@
             <div class="card">
               <div class="card-header">
                 <h3>50 Activated Drivers</h3>
-                <div class="pill">N$ 1000</div>
+                <div class="pill">Milestone</div>
               </div>
               <div class="card-body">
                 <div class="metric-box">
@@ -1538,7 +1590,7 @@
             <div class="card">
               <div class="card-header">
                 <h3>150 Activated Clients</h3>
-                <div class="pill">N$ 2500</div>
+                <div class="pill">Milestone</div>
               </div>
               <div class="card-body">
                 <div class="metric-box">
@@ -1675,7 +1727,7 @@
                     <div class="mini-note">Best for WhatsApp status and Facebook post</div>
                   </div>
                   <div class="flyer-footer">
-                    <div class="mini-note">Static premium template</div>
+                    <div class="mini-note">Browser-generated flyer</div>
                     <button class="btn btn-primary" onclick="downloadFlyer('client')">Download</button>
                   </div>
                 </div>
@@ -1690,7 +1742,7 @@
                     <div class="mini-note">Best for status, stories, and groups</div>
                   </div>
                   <div class="flyer-footer">
-                    <div class="mini-note">Static premium template</div>
+                    <div class="mini-note">Browser-generated flyer</div>
                     <button class="btn btn-primary" onclick="downloadFlyer('driver')">Download</button>
                   </div>
                 </div>
@@ -1705,13 +1757,13 @@
                     <div class="mini-note">Team growth poster</div>
                   </div>
                   <div class="flyer-footer">
-                    <div class="mini-note">Static premium template</div>
+                    <div class="mini-note">Browser-generated flyer</div>
                     <button class="btn btn-primary" onclick="downloadFlyer('agent')">Download</button>
                   </div>
                 </div>
               </div>
               <div style="margin-top:14px" class="mini-note">
-                These are premium static browser-generated posters for now. True image-generator posters and A4 PDF export can be connected next with a dedicated backend or image route.
+                Flyers use your referral details and download directly from this browser.
               </div>
             </div>
           </div>
@@ -1730,15 +1782,41 @@
                   <div class="stack">
                     <div class="title" id="profileNameLabel">Agent profile</div>
                     <div class="sub" id="profileCompletionText">Loading profile requirements...</div>
+                    <div class="completion-bar"><div class="completion-fill" id="profileCompletionFill"></div></div>
                   </div>
+                </div>
+                <div class="camera-box">
+                  <video id="cameraPreview" class="camera-preview" autoplay playsinline></video>
+                  <canvas id="cameraCanvas" class="camera-preview"></canvas>
+                  <input class="field" id="profilePhotoFile" type="file" accept="image/*">
+                  <div class="toolbar">
+                    <button class="btn btn-soft" type="button" id="openCameraBtn">Open Camera</button>
+                    <button class="btn btn-soft" type="button" id="capturePhotoBtn">Capture Photo</button>
+                    <button class="btn btn-soft" type="button" id="retakePhotoBtn">Retake</button>
+                    <button class="btn btn-primary" type="button" id="uploadPhotoBtn">Save Photo</button>
+                  </div>
+                  <div class="mini-note" id="cameraStatus">Use camera or upload from gallery. Saved photos are stored in Supabase Storage.</div>
                 </div>
                 <form id="settingsForm" class="form-grid">
                   <input class="field" name="full_name" id="setName" placeholder="Full name" />
                   <input class="field" name="username" id="setUsername" placeholder="Username" />
+                  <input class="field" name="email" id="setEmail" placeholder="Email" readonly />
                   <input class="field" name="phone" id="setPhone" placeholder="Phone" />
+                  <select class="select" name="gender" id="setGender">
+                    <option value="">Gender</option>
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                  <input class="field" name="date_of_birth" id="setBirth" type="date" placeholder="Date of birth" />
                   <input class="field" name="town" id="setTown" placeholder="Town" />
                   <input class="field" name="region" id="setRegion" placeholder="Region" />
+                  <input class="field" name="national_id" id="setNationalId" placeholder="National ID / ID number" />
+                  <input class="field" name="next_of_kin_name" id="setKinName" placeholder="Next of kin name" />
+                  <input class="field" name="next_of_kin_phone" id="setKinPhone" placeholder="Next of kin phone" />
                   <input class="field full" name="residential_address" id="setAddress" placeholder="Residential address" />
+                  <textarea class="textarea full" name="bio" id="setBio" placeholder="Bio / about"></textarea>
                   <input class="field full" name="profile_picture_url" id="setProfilePicture" placeholder="Profile picture URL" />
                   <input class="field full" id="setReferral" placeholder="Referral code" readonly />
                   <div class="full toolbar">
@@ -1948,19 +2026,31 @@
       $("clientsThisWeek").textContent = Number(summary.clients_this_week || summary.week_clients || summary.clients_week || 0);
       $("walletBalanceMain").textContent = money(wallet.balance || wallet.total || wallet.available_balance || summary.wallet_balance || 0);
       $("pendingApprovalSub").textContent = Number(summary.pending_approvals || 0) + " pending approvals not counted in earnings";
+      $("qualityScore").textContent = Number(summary.quality_score || 0);
+      const delta = Number(summary.week_delta || 0);
+      $("weekDeltaSub").textContent = `${delta >= 0 ? "+" : ""}${delta} registrations vs last week`;
+      renderAgentAlerts(summary.alerts || []);
 
       $("refCodeBig").textContent = safe(me.referral_code || me.code || "-");
       $("setName").value = safe(me.full_name || me.name || "", "");
       $("setUsername").value = safe(me.username || "", "");
+      $("setEmail").value = safe(me.email || "", "");
       $("setPhone").value = safe(me.phone || "", "");
+      $("setGender").value = safe(me.gender || "", "");
+      $("setBirth").value = safe(me.date_of_birth || me.dob || "", "").slice(0,10);
       $("setTown").value = safe(me.town || "", "");
       $("setRegion").value = safe(me.region || "", "");
+      $("setNationalId").value = safe(me.national_id || me.id_number || "", "");
+      $("setKinName").value = safe(me.next_of_kin_name || "", "");
+      $("setKinPhone").value = safe(me.next_of_kin_phone || "", "");
       $("setAddress").value = safe(me.residential_address || me.address || "", "");
+      $("setBio").value = safe(me.bio || me.about || "", "");
       $("setProfilePicture").value = safe(me.profile_picture_url || me.profile_pic_path || "", "");
       $("setReferral").value = safe(me.referral_code || me.code || "", "");
 
       const missing = Array.isArray(me.missing_profile_fields) ? me.missing_profile_fields : (Array.isArray(summary.missing_profile_fields) ? summary.missing_profile_fields : []);
       const complete = missing.length === 0 && (me.profile_complete !== false) && (summary.profile_complete !== false);
+      state.profileComplete = complete;
       const alert = $("profileAlert");
       if(alert){
         alert.classList.toggle("show", !complete);
@@ -1969,10 +2059,34 @@
           : `<strong>Complete My Account before registering.</strong><br>Missing: ${esc(missing.join(", ") || "required profile fields")}`;
       }
       $("profileStatusPill").textContent = complete ? "Complete" : "Incomplete";
-      $("profileCompletionText").textContent = complete ? "Your account is ready for registrations." : "Missing: " + (missing.join(", ") || "required profile fields");
+      const percent = Number(me.profile_completion_percent || summary.profile_completion_percent || (complete ? 100 : 0));
+      $("profileCompletionText").textContent = complete ? `Profile ${percent}% complete. Your account is ready for registrations.` : `Profile ${percent}% complete. Missing: ` + (missing.join(", ") || "required profile fields");
+      $("profileCompletionFill").style.width = Math.max(0, Math.min(100, percent)) + "%";
       $("profileNameLabel").textContent = name;
       const photo = me.profile_picture_url || me.profile_pic_path || "";
       $("profilePhoto").src = photo || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23edf6fd'/%3E%3Ctext x='48' y='56' text-anchor='middle' font-family='Arial' font-size='28' fill='%230ea5e9'%3EY%3C/text%3E%3C/svg%3E";
+      document.querySelectorAll('#driverForm button[type="submit"], #clientForm button[type="submit"]').forEach(btn => {
+        btn.disabled = !complete;
+        btn.title = complete ? "" : "Complete My Account before registering";
+      });
+    }
+
+    function renderAgentAlerts(rows){
+      const box = $("agentAlertList");
+      if(!box) return;
+      if(!Array.isArray(rows) || !rows.length){
+        box.innerHTML = '<div class="muted">No alerts right now. Keep registrations clean and current.</div>';
+        return;
+      }
+      box.innerHTML = rows.map(r => `
+        <div class="list-item">
+          <div class="stack">
+            <div class="title">${esc(String(r.type || 'Alert').toUpperCase())}</div>
+            <div class="sub">${esc(r.message || '')}</div>
+          </div>
+          <div class="pill">${esc(r.level || 'info')}</div>
+        </div>
+      `).join("");
     }
 
     function renderMessages(targetId="messageList"){
@@ -2121,9 +2235,11 @@
 
     function renderTeam(){
       const t = firstData(state.teamSummary || {});
-      const rows = guessRows(state.teamSummary || {});
+      const rows = Array.isArray((state.teamSummary || {}).rows) ? state.teamSummary.rows : guessRows(state.teamSummary || {});
       const count = Number(t.team_agents || t.total || t.team_total || rows.length || 0);
       $("teamSize").textContent = count;
+      const activationTarget = document.querySelector('#team .grid-3 .card:nth-child(2) .stat-value');
+      if(activationTarget) activationTarget.textContent = `${Math.min(count,10)} / 10`;
 
       const list = $("teamSummaryList");
       const pieces = [];
@@ -2143,7 +2259,8 @@
             <div class="list-item">
               <div class="stack">
                 <div class="title">${esc(safe(r.full_name || r.name || r.email || "Team member"))}</div>
-                <div class="sub">${esc(safe(r.email || r.phone || "-"))}</div>
+                <div class="sub">${esc(safe(r.username || "-"))} • ${esc(safe(r.phone || "-"))} • ${esc(safe(r.email || "-"))}</div>
+                <div class="sub">${esc(safe(r.town || "-"))} • ${esc(safe(r.region || "-"))} • Drivers ${Number(r.drivers_all || 0)} • Clients ${Number(r.clients_all || 0)}</div>
               </div>
               <div class="pill">${esc(safe(r.status || "Joined"))}</div>
             </div>
@@ -2153,8 +2270,8 @@
         pieces.push(`
           <div class="list-item">
             <div class="stack">
-              <div class="title">No detailed team rows yet</div>
-              <div class="sub">The summary route is live, and this section will expand automatically if more team rows are returned.</div>
+              <div class="title">No referred agents yet</div>
+              <div class="sub">Share your referral code. Agents who sign up with it will appear here after their profile is created.</div>
             </div>
           </div>
         `);
@@ -2458,12 +2575,16 @@
     }
 
     async function loadTeam(){
-      try{
-        const data = await jget('/api/agent/team_summary_v4');
-        state.teamSummary = data.summary || data.data || data || {};
-      }catch(_){
-        state.teamSummary = {};
-      }
+      const [summary, rows] = await Promise.allSettled([
+        jget('/api/agent/team_summary_v4'),
+        jget('/api/agent/team_v4')
+      ]);
+      const summaryData = summary.status === 'fulfilled' ? summary.value : {};
+      const rowData = rows.status === 'fulfilled' ? rows.value : {};
+      state.teamSummary = {
+        ...(summaryData.summary || summaryData.data || summaryData || {}),
+        rows: guessRows(rowData).length ? guessRows(rowData) : guessRows(summaryData)
+      };
     }
 
     async function loadJobs(){
@@ -2585,11 +2706,19 @@
         full_name: $("setName").value.trim(),
         username: $("setUsername").value.trim(),
         phone: $("setPhone").value.trim(),
+        gender: $("setGender").value.trim(),
+        date_of_birth: $("setBirth").value.trim(),
         town: $("setTown").value.trim(),
         region: $("setRegion").value.trim(),
         operation_region: $("setRegion").value.trim(),
+        national_id: $("setNationalId").value.trim(),
+        id_number: $("setNationalId").value.trim(),
+        next_of_kin_name: $("setKinName").value.trim(),
+        next_of_kin_phone: $("setKinPhone").value.trim(),
         residential_address: $("setAddress").value.trim(),
         address: $("setAddress").value.trim(),
+        bio: $("setBio").value.trim(),
+        about: $("setBio").value.trim(),
         profile_picture_url: $("setProfilePicture").value.trim(),
         profile_pic_path: $("setProfilePicture").value.trim()
       };
@@ -2609,6 +2738,11 @@
 
     async function submitDriver(ev){
       ev.preventDefault();
+      if(state.profileComplete === false){
+        toast("Complete My Account before registering drivers.");
+        openSection("settings");
+        return;
+      }
       const btn = ev.target.querySelector('button[type="submit"]');
       const agentName = state.me?.full_name || state.me?.username || 'Agent';
       if(btn){ btn.disabled = true; btn.innerHTML = `<span class="loader"></span> ${esc(agentName)}, saving driver...`; }
@@ -2643,6 +2777,11 @@
 
     async function submitClient(ev){
       ev.preventDefault();
+      if(state.profileComplete === false){
+        toast("Complete My Account before registering clients.");
+        openSection("settings");
+        return;
+      }
       const btn = ev.target.querySelector('button[type="submit"]');
       const agentName = state.me?.full_name || state.me?.username || 'Agent';
       if(btn){ btn.disabled = true; btn.innerHTML = `<span class="loader"></span> ${esc(agentName)}, saving client...`; }
@@ -2757,6 +2896,105 @@
     }
     window.downloadFlyer = downloadFlyer;
 
+    let cameraStream = null;
+    let pendingPhotoData = "";
+
+    function setCameraStatus(text){
+      const el = $("cameraStatus");
+      if(el) el.textContent = text;
+    }
+
+    async function openCamera(){
+      try{
+        if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+          setCameraStatus("Camera is not available in this browser. Use gallery upload.");
+          return;
+        }
+        cameraStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}, audio:false});
+        const video = $("cameraPreview");
+        video.srcObject = cameraStream;
+        video.style.display = "block";
+        $("cameraCanvas").style.display = "none";
+        setCameraStatus("Camera ready. Capture when your face is clear.");
+      }catch(e){
+        setCameraStatus("Camera permission denied or unavailable. Use gallery upload.");
+      }
+    }
+
+    function capturePhoto(){
+      const video = $("cameraPreview");
+      const canvas = $("cameraCanvas");
+      if(!video || !video.videoWidth){
+        setCameraStatus("Open the camera first, or use gallery upload.");
+        return;
+      }
+      const max = 900;
+      const scale = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      pendingPhotoData = canvas.toDataURL("image/jpeg", 0.86);
+      canvas.style.display = "block";
+      video.style.display = "none";
+      $("profilePhoto").src = pendingPhotoData;
+      setCameraStatus("Photo captured. Save Photo to upload it.");
+      if(cameraStream){
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+      }
+    }
+
+    function retakePhoto(){
+      pendingPhotoData = "";
+      $("cameraCanvas").style.display = "none";
+      openCamera();
+    }
+
+    function loadGalleryPhoto(file){
+      if(!file) return;
+      if(!file.type.startsWith("image/")){
+        setCameraStatus("Choose a valid image file.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        pendingPhotoData = String(reader.result || "");
+        $("profilePhoto").src = pendingPhotoData;
+        setCameraStatus("Gallery photo ready. Save Photo to upload it.");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function uploadProfilePhoto(){
+      if(!pendingPhotoData){
+        setCameraStatus("Capture a photo or choose one from gallery first.");
+        return;
+      }
+      const btn = $("uploadPhotoBtn");
+      const old = btn.textContent;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loader"></span> Saving photo...';
+      try{
+        const res = await jget('/api/agent/profile_photo_v4', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({image_data: pendingPhotoData})
+        });
+        $("setProfilePicture").value = res.url || "";
+        $("profilePhoto").src = res.url || pendingPhotoData;
+        pendingPhotoData = "";
+        setCameraStatus("Profile photo saved.");
+        await loadMe();
+        await loadSummary();
+        updateHero();
+      }catch(e){
+        setCameraStatus(e.message || "Photo upload failed.");
+      }finally{
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    }
+
     async function refreshAll(showToast=true){
       $("helloBadge").innerHTML = '<span class="loader"></span>';
       setLoadingText("weekBadge", "Loading...");
@@ -2817,6 +3055,11 @@
     $("withdrawForm").addEventListener('submit', submitWithdraw);
     $("settingsForm").addEventListener('submit', saveSettings);
     $("copyCodeBtn").addEventListener('click', copyReferral);
+    $("openCameraBtn").addEventListener('click', openCamera);
+    $("capturePhotoBtn").addEventListener('click', capturePhoto);
+    $("retakePhotoBtn").addEventListener('click', retakePhoto);
+    $("uploadPhotoBtn").addEventListener('click', uploadProfilePhoto);
+    $("profilePhotoFile").addEventListener('change', (e) => loadGalleryPhoto(e.target.files && e.target.files[0]));
 
     function bindAgentMenu(){
       $("menuBtn")?.addEventListener('click', toggleAgentMenu);

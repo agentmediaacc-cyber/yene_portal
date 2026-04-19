@@ -66,15 +66,15 @@ def register_admin_workflow_routes(app, sb_admin):
         if rows:
             return rows[0]
         return {
-            "rule_name": "Default",
-            "driver_reg": 10,
-            "client_reg": 10,
+            "rule_name": "No active payment rule",
+            "driver_reg": 0,
+            "client_reg": 0,
             "referral_pct": 0,
             "first_trip_bonus": 0,
-            "daily_5_clients_bonus": 50,
-            "daily_5_drivers_bonus": 100,
-            "weekly_30_activations_bonus": 500,
-            "monthly_50_driver_activations_bonus": 2500,
+            "daily_5_clients_bonus": 0,
+            "daily_5_drivers_bonus": 0,
+            "weekly_30_activations_bonus": 0,
+            "monthly_50_driver_activations_bonus": 0,
         }
 
     def _date_range(scope):
