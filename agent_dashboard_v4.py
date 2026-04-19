@@ -94,6 +94,22 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
     def _approved(row):
         return str((row or {}).get("status") or "").strip().upper() in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
 
+    def _profile_missing(agent):
+        missing = []
+        checks = [
+            ("profile picture", agent.get("profile_picture_url") or agent.get("profile_pic_path")),
+            ("full name", agent.get("full_name")),
+            ("username", agent.get("username")),
+            ("phone number", agent.get("phone") or agent.get("phone_number")),
+            ("town", agent.get("town")),
+            ("region of operation", agent.get("operation_region") or agent.get("region")),
+            ("residential address", agent.get("residential_address") or agent.get("address")),
+        ]
+        for label, value in checks:
+            if not str(value or "").strip() or str(value or "").strip().lower() in {"none", "pending", "n/a"}:
+                missing.append(label)
+        return missing
+
     def _select_all(table, limit=10000, order_col="created_at", desc=True):
         try:
             q = sb_admin.table(table).select("*")
@@ -498,9 +514,13 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 "referral_code": agent.get("referral_code"),
                 "username": agent.get("username"),
                 "profile_picture_url": agent.get("profile_picture_url"),
-                "residential_address": agent.get("residential_address"),
+                "profile_pic_path": agent.get("profile_pic_path"),
+                "residential_address": agent.get("residential_address") or agent.get("address"),
                 "operation_region": agent.get("operation_region"),
                 "pin": agent.get("pin"),
+                "must_change_password": bool(agent.get("must_change_password")),
+                "profile_complete": not bool(_profile_missing(agent)),
+                "missing_profile_fields": _profile_missing(agent),
             }
         })
 
@@ -556,7 +576,9 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 "id": agent.get("id"),
                 "full_name": agent.get("full_name"),
                 "email": agent.get("email"),
-            }
+            },
+            "profile_complete": not bool(_profile_missing(agent)),
+            "missing_profile_fields": _profile_missing(agent),
         })
 
     @app.route("/api/agent/activity_v4", methods=["GET"], endpoint="agent_activity_v4")
@@ -703,6 +725,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         data = request.get_json(silent=True) or {}
         updates = {
             "full_name": (data.get("full_name") or "").strip() or agent.get("full_name"),
+            "username": (data.get("username") or "").strip() or agent.get("username"),
             "phone": (data.get("phone") or "").strip() or agent.get("phone"),
             "email": (data.get("email") or "").strip() or agent.get("email"),
             "town": (data.get("town") or "").strip() or agent.get("town"),
@@ -713,7 +736,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 or agent.get("operation_region")
             ),
         }
-        for optional_key in ("profile_picture_url", "residential_address", "pin"):
+        for optional_key in ("profile_picture_url", "profile_pic_path", "residential_address", "address", "pin"):
             if optional_key in data:
                 updates[optional_key] = (data.get(optional_key) or "").strip()
 
@@ -732,6 +755,13 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         agent, err = get_agent()
         if err:
             return jsonify({"ok": False, "error": err}), 401
+        missing_profile = _profile_missing(agent)
+        if missing_profile:
+            return jsonify({
+                "ok": False,
+                "error": "Complete your profile before registering drivers. Missing: " + ", ".join(missing_profile),
+                "missing_profile_fields": missing_profile,
+            }), 403
 
         data = request.get_json(silent=True) or {}
         full_name = (data.get("full_name") or "").strip()
@@ -838,6 +868,13 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         agent, err = get_agent()
         if err:
             return jsonify({"ok": False, "error": err}), 401
+        missing_profile = _profile_missing(agent)
+        if missing_profile:
+            return jsonify({
+                "ok": False,
+                "error": "Complete your profile before registering clients. Missing: " + ", ".join(missing_profile),
+                "missing_profile_fields": missing_profile,
+            }), 403
 
         data = request.get_json(silent=True) or {}
         full_name = (data.get("full_name") or "").strip()

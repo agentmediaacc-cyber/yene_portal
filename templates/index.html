@@ -6,19 +6,19 @@
   <title>YENE Promoter & Agent Platform</title>
   <style>
     :root{
-      --bg:#07131f;
-      --card:rgba(9,22,40,.84);
-      --card2:rgba(8,18,34,.72);
-      --line:rgba(255,255,255,.10);
-      --text:#eef6ff;
-      --muted:#b5c8e8;
-      --blue:#58b7ff;
-      --blue2:#238dff;
+      --bg:#f7fafc;
+      --card:rgba(255,255,255,.92);
+      --card2:rgba(255,255,255,.86);
+      --line:rgba(20,36,54,.12);
+      --text:#142231;
+      --muted:#5d7189;
+      --blue:#0ea5e9;
+      --blue2:#22c55e;
       --green:#33d17a;
       --warn:#ffb84d;
       --danger:#ff6b6b;
-      --shadow:0 18px 40px rgba(0,0,0,.30);
-      --radius:24px;
+      --shadow:0 18px 40px rgba(22,44,70,.14);
+      --radius:8px;
     }
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
@@ -26,8 +26,8 @@
       font-family:Inter,Segoe UI,Arial,sans-serif;
       color:var(--text);
       background:
-        linear-gradient(rgba(4,13,24,.70), rgba(4,13,24,.86)),
-        url("https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1800&q=80")
+        linear-gradient(rgba(247,250,252,.80), rgba(247,250,252,.96)),
+        url("https://images.unsplash.com/photo-1531219572328-a0171b4448a3?auto=format&fit=crop&w=1800&q=80")
         center/cover fixed no-repeat;
       min-height:100vh;
     }
@@ -35,7 +35,7 @@
     .wrap{max-width:1280px;margin:0 auto;padding:20px}
     .topbar{
       display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
-      background:rgba(7,18,33,.62);
+      background:rgba(255,255,255,.78);
       border:1px solid var(--line);
       border-radius:22px;
       padding:14px 18px;
@@ -45,9 +45,9 @@
     }
     .brand{display:flex;align-items:center;gap:12px}
     .logo{
-      width:52px;height:52px;border-radius:16px;
+      width:52px;height:52px;border-radius:8px;
       display:flex;align-items:center;justify-content:center;
-      background:linear-gradient(135deg,var(--blue),#7c4dff);
+      background:linear-gradient(135deg,var(--blue),var(--blue2));
       color:white;font-weight:900;font-size:24px;
       box-shadow:0 12px 26px rgba(0,0,0,.25);
     }
@@ -55,10 +55,10 @@
     .brand p{margin:3px 0 0;color:var(--muted);font-size:13px}
     .nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .nav a{
-      padding:10px 14px;border-radius:12px;border:1px solid transparent;
-      background:rgba(255,255,255,.04);font-weight:700;transition:.18s ease;
+      padding:10px 14px;border-radius:8px;border:1px solid transparent;
+      background:rgba(14,165,233,.08);font-weight:700;transition:.18s ease;
     }
-    .nav a:hover{border-color:rgba(88,183,255,.25);background:rgba(88,183,255,.10);transform:translateY(-1px)}
+    .nav a:hover{border-color:rgba(14,165,233,.25);background:rgba(14,165,233,.12);transform:translateY(-1px)}
     .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-top:18px;align-items:stretch}
     .panel{
       background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
@@ -66,48 +66,45 @@
     }
     .eyebrow{
       display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;
-      background:rgba(88,183,255,.10);border:1px solid rgba(88,183,255,.20);
-      color:#d8efff;font-size:13px;font-weight:800;margin-bottom:14px;
+      background:rgba(14,165,233,.10);border:1px solid rgba(14,165,233,.20);
+      color:#075985;font-size:13px;font-weight:800;margin-bottom:14px;
     }
     .hero h2{font-size:clamp(30px,5vw,56px);line-height:1.02;margin:0 0 14px;font-weight:950;max-width:760px}
     .hero p{margin:0;color:var(--muted);font-size:17px;line-height:1.6;max-width:760px}
     .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
     .btn{
       display:inline-flex;align-items:center;justify-content:center;min-width:160px;
-      padding:14px 18px;border-radius:14px;font-weight:900;border:none;cursor:pointer;
+      padding:14px 18px;border-radius:8px;font-weight:900;border:none;cursor:pointer;
       transition:.18s ease;box-shadow:0 10px 24px rgba(0,0,0,.22);
     }
-    .btn.primary{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#04111d}
-    .btn.secondary{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--line)}
+    .btn.primary{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#ffffff}
+    .btn.secondary{background:#ffffff;color:var(--text);border:1px solid var(--line)}
     .btn:hover{transform:translateY(-2px)}
     .heroStats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:22px}
-    .miniCard{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:18px;padding:16px}
+    .miniCard{background:rgba(248,250,252,.88);border:1px solid var(--line);border-radius:8px;padding:16px}
     .miniLabel{color:var(--muted);font-size:12px;text-transform:uppercase;font-weight:800;letter-spacing:.4px}
     .miniValue{margin-top:8px;font-size:28px;font-weight:950}
     .welcomeBox{position:relative;overflow:hidden;min-height:100%}
-    .welcomeBox:before{
-      content:"";position:absolute;inset:auto -60px -60px auto;width:220px;height:220px;border-radius:50%;
-      background:radial-gradient(circle, rgba(88,183,255,.28), rgba(88,183,255,0) 70%);pointer-events:none;
-    }
+    .welcomeBox:before{content:"";position:absolute;inset:auto 0 0 auto;width:38%;height:6px;background:linear-gradient(90deg,var(--blue),var(--blue2));pointer-events:none}
     .sectionGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
     .title{font-size:21px;font-weight:900;margin:0 0 12px;display:flex;align-items:center;gap:10px}
     .subtitle{color:var(--muted);margin:-2px 0 14px;font-size:14px}
     .updates{display:grid;gap:10px}
-    .updateItem{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:16px;padding:14px}
+    .updateItem{background:rgba(248,250,252,.88);border:1px solid var(--line);border-radius:8px;padding:14px}
     .updateDate{font-size:12px;color:#cce7ff;font-weight:800;margin-bottom:6px}
     .updateText{color:var(--text);line-height:1.5}
     .rules{display:grid;gap:10px}
-    .rule{display:flex;gap:12px;align-items:flex-start;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:16px;padding:14px}
-    .ruleIcon{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(88,183,255,.12);flex:0 0 auto;font-size:17px}
+    .rule{display:flex;gap:12px;align-items:flex-start;background:rgba(248,250,252,.88);border:1px solid var(--line);border-radius:8px;padding:14px}
+    .ruleIcon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(14,165,233,.12);flex:0 0 auto;font-size:17px}
     .infoCards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:18px}
-    .feature{background:var(--card2);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
+    .feature{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:18px;box-shadow:var(--shadow);backdrop-filter:blur(8px)}
     .feature h3{margin:12px 0 8px;font-size:18px}
     .feature p{margin:0;color:var(--muted);line-height:1.55;font-size:14px}
-    .feature .icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:rgba(88,183,255,.12);font-size:22px}
-    .tableWrap{width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.03)}
+    .feature .icon{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(14,165,233,.12);font-size:22px}
+    .tableWrap{width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
     table{width:100%;border-collapse:collapse;min-width:680px}
-    th,td{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;font-size:14px}
-    th{background:rgba(10,24,44,.72);color:#d2e8ff;font-weight:900}
+    th,td{padding:12px 14px;border-bottom:1px solid rgba(20,36,54,.08);text-align:left;font-size:14px}
+    th{background:#edf6fd;color:#24384f;font-weight:900}
     .pill{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}
     .pill.active{background:rgba(51,209,122,.16);color:#9ef2c1}
     .pill.inactive{background:rgba(255,107,107,.14);color:#ffc4c4}
@@ -141,7 +138,7 @@
 
       <div class="nav">
         <a href="/apply">Apply to Join</a>
-        <a href="/login">Agent Login</a>
+        <a href="/login?force=1">Login</a>
         <a href="#updates">Official Updates</a>
       </div>
     </div>
@@ -158,7 +155,7 @@
 
         <div class="cta">
           <a class="btn primary" href="/apply">Apply to Join</a>
-          <a class="btn secondary" href="/login">Agent Login</a>
+          <a class="btn secondary" href="/login?force=1">Login</a>
         </div>
 
         <div class="heroStats">
@@ -171,20 +168,20 @@
             <div class="miniValue">{{ stats.agents_active }}</div>
           </div>
           <div class="miniCard">
-            <div class="miniLabel">Drivers Registered</div>
+            <div class="miniLabel">Approved Drivers</div>
             <div class="miniValue">{{ stats.drivers_registered }}</div>
           </div>
           <div class="miniCard">
-            <div class="miniLabel">Clients Registered</div>
+            <div class="miniLabel">Approved Clients</div>
             <div class="miniValue">{{ stats.clients_registered }}</div>
           </div>
           <div class="miniCard">
-            <div class="miniLabel">This Week</div>
+            <div class="miniLabel">Weekly Preview</div>
             <div class="miniValue">{{ stats.registrations_this_week }}</div>
           </div>
           <div class="miniCard">
-            <div class="miniLabel">Wallet Credits</div>
-            <div class="miniValue">N$ {{ '%.0f'|format(stats.wallet_credits or 0) }}</div>
+            <div class="miniLabel">All-Time Clients</div>
+            <div class="miniValue">{{ stats.clients_all_time }}</div>
           </div>
         </div>
       </div>
@@ -216,8 +213,8 @@
 
     <div class="sectionGrid">
       <div class="panel">
-        <div class="title">Top Performing Agents</div>
-        <div class="subtitle">Live leaderboard preview from current driver and client ownership.</div>
+        <div class="title">Current Week Leaderboard</div>
+        <div class="subtitle">Approved registrations only, {{ stats.week_start }} to {{ stats.week_end }}. Score: drivers x3, clients x2.</div>
         <div class="tableWrap">
           <table>
             <thead>
@@ -315,27 +312,31 @@
     </div>
 
     <div class="panel" style="margin-top:18px">
-      <div class="title">📍 Regional Payment Rates</div>
-      <div class="subtitle">Live payment visibility from your network setup.</div>
+      <div class="title">Weekly Agent Earnings</div>
+      <div class="subtitle">Live payment rules for approved work this week. Amounts may vary by town or region when configured.</div>
       <div class="tableWrap">
         <table>
           <thead>
             <tr>
               <th>Region</th>
               <th>Town</th>
-              <th>Driver (N$)</th>
-              <th>Client (N$)</th>
+              <th>Driver Pay</th>
+              <th>Client Pay</th>
+              <th>Daily Bonus</th>
+              <th>Activation / Trip Bonus</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            {% if rates %}
-            {% for r in rates %}
+            {% if payment_info %}
+            {% for r in payment_info %}
             <tr>
               <td>{{ r.region }}</td>
               <td>{{ r.town }}</td>
-              <td>{{ r.driver }}</td>
-              <td>{{ r.client }}</td>
+              <td>N$ {{ r.driver_pay }}</td>
+              <td>N$ {{ r.client_pay }}</td>
+              <td>Drivers N$ {{ r.driver_daily_bonus }} • Clients N$ {{ r.client_daily_bonus }}</td>
+              <td>Activation N$ {{ r.activation_bonus }} • First trip N$ {{ r.first_trip_bonus }}</td>
               <td>
                 {% if (r.status|string|lower) == 'active' %}
                 <span class="pill active">{{ r.status }}</span>
@@ -347,7 +348,7 @@
             {% endfor %}
             {% else %}
             <tr>
-              <td colspan="5">No payment rates have been published yet.</td>
+              <td colspan="7">No payment rules have been published yet.</td>
             </tr>
             {% endif %}
           </tbody>
@@ -365,7 +366,7 @@
         </div>
         <div class="ctaStrip">
           <a class="btn primary" href="/apply">Start My Application</a>
-          <a class="btn secondary" href="/login">Open Agent Portal</a>
+          <a class="btn secondary" href="/login?force=1">Login</a>
         </div>
       </div>
 

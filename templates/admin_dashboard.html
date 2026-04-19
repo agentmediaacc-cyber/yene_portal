@@ -154,7 +154,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    let agents=[], drivers=[], clients=[], finance=[], jobs=[], broadcasts=[], payouts=[], selectedAgent=null;
+    let agents=[], drivers=[], clients=[], finance=[], jobs=[], broadcasts=[], payouts=[], paymentRules=[], selectedAgent=null;
     const $=id=>document.getElementById(id);
     const money=n=>"N$ "+(Number(n||0)||0).toFixed(2);
     const esc=s=>String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
@@ -175,9 +175,11 @@
     async function loadDrivers(){const j=await get("/api/admin/drivers");drivers=j.rows||j.data||[];renderDrivers();renderApprovals();renderLeaderboard()}
     async function loadClients(){const j=await get("/api/admin/clients");clients=j.rows||j.data||[];renderClients();renderApprovals();renderLeaderboard()}
     async function loadFinance(){const j=await get("/api/admin/finance");finance=j.rows||j.data||[];renderFinance();loadPayouts()}
+    async function loadPaymentRules(){try{const j=await get("/api/admin/payment_rules");paymentRules=j.rows||j.data||[];renderPaymentRules()}catch(e){paymentRules=[]}}
     async function loadPayouts(){try{const j=await get("/api/admin/payout_workflow?scope=weekly");payouts=j.rows||[];renderPayouts()}catch(e){$("payoutRows").innerHTML="<table><tbody><tr><td>Could not load payout workflow.</td></tr></tbody></table>"}}
     async function loadJobs(){try{const j=await get("/api/admin/jobs");jobs=j.rows||[];renderJobs()}catch(e){$("jobRows").innerHTML=`<tr><td colspan="5">Jobs table unavailable. Run sql/yene_upgrade.sql.</td></tr>`}}
     async function loadBroadcasts(){const j=await get("/api/admin/broadcasts");broadcasts=j.rows||j.data||[];renderBroadcasts()}
+    function renderPaymentRules(){const r=paymentRules[0]||{};if(!$("payDriver"))return;$("payDriver").value=$("payDriver").value||r.driver_reg||r.driver_register_amount||r.driver_amount||0;$("payClient").value=$("payClient").value||r.client_reg||r.client_register_amount||r.client_amount||0;$("payDailyDriver").value=$("payDailyDriver").value||r.daily_5_drivers_bonus||r.driver_daily_bonus||0;$("payDailyClient").value=$("payDailyClient").value||r.daily_5_clients_bonus||r.client_daily_bonus||0;$("payWeekly").value=$("payWeekly").value||r.weekly_30_activations_bonus||r.activation_bonus||0;$("payFirstTrip").value=$("payFirstTrip").value||r.first_trip_bonus||0}
     function renderRecent(rows){if(!rows.length){rows=[...drivers.map(d=>({created_at:d.created_at,type:"Driver",name:d.full_name,phone:d.phone||d.phone_number,town:d.town,agent:d.recruiter_name})),...clients.map(c=>({created_at:c.created_at,type:"Client",name:c.full_name,phone:c.phone||c.phone_number,town:c.town,agent:c.recruiter_name}))].sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||""))).slice(0,25)}$("recentRows").innerHTML=rows.length?rows.slice(0,25).map(r=>`<tr><td>${date(r.created_at)}</td><td>${esc(r.type)}</td><td>${esc(val(r.name))}</td><td>${esc(val(r.phone))}</td><td>${esc(val(r.town))}</td><td>${esc(val(r.agent))}</td></tr>`).join(""):`<tr><td colspan="6">No activity yet.</td></tr>`}
     function renderLeaderboard(){const rows=agents.map(a=>{const c=agentCounts(a);return {a,...c,score:c.drivers*3+c.clients*2}}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,10);$("leaderRows").innerHTML=rows.length?rows.map(x=>`<tr><td>${esc(x.a.full_name||x.a.username||x.a.email||"Agent")}</td><td>${x.drivers}</td><td>${x.clients}</td><td>${x.score}</td></tr>`).join(""):`<tr><td colspan="4">No leaderboard activity yet.</td></tr>`}
     function renderAgents(){const q=($("agentSearch").value||"").toLowerCase();const rows=agents.filter(a=>JSON.stringify(a).toLowerCase().includes(q));$("agentRows").innerHTML=rows.length?rows.map(a=>{const c=agentCounts(a);return `<tr><td>${esc(a.full_name||a.username||"Agent")}</td><td>${statusPill(a.status)}</td><td>${esc(a.email||"")}</td><td>${c.drivers}</td><td>${c.clients}</td><td><button class="btn" onclick="setSelected('${esc(a.id)}')">Select</button></td></tr>`}).join(""):`<tr><td colspan="6">No agents found.</td></tr>`}
@@ -205,7 +207,7 @@
     function renderBroadcasts(){$("broadcastRows").innerHTML=broadcasts.length?broadcasts.map(b=>`<tr><td>${date(b.created_at)}</td><td>${esc(b.title||"Broadcast")}</td><td>${esc(b.message||"")}</td></tr>`).join(""):`<tr><td colspan="3">No broadcasts.</td></tr>`}
     async function createBroadcast(){await post("/api/admin/broadcast",{title:$("broadcastTitle").value,message:$("broadcastMessage").value});$("broadcastTitle").value=$("broadcastMessage").value="";toast("Broadcast sent");await loadBroadcasts()}
     async function refreshCore(){await Promise.allSettled([loadAgents(),loadDrivers(),loadClients()]);renderApprovals();await loadOverview()}
-    async function refreshAll(){await refreshCore();await Promise.allSettled([loadFinance(),loadJobs(),loadBroadcasts()]);toast("Refreshed")}
+    async function refreshAll(){await refreshCore();await Promise.allSettled([loadFinance(),loadPaymentRules(),loadJobs(),loadBroadcasts()]);toast("Refreshed")}
     bindTabs();initDates();togglePeriodInputs();refreshAll();
   </script>
 </body>

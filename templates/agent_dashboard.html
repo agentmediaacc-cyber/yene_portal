@@ -874,6 +874,54 @@
       .search-hide{display:none}
       .mini-grid,.form-grid{grid-template-columns:1fr}
     }
+    body{
+      background:linear-gradient(180deg,#f7fafc 0%,#edf6fd 100%);
+      color:#142231;
+    }
+    .sidebar,.topbar,.brand,.card,.hero-side,.list-item,.metric-box,.achievement,.rival-box,.msg-card,.support-kpi,.flyer-card{
+      background:#ffffff;
+      color:#142231;
+      border-color:rgba(20,36,54,.12);
+      box-shadow:0 18px 42px rgba(22,44,70,.12);
+    }
+    .hero{
+      background:linear-gradient(135deg,rgba(255,255,255,.94),rgba(240,249,255,.88));
+      border-radius:8px;
+    }
+    .card,.hero-side,.brand,.nav-btn,.btn,.field,.select,.textarea,.metric-box,.list-item,.avatar,.pill,.table-wrap,.toast,.support-tab,.support-kpi,.msg-card,.achievement,.rival-box,.logo,.menu-btn,.icon-btn,.sidebar-close{
+      border-radius:8px;
+    }
+    .btn-primary,.logo,.avatar{
+      background:linear-gradient(135deg,#0ea5e9,#22c55e);
+      color:#fff;
+    }
+    .btn-soft,.field,.select,.textarea,.menu-btn,.icon-btn,.soft-badge,.nav-btn{
+      background:#ffffff;
+      color:#142231;
+    }
+    .nav-btn:hover,.nav-btn.active{
+      background:#e0f2fe;
+      border-color:rgba(14,165,233,.28);
+    }
+    .sub,.muted,.label,.mini-note{color:#5d7189}
+    table{background:#fff}
+    th{background:#edf6fd;color:#24384f}
+    tr:hover td{background:#f8fafc}
+    .profile-alert{
+      display:none;
+      border:1px solid #facc15;
+      background:#fefce8;
+      color:#713f12;
+      border-radius:8px;
+      padding:14px;
+      margin-bottom:16px;
+      line-height:1.5;
+    }
+    .profile-alert.show{display:block}
+    .profile-photo{
+      width:84px;height:84px;border-radius:8px;object-fit:cover;
+      border:1px solid rgba(20,36,54,.14);background:#edf6fd;
+    }
   </style>
 </head>
 <body>
@@ -917,7 +965,7 @@
           <span class="nav-ico">⬒</span><span>Marketing</span>
         </button>
         <button class="nav-btn" data-section="settings">
-          <span class="nav-ico">⚙</span><span>Settings</span>
+          <span class="nav-ico">⚙</span><span>My Account</span>
         </button>
         <a class="nav-btn" href="/" style="display:flex">
           <span class="nav-ico">↩</span><span>Return Home</span>
@@ -1069,6 +1117,9 @@
         </section>
 
         <section id="registrations" class="section">
+          <div class="profile-alert" id="profileAlert">
+            Complete My Account before submitting registrations.
+          </div>
           <div class="grid-2">
             <div class="card">
               <div class="card-header">
@@ -1670,19 +1721,30 @@
           <div class="grid-2">
             <div class="card">
               <div class="card-header">
-                <h3>Agent Settings</h3>
-                <div class="pill">Connected if route accepts save</div>
+                <h3>My Account</h3>
+                <div class="pill" id="profileStatusPill">Profile</div>
               </div>
               <div class="card-body">
+                <div class="row" style="align-items:flex-start;margin-bottom:14px">
+                  <img class="profile-photo" id="profilePhoto" alt="Agent profile photo">
+                  <div class="stack">
+                    <div class="title" id="profileNameLabel">Agent profile</div>
+                    <div class="sub" id="profileCompletionText">Loading profile requirements...</div>
+                  </div>
+                </div>
                 <form id="settingsForm" class="form-grid">
                   <input class="field" name="full_name" id="setName" placeholder="Full name" />
+                  <input class="field" name="username" id="setUsername" placeholder="Username" />
                   <input class="field" name="phone" id="setPhone" placeholder="Phone" />
                   <input class="field" name="town" id="setTown" placeholder="Town" />
                   <input class="field" name="region" id="setRegion" placeholder="Region" />
+                  <input class="field full" name="residential_address" id="setAddress" placeholder="Residential address" />
+                  <input class="field full" name="profile_picture_url" id="setProfilePicture" placeholder="Profile picture URL" />
                   <input class="field full" id="setReferral" placeholder="Referral code" readonly />
                   <div class="full toolbar">
-                    <button class="btn btn-primary" type="submit">Save Settings</button>
+                    <button class="btn btn-primary" type="submit">Save My Account</button>
                     <button class="btn btn-soft" type="button" id="copyCodeBtn">Copy Referral Code</button>
+                    <a class="btn btn-soft" href="/agent/change-password">Password & Security</a>
                   </div>
                 </form>
               </div>
@@ -1690,15 +1752,15 @@
 
             <div class="card">
               <div class="card-header">
-                <h3>What is already live</h3>
-                <div class="pill">Current system</div>
+                <h3>Registration Requirements</h3>
+                <div class="pill">Required</div>
               </div>
               <div class="card-body">
                 <div class="list">
-                  <div class="list-item"><div class="stack"><div class="title">Agent profile and summary</div><div class="sub">Using current live agent routes.</div></div></div>
-                  <div class="list-item"><div class="stack"><div class="title">Wallet, withdrawals, messages</div><div class="sub">Already connected to your backend.</div></div></div>
-                  <div class="list-item"><div class="stack"><div class="title">Referral team and leaderboard</div><div class="sub">Live routes used here without changing backend.</div></div></div>
-                  <div class="list-item"><div class="stack"><div class="title">Future modules ready</div><div class="sub">Client activity, driver trips, true flyer generator, stronger duplicate scanner.</div></div></div>
+                  <div class="list-item"><div class="stack"><div class="title">Profile picture</div><div class="sub">Shown on profile views and ready for leaderboard displays.</div></div></div>
+                  <div class="list-item"><div class="stack"><div class="title">Full identity</div><div class="sub">Full name, username, phone, town, region, and residential address are required.</div></div></div>
+                  <div class="list-item"><div class="stack"><div class="title">Password & security</div><div class="sub">Use the password page if admin issued a temporary password or you need to update credentials.</div></div></div>
+                  <div class="list-item"><div class="stack"><div class="title">Registration access</div><div class="sub">Driver and client submissions unlock once the required account fields are complete.</div></div></div>
                 </div>
               </div>
             </div>
@@ -1889,10 +1951,28 @@
 
       $("refCodeBig").textContent = safe(me.referral_code || me.code || "-");
       $("setName").value = safe(me.full_name || me.name || "", "");
+      $("setUsername").value = safe(me.username || "", "");
       $("setPhone").value = safe(me.phone || "", "");
       $("setTown").value = safe(me.town || "", "");
       $("setRegion").value = safe(me.region || "", "");
+      $("setAddress").value = safe(me.residential_address || me.address || "", "");
+      $("setProfilePicture").value = safe(me.profile_picture_url || me.profile_pic_path || "", "");
       $("setReferral").value = safe(me.referral_code || me.code || "", "");
+
+      const missing = Array.isArray(me.missing_profile_fields) ? me.missing_profile_fields : (Array.isArray(summary.missing_profile_fields) ? summary.missing_profile_fields : []);
+      const complete = missing.length === 0 && (me.profile_complete !== false) && (summary.profile_complete !== false);
+      const alert = $("profileAlert");
+      if(alert){
+        alert.classList.toggle("show", !complete);
+        alert.innerHTML = complete
+          ? ""
+          : `<strong>Complete My Account before registering.</strong><br>Missing: ${esc(missing.join(", ") || "required profile fields")}`;
+      }
+      $("profileStatusPill").textContent = complete ? "Complete" : "Incomplete";
+      $("profileCompletionText").textContent = complete ? "Your account is ready for registrations." : "Missing: " + (missing.join(", ") || "required profile fields");
+      $("profileNameLabel").textContent = name;
+      const photo = me.profile_picture_url || me.profile_pic_path || "";
+      $("profilePhoto").src = photo || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23edf6fd'/%3E%3Ctext x='48' y='56' text-anchor='middle' font-family='Arial' font-size='28' fill='%230ea5e9'%3EY%3C/text%3E%3C/svg%3E";
     }
 
     function renderMessages(targetId="messageList"){
@@ -2503,9 +2583,15 @@
       ev.preventDefault();
       const body = {
         full_name: $("setName").value.trim(),
+        username: $("setUsername").value.trim(),
         phone: $("setPhone").value.trim(),
         town: $("setTown").value.trim(),
-        region: $("setRegion").value.trim()
+        region: $("setRegion").value.trim(),
+        operation_region: $("setRegion").value.trim(),
+        residential_address: $("setAddress").value.trim(),
+        address: $("setAddress").value.trim(),
+        profile_picture_url: $("setProfilePicture").value.trim(),
+        profile_pic_path: $("setProfilePicture").value.trim()
       };
       try{
         await jget('/api/agent/settings_v4', {
@@ -2524,7 +2610,8 @@
     async function submitDriver(ev){
       ev.preventDefault();
       const btn = ev.target.querySelector('button[type="submit"]');
-      if(btn){ btn.disabled = true; btn.textContent = 'Saving driver...'; }
+      const agentName = state.me?.full_name || state.me?.username || 'Agent';
+      if(btn){ btn.disabled = true; btn.innerHTML = `<span class="loader"></span> ${esc(agentName)}, saving driver...`; }
       const fd = new FormData(ev.target);
       const raw = Object.fromEntries(fd.entries());
 
@@ -2544,7 +2631,6 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        const agentName = state.me?.full_name || state.me?.profile?.full_name || 'Agent';
         toast(`Thank you, ${agentName}. Driver submitted for approval.`);
         await refreshAll(false);
       }catch(e){
@@ -2558,7 +2644,8 @@
     async function submitClient(ev){
       ev.preventDefault();
       const btn = ev.target.querySelector('button[type="submit"]');
-      if(btn){ btn.disabled = true; btn.textContent = 'Saving client...'; }
+      const agentName = state.me?.full_name || state.me?.username || 'Agent';
+      if(btn){ btn.disabled = true; btn.innerHTML = `<span class="loader"></span> ${esc(agentName)}, saving client...`; }
       const fd = new FormData(ev.target);
       const raw = Object.fromEntries(fd.entries());
 
@@ -2576,7 +2663,6 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        const agentName = state.me?.full_name || state.me?.profile?.full_name || 'Agent';
         toast(`Thank you, ${agentName}. Client submitted for approval.`);
         await refreshAll(false);
       }catch(e){

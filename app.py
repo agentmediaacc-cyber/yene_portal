@@ -361,17 +361,22 @@ def homepage_stats(sb_admin):
     def _pending(v):
         return _clean(v).upper() in ("PENDING", "PENDING_APPROVAL", "UNDER_REVIEW")
 
-    def _created_this_week(row):
+    today = datetime.utcnow().date()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    def _row_date(row):
         raw = _clean(row.get("created_at"))
         if not raw:
-            return False
+            return None
         try:
-            created = datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
         except Exception:
-            return False
-        today = datetime.utcnow().date()
-        week_start = today - timedelta(days=today.weekday())
-        return week_start <= created <= today
+            return None
+
+    def _created_this_week(row):
+        created = _row_date(row)
+        return bool(created and week_start <= created <= week_end)
 
     def _official_updates():
         rows = _safe_select("broadcasts", {}, "*", 10, "created_at", True)
@@ -424,14 +429,21 @@ def homepage_stats(sb_admin):
             },
         ]
 
+    def _payment_value(row, *keys):
+        for key in keys:
+            val = row.get(key)
+            if val not in (None, ""):
+                return val
+        return 0
+
     def _regional_rates():
         rows = _safe_select("payment_rules", {}, "*", 200, "updated_at", True)
         out = []
         for r in rows:
             region = _clean(r.get("region"))
             town = _clean(r.get("town"))
-            driver = r.get("driver_reg")
-            client = r.get("client_reg")
+            driver = _payment_value(r, "driver_reg", "driver_register_amount", "driver_amount")
+            client = _payment_value(r, "client_reg", "client_register_amount", "client_amount")
             status = _clean(r.get("status")) or "Active"
             if region or town:
                 out.append(
@@ -463,13 +475,34 @@ def homepage_stats(sb_admin):
 
         return []
 
+    def _weekly_payment_info():
+        rows = _safe_select("weekly_payment_settings", {}, "*", 50, "updated_at", True)
+        source = "weekly_payment_settings"
+        if not rows:
+            rows = _safe_select("payment_rules", {}, "*", 100, "updated_at", True)
+            source = "payment_rules"
+        out = []
+        for r in rows:
+            out.append({
+                "source": source,
+                "region": _clean(r.get("region") or r.get("operation_region")) or "Namibia",
+                "town": _clean(r.get("town")) or "All towns",
+                "driver_pay": _payment_value(r, "driver_reg", "driver_register_amount", "driver_amount"),
+                "client_pay": _payment_value(r, "client_reg", "client_register_amount", "client_amount"),
+                "driver_daily_bonus": _payment_value(r, "daily_5_drivers_bonus", "driver_daily_bonus", "daily_driver_bonus"),
+                "client_daily_bonus": _payment_value(r, "daily_5_clients_bonus", "client_daily_bonus", "daily_client_bonus"),
+                "activation_bonus": _payment_value(r, "weekly_30_activations_bonus", "activation_bonus", "weekly_activation_bonus"),
+                "first_trip_bonus": _payment_value(r, "first_trip_bonus"),
+                "status": _clean(r.get("status")) or "Active",
+            })
+        return out[:8]
+
     agents = _safe_select("agent_profiles", {}, "*", 10000)
     if not agents:
         agents = _safe_select("agents", {}, "*", 10000)
     drivers = _safe_select("drivers", {}, "*", 10000, "created_at", True)
     clients = _safe_select("clients", {}, "*", 10000, "created_at", True)
     jobs = _safe_select("remote_jobs", {}, "*", 8, "created_at", True)
-    ledger = _safe_select("agent_wallet_ledger", {}, "*", 10000, "created_at", True)
     recent = []
     for d in drivers[:10]:
         recent.append({
@@ -493,7 +526,9 @@ def homepage_stats(sb_admin):
     pending_agents = [r for r in agents if _pending(r.get("status"))]
     approved_drivers = [r for r in drivers if _approved(r.get("status"))]
     approved_clients = [r for r in clients if _approved(r.get("status"))]
-    weekly_registrations = len([r for r in drivers + clients if _created_this_week(r)])
+    weekly_drivers = [r for r in drivers if _created_this_week(r)]
+    weekly_clients = [r for r in clients if _created_this_week(r)]
+    weekly_registrations = len(weekly_drivers) + len(weekly_clients)
 
     leaderboard = []
     for agent in active_agents:
@@ -505,35 +540,31 @@ def homepage_stats(sb_admin):
         }
         ids.discard("")
         agent_drivers = [
-            r for r in drivers
+            r for r in weekly_drivers
             if _clean(r.get("recruiter_agent_id")) in ids
             or _clean(r.get("agent_id")) in ids
             or _clean(r.get("agent_auth_id")) in ids
             or _clean(r.get("recruiter_email")).lower() in ids
         ]
         agent_clients = [
-            r for r in clients
+            r for r in weekly_clients
             if _clean(r.get("recruiter_agent_id")) in ids
             or _clean(r.get("agent_id")) in ids
             or _clean(r.get("agent_auth_id")) in ids
             or _clean(r.get("recruiter_email")).lower() in ids
         ]
-        score = len(agent_drivers) * 3 + len(agent_clients) * 2
+        approved_agent_drivers = [r for r in agent_drivers if _approved(r.get("status"))]
+        approved_agent_clients = [r for r in agent_clients if _approved(r.get("status"))]
+        score = len(approved_agent_drivers) * 3 + len(approved_agent_clients) * 2
         if score:
             leaderboard.append({
                 "name": _clean(agent.get("full_name") or agent.get("username") or agent.get("email")) or "Agent",
                 "town": _clean(agent.get("town") or agent.get("operation_region") or agent.get("region")) or "Namibia",
-                "drivers": len(agent_drivers),
-                "clients": len(agent_clients),
+                "drivers": len(approved_agent_drivers),
+                "clients": len(approved_agent_clients),
                 "score": score,
             })
     leaderboard.sort(key=lambda item: item["score"], reverse=True)
-
-    wallet_credits = sum(
-        float(x.get("amount") or 0)
-        for x in ledger
-        if _clean(x.get("entry_type") or x.get("txn_type") or x.get("type")).lower() in {"credit", "bonus", "earning"}
-    )
 
     job_alerts = []
     for job in jobs:
@@ -571,9 +602,13 @@ def homepage_stats(sb_admin):
             "clients": len(approved_clients),
             "clients_registered": len(approved_clients),
             "clients_total": len(clients),
+            "clients_all_time": len(clients),
             "clients_pending": len([r for r in clients if _pending(r.get("status"))]),
             "registrations_this_week": weekly_registrations,
-            "wallet_credits": round(wallet_credits, 2),
+            "weekly_drivers": len(weekly_drivers),
+            "weekly_clients": len(weekly_clients),
+            "week_start": week_start.isoformat(),
+            "week_end": week_end.isoformat(),
             "leaderboard": leaderboard[:5],
             "job_alerts": job_alerts[:5],
             "recent_activity": recent[:12],
@@ -581,6 +616,7 @@ def homepage_stats(sb_admin):
         "updates": _official_updates(),
         "rules": _network_rules(),
         "rates": _regional_rates(),
+        "payment_info": _weekly_payment_info(),
     }
 
 
@@ -593,6 +629,7 @@ def index():
         updates=home["updates"],
         rules=home["rules"],
         rates=home["rates"],
+        payment_info=home["payment_info"],
     )
 
 
@@ -605,7 +642,8 @@ def index():
 def login():
     if request.method == "GET":
         dashboard = _current_dashboard_for_session()
-        if dashboard:
+        wants_form = (request.args.get("force") or request.args.get("login") or "").lower() in {"1", "true", "yes"}
+        if dashboard and not wants_form:
             return redirect(dashboard)
         return render_template(
             "login.html",
@@ -645,7 +683,8 @@ def login():
 def admin_login():
     if request.method == "GET":
         dashboard = _current_dashboard_for_session()
-        if dashboard:
+        wants_form = (request.args.get("force") or request.args.get("login") or "").lower() in {"1", "true", "yes"}
+        if dashboard and not wants_form:
             return redirect(dashboard)
         return render_template("login.html", login_mode="admin")
 

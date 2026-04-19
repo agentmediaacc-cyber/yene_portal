@@ -25,6 +25,54 @@ def register_admin_approval_working_routes(app, sb_admin):
         except Exception as e:
             return e
 
+    def _safe_insert(table, payload):
+        try:
+            return sb_admin.table(table).insert(payload).execute()
+        except Exception as e:
+            return e
+
+    def _safe_float(value, default=0.0):
+        try:
+            return float(value or 0)
+        except Exception:
+            return default
+
+    def _payment_amount(kind):
+        rows = _safe_select("weekly_payment_settings", {}, "*", 1)
+        if not rows:
+            rows = _safe_select("payment_rules", {}, "*", 1)
+        row = rows[0] if rows else {}
+        if kind == "driver":
+            return _safe_float(row.get("driver_reg") or row.get("driver_register_amount") or row.get("driver_amount"))
+        return _safe_float(row.get("client_reg") or row.get("client_register_amount") or row.get("client_amount"))
+
+    def _credit_approval(table, row_id, kind):
+        rows = _safe_select(table, {"id": row_id}, "*", 1)
+        if not rows:
+            return
+        row = rows[0]
+        amount = _payment_amount(kind)
+        if amount <= 0:
+            return
+        agent_id = row.get("recruiter_agent_id") or row.get("agent_id") or row.get("agent_auth_id")
+        reference = f"{kind}-approval-{row_id}"
+        existing = _safe_select("agent_wallet_ledger", {"reference": reference}, "id", 1)
+        if existing:
+            return
+        payload = {
+            "agent_id": str(agent_id or ""),
+            "agent_auth_id": str(row.get("agent_auth_id") or ""),
+            "agent_email": row.get("recruiter_email") or "",
+            "agent_name": row.get("recruiter_name") or "",
+            "entry_type": "credit",
+            "amount": amount,
+            "reference": reference,
+            "note": f"{kind.title()} registration approved",
+            "status": "approved",
+            "created_at": _now(),
+        }
+        _safe_insert("agent_wallet_ledger", payload)
+
     def _now():
         return datetime.utcnow().isoformat() + "Z"
 
@@ -92,6 +140,7 @@ def register_admin_approval_working_routes(app, sb_admin):
         if isinstance(res, Exception):
             return jsonify({"ok": False, "error": str(res)}), 500
 
+        _credit_approval("drivers", row_id, "driver")
         return jsonify({"ok": True, "message": "Driver approved successfully"})
 
     @app.post("/api/admin/reject_driver")
@@ -137,6 +186,7 @@ def register_admin_approval_working_routes(app, sb_admin):
         if isinstance(res, Exception):
             return jsonify({"ok": False, "error": str(res)}), 500
 
+        _credit_approval("clients", row_id, "client")
         return jsonify({"ok": True, "message": "Client approved successfully"})
 
     @app.post("/api/admin/reject_client")
