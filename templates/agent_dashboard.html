@@ -953,7 +953,78 @@
       transition:width .25s ease;
     }
     .btn[disabled]{opacity:.55;cursor:not-allowed;transform:none}
-  </style>
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 9999;
+      min-width: 280px;
+      max-width: 420px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      font-weight: 700;
+      line-height: 1.45;
+      box-shadow: 0 14px 40px rgba(0,0,0,.25);
+      border: 1px solid rgba(255,255,255,.10);
+      color: #ffffff;
+      background: #1f2937;
+    }
+    .toast--success {
+      background: #14532d;
+      color: #ecfdf5;
+      border-color: #22c55e;
+    }
+    .toast--error {
+      background: #7f1d1d;
+      color: #fef2f2;
+      border-color: #ef4444;
+    }
+    .toast--warning {
+      background: #78350f;
+      color: #fffbeb;
+      border-color: #f59e0b;
+    }
+    .toast--info {
+      background: #1e3a8a;
+      color: #eff6ff;
+      border-color: #3b82f6;
+    }
+    .inline-feedback {
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-weight: 700;
+      line-height: 1.45;
+      border: 1px solid transparent;
+    }
+    .inline-feedback.success {
+      background: #dcfce7;
+      color: #14532d;
+      border-color: #22c55e;
+    }
+    .inline-feedback.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border-color: #ef4444;
+    }
+    .inline-feedback.info {
+      background: #dbeafe;
+      color: #1d4ed8;
+      border-color: #60a5fa;
+    }
+    .inline-feedback.warning {
+      background: #fef3c7;
+      color: #92400e;
+      border-color: #f59e0b;
+    }
+    .btn-loading {
+      opacity: .75;
+      pointer-events: none;
+      filter: saturate(.85);
+    }
+
+</style>
 </head>
 <body>
   <div class="app">
@@ -1170,7 +1241,7 @@
 
         <section id="registrations" class="section">
           <div class="profile-alert" id="profileAlert">
-            Complete My Account before submitting registrations.
+            Optional profile details can be completed anytime. Registrations are open.
           </div>
           <div class="grid-2">
             <div class="card">
@@ -1180,6 +1251,7 @@
               </div>
               <div class="card-body">
                 <form id="driverForm" class="form-grid">
+                  <div id="driverFormFeedback" class="inline-feedback info full" style="display:none;"></div>
                   <input class="field" name="full_name" placeholder="Driver full name" required />
                   <input class="field" name="phone" placeholder="Phone number" required />
                   <input class="field" name="town" placeholder="Town" required />
@@ -1201,6 +1273,7 @@
               </div>
               <div class="card-body">
                 <form id="clientForm" class="form-grid">
+                  <div id="clientFormFeedback" class="inline-feedback info full" style="display:none;"></div>
                   <input class="field" name="full_name" placeholder="Client full name" required />
                   <input class="field" name="phone" placeholder="Phone number" required />
                   <input class="field" name="town" placeholder="Town" required />
@@ -1236,7 +1309,7 @@
                     </tr>
                   </thead>
                   <tbody id="activityTableBody">
-                    <tr><td colspan="5" class="muted">Loading...</td></tr>
+                    <tr><td colspan="5" class="muted">Loading live data...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -1445,7 +1518,7 @@
                 </div>
                 <div class="stat-ico">👤</div>
               </div>
-              <div class="stat-sub" id="rankClientsWeekSub">Loading real leaderboard data...</div>
+              <div class="stat-sub" id="rankClientsWeekSub">Loading current week leaderboard...</div>
             </div>
 
             <div class="card stat">
@@ -1456,7 +1529,7 @@
                 </div>
                 <div class="stat-ico">🚗</div>
               </div>
-              <div class="stat-sub" id="rankDriversWeekSub">Loading real leaderboard data...</div>
+              <div class="stat-sub" id="rankDriversWeekSub">Loading current week leaderboard...</div>
             </div>
 
             <div class="card stat spark">
@@ -1918,12 +1991,46 @@
       return `${kind} saved and waiting for admin approval. Current week: ${drivers} drivers, ${clients} clients.`;
     }
 
-    function toast(msg){
-      const t = $("toast");
-      t.textContent = msg;
-      t.classList.add("show");
-      clearTimeout(t._timer);
-      t._timer = setTimeout(() => t.classList.remove("show"), 2600);
+
+    function showInlineFeedback(targetId, message, type = "info") {
+      const el = document.getElementById(targetId);
+      if (!el) return;
+      el.className = "inline-feedback " + type;
+      el.textContent = String(message || "");
+      el.style.display = "block";
+    }
+
+    function setButtonLoading(btn, isLoading, loadingText = "Saving...") {
+      if (!btn) return;
+      if (!btn.dataset.originalText) {
+        btn.dataset.originalText = btn.innerHTML;
+      }
+      if (isLoading) {
+        btn.classList.add("btn-loading");
+        btn.innerHTML = loadingText;
+        btn.disabled = true;
+      } else {
+        btn.classList.remove("btn-loading");
+        btn.innerHTML = btn.dataset.originalText || btn.innerHTML;
+        btn.disabled = false;
+      }
+    }
+
+    function toast(message, type = "info") {
+      let el = document.getElementById("globalToast");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "globalToast";
+        el.className = "toast";
+        document.body.appendChild(el);
+      }
+      el.className = "toast toast--" + type;
+      el.textContent = String(message || "");
+      el.style.display = "block";
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        el.style.display = "none";
+      }, 4200);
     }
 
     async function jget(url, opts={}){
@@ -2759,7 +2866,8 @@
       ev.preventDefault();
       const btn = ev.target.querySelector('button[type="submit"]');
       const agentName = state.me?.full_name || state.me?.username || 'Agent';
-      if(btn){ btn.disabled = true; btn.innerHTML = `<span class="loader"></span> ${esc(agentName)}, saving driver...`; }
+      showInlineFeedback("driverFormFeedback", `${agentName}, saving driver registration...`, "info");
+      setButtonLoading(btn, true, `<span class="loader"></span> ${esc(agentName)}, saving driver...`);
       const fd = new FormData(ev.target);
       const raw = Object.fromEntries(fd.entries());
 
@@ -2779,12 +2887,16 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        toast(await hardRefreshDashboardAfterRegistration("Driver"));
+        const message = await hardRefreshDashboardAfterRegistration("Driver");
+        showInlineFeedback("driverFormFeedback", message, "success");
+        toast(message, "success");
       }catch(e){
         console.error('register_driver_v4 payload rejected:', payload, e);
-        toast('Driver registration failed: ' + e.message);
+        const message = 'Driver registration failed: ' + e.message;
+        showInlineFeedback("driverFormFeedback", message, "error");
+        toast(message, "error");
       }finally{
-        if(btn){ btn.disabled = false; btn.textContent = 'Register Driver'; }
+        setButtonLoading(btn, false);
       }
     }
 
@@ -2792,7 +2904,8 @@
       ev.preventDefault();
       const btn = ev.target.querySelector('button[type="submit"]');
       const agentName = state.me?.full_name || state.me?.username || 'Agent';
-      if(btn){ btn.disabled = true; btn.innerHTML = `<span class="loader"></span> ${esc(agentName)}, saving client...`; }
+      showInlineFeedback("clientFormFeedback", `${agentName}, saving client registration...`, "info");
+      setButtonLoading(btn, true, `<span class="loader"></span> ${esc(agentName)}, saving client...`);
       const fd = new FormData(ev.target);
       const raw = Object.fromEntries(fd.entries());
 
@@ -2810,12 +2923,16 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        toast(await hardRefreshDashboardAfterRegistration("Client"));
+        const message = await hardRefreshDashboardAfterRegistration("Client");
+        showInlineFeedback("clientFormFeedback", message, "success");
+        toast(message, "success");
       }catch(e){
         console.error('register_client_v4 payload rejected:', payload, e);
-        toast('Client registration failed: ' + e.message);
+        const message = 'Client registration failed: ' + e.message;
+        showInlineFeedback("clientFormFeedback", message, "error");
+        toast(message, "error");
       }finally{
-        if(btn){ btn.disabled = false; btn.textContent = 'Register Client'; }
+        setButtonLoading(btn, false);
       }
     }
 
@@ -3004,7 +3121,7 @@
 
     async function refreshAll(showToast=true){
       $("helloBadge").innerHTML = '<span class="loader"></span>';
-      setLoadingText("weekBadge", "Loading...");
+      setLoadingText("weekBadge", "Loading live data...");
       await loadAndRender("profile", loadMe, updateHero);
 
       await Promise.allSettled([

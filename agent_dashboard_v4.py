@@ -740,6 +740,15 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "team": team[:100],
         })
 
+    @app.route("/api/agent/team_v4", methods=["GET"], endpoint="agent_team_v4")
+    @require_login("AGENT")
+    def agent_team_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+        team = team_agents(agent)
+        return jsonify({"ok": True, "rows": team[:100], "team": team[:100], "count": len(team)})
+
     @app.route("/api/agent/settings_v4", methods=["POST"], endpoint="agent_settings_v4")
     @require_login("AGENT")
     def agent_settings_v4():

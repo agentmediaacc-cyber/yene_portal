@@ -18,7 +18,28 @@
     .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#f8fafc;border-radius:999px;padding:5px 8px;font-size:12px;font-weight:850}.pill.ok{background:#dcfce7;border-color:#bbf7d0;color:#166534}.pill.bad{background:#fee2e2;border-color:#fecaca;color:#991b1b}.pill.warn{background:#fef3c7;border-color:#fde68a;color:#92400e}.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0f172a;color:#fff;border-radius:8px;padding:10px 14px;display:none;z-index:200;max-width:92vw}.mobile-menu{display:none}
     @media(max-width:1060px){.grid,.grid4{grid-template-columns:repeat(2,1fr)}.grid2,.grid3,.filters{grid-template-columns:1fr}.hide-sm{display:none}}
     @media(max-width:700px){.top-inner{align-items:flex-start}.actions{width:100%}.mobile-menu{display:inline-flex}.tabs{position:fixed;inset:0 auto 0 0;width:min(86vw,340px);z-index:90;background:#fff;border-right:1px solid var(--line);padding:16px;flex-direction:column;transform:translateX(-105%);transition:.2s}.tabs.open{transform:translateX(0)}.tab{text-align:left}.grid,.grid4{grid-template-columns:1fr}.wrap{padding:12px}.v{font-size:25px}}
-  </style>
+
+.admin-busy-overlay{
+  position:fixed; inset:0; background:rgba(15,23,42,.55);
+  display:none; align-items:center; justify-content:center;
+  z-index:99999; backdrop-filter: blur(2px);
+}
+.admin-busy-box{
+  min-width:280px; max-width:420px;
+  background:#0f172a; color:#fff; padding:18px 20px;
+  border-radius:16px; box-shadow:0 18px 50px rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.08); font-weight:700;
+}
+.admin-feedback{
+  margin:12px 0; padding:12px 14px; border-radius:12px; font-weight:700;
+}
+.admin-feedback.success{background:#dcfce7;color:#14532d;border:1px solid #22c55e;}
+.admin-feedback.error{background:#fee2e2;color:#991b1b;border:1px solid #ef4444;}
+.admin-feedback.info{background:#dbeafe;color:#1d4ed8;border:1px solid #60a5fa;}
+.bulk-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0 14px;}
+.bulk-count{font-weight:800;color:#0f172a;background:#e2e8f0;padding:8px 12px;border-radius:999px;}
+
+</style>
 </head>
 <body>
   <header class="top">
@@ -105,11 +126,11 @@
     </section>
 
     <section class="section" id="drivers">
-      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">All Registered Drivers</div><div class="sub">Search, filter, approve, or reject driver registrations.</div></div><button class="btn ghost" onclick="exportCsv('drivers')">Export CSV</button></div><div class="filters"><input id="driverSearch" placeholder="Search drivers, phone, town, agent" oninput="renderDrivers()"><select id="driverStatusFilter" onchange="renderDrivers()"><option value="">All statuses</option><option>PENDING</option><option>APPROVED</option><option>ACTIVE</option><option>REJECTED</option></select><input id="driverFrom" type="date" onchange="renderDrivers()"><input id="driverTo" type="date" onchange="renderDrivers()"><button class="btn" onclick="clearDriverFilters()">Clear</button></div><div class="row" style="margin-top:12px"><label class="pill"><input type="checkbox" id="driverSelectAll" onchange="setAllVisible('driver',this.checked)"> Select visible</label><button class="btn ok" onclick="bulkApprove('driver')">Bulk approve selected</button><button class="btn bad" onclick="bulkReject('driver')">Bulk reject selected</button><button class="btn ghost" onclick="bulkApprove('driver',true)">Approve all filtered</button><button class="btn ghost" onclick="bulkReject('driver',true)">Reject all filtered</button><span class="pill" id="driverBulkCount">0 selected</span></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Status</th><th>Name</th><th>Phone</th><th>Town/Region</th><th>Recruiter</th><th>Created</th><th>Actions</th></tr></thead><tbody id="driverRows"><tr><td colspan="8">Loading...</td></tr></tbody></table></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">All Registered Drivers</div><div class="sub">Search, filter, approve, or reject driver registrations.</div></div><button class="btn ghost" onclick="exportCsv('drivers')">Export CSV</button></div><div id="driversAdminFeedback" class="admin-feedback info" style="display:none;"></div><div class="filters"><input id="driverSearch" placeholder="Search drivers, phone, town, agent" oninput="renderDrivers()"><select id="driverStatusFilter" onchange="renderDrivers()"><option value="">All statuses</option><option>PENDING</option><option>APPROVED</option><option>ACTIVE</option><option>REJECTED</option></select><input id="driverFrom" type="date" onchange="renderDrivers()"><input id="driverTo" type="date" onchange="renderDrivers()"><button class="btn" onclick="clearDriverFilters()">Clear</button></div><div class="row" style="margin-top:12px"><label class="pill"><input type="checkbox" id="driverSelectAll" onchange="setAllVisible('driver',this.checked)"> Select visible</label><button class="btn ok" onclick="bulkApprove('driver')">Bulk approve selected</button><button class="btn bad" onclick="bulkReject('driver')">Bulk reject selected</button><button class="btn ghost" onclick="bulkApprove('driver',true)">Approve all filtered</button><button class="btn ghost" onclick="bulkReject('driver',true)">Reject all filtered</button><span class="pill" id="driverBulkCount">0 selected</span></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Status</th><th>Name</th><th>Phone</th><th>Town/Region</th><th>Recruiter</th><th>Created</th><th>Actions</th></tr></thead><tbody id="driverRows"><tr><td colspan="8">Loading...</td></tr></tbody></table></div></div>
     </section>
 
     <section class="section" id="clients">
-      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">All Registered Clients</div><div class="sub">Search, filter, approve, or reject client registrations.</div></div><button class="btn ghost" onclick="exportCsv('clients')">Export CSV</button></div><div class="filters"><input id="clientSearch" placeholder="Search clients, phone, town, agent" oninput="renderClients()"><select id="clientStatusFilter" onchange="renderClients()"><option value="">All statuses</option><option>PENDING</option><option>APPROVED</option><option>ACTIVE</option><option>REJECTED</option></select><input id="clientFrom" type="date" onchange="renderClients()"><input id="clientTo" type="date" onchange="renderClients()"><button class="btn" onclick="clearClientFilters()">Clear</button></div><div class="row" style="margin-top:12px"><label class="pill"><input type="checkbox" id="clientSelectAll" onchange="setAllVisible('client',this.checked)"> Select visible</label><button class="btn ok" onclick="bulkApprove('client')">Bulk approve selected</button><button class="btn bad" onclick="bulkReject('client')">Bulk reject selected</button><button class="btn ghost" onclick="bulkApprove('client',true)">Approve all filtered</button><button class="btn ghost" onclick="bulkReject('client',true)">Reject all filtered</button><span class="pill" id="clientBulkCount">0 selected</span></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Status</th><th>Name</th><th>Phone</th><th>Town/Region</th><th>Recruiter</th><th>Created</th><th>Actions</th></tr></thead><tbody id="clientRows"><tr><td colspan="8">Loading...</td></tr></tbody></table></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">All Registered Clients</div><div class="sub">Search, filter, approve, or reject client registrations.</div></div><button class="btn ghost" onclick="exportCsv('clients')">Export CSV</button></div><div id="clientsAdminFeedback" class="admin-feedback info" style="display:none;"></div><div class="filters"><input id="clientSearch" placeholder="Search clients, phone, town, agent" oninput="renderClients()"><select id="clientStatusFilter" onchange="renderClients()"><option value="">All statuses</option><option>PENDING</option><option>APPROVED</option><option>ACTIVE</option><option>REJECTED</option></select><input id="clientFrom" type="date" onchange="renderClients()"><input id="clientTo" type="date" onchange="renderClients()"><button class="btn" onclick="clearClientFilters()">Clear</button></div><div class="row" style="margin-top:12px"><label class="pill"><input type="checkbox" id="clientSelectAll" onchange="setAllVisible('client',this.checked)"> Select visible</label><button class="btn ok" onclick="bulkApprove('client')">Bulk approve selected</button><button class="btn bad" onclick="bulkReject('client')">Bulk reject selected</button><button class="btn ghost" onclick="bulkApprove('client',true)">Approve all filtered</button><button class="btn ghost" onclick="bulkReject('client',true)">Reject all filtered</button><span class="pill" id="clientBulkCount">0 selected</span></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Status</th><th>Name</th><th>Phone</th><th>Town/Region</th><th>Recruiter</th><th>Created</th><th>Actions</th></tr></thead><tbody id="clientRows"><tr><td colspan="8">Loading...</td></tr></tbody></table></div></div>
     </section>
 
     <section class="section" id="reports">
@@ -147,7 +168,25 @@
     const val=(x,f="-")=>(x===null||x===undefined||x==="")?f:x;
     const date=x=>{try{return x?new Date(x).toLocaleString():"-"}catch(e){return String(x||"-")}};
     const dayOnly=x=>String(x||"").slice(0,10);
-    function toast(msg){$("toast").textContent=msg;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2600)}
+
+function showAdminBusy(message){
+  const wrap = document.getElementById('adminBusyOverlay');
+  const txt = document.getElementById('adminBusyText');
+  if(txt) txt.textContent = message || 'Working...';
+  if(wrap) wrap.style.display = 'flex';
+}
+function hideAdminBusy(){
+  const wrap = document.getElementById('adminBusyOverlay');
+  if(wrap) wrap.style.display = 'none';
+}
+function showAdminFeedback(targetId, message, type='info'){
+  const el = document.getElementById(targetId);
+  if(!el) return;
+  el.className = 'admin-feedback ' + type;
+  el.textContent = message || '';
+  el.style.display = 'block';
+}
+function toast(msg){$("toast").textContent=msg;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2600)}
     async function get(url){const r=await fetch(url,{credentials:"same-origin"});const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||"Request failed");return j}
     async function post(url,body={}){const r=await fetch(url,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||"Request failed");return j}
     function statusPill(s){const u=String(s||"").toUpperCase();let c=u.includes("APPROV")||u==="ACTIVE"||u==="VERIFIED"?"ok":(u.includes("PEND")||u.includes("REVIEW")?"warn":(u.includes("BLOCK")||u.includes("REJECT")?"bad":""));return `<span class="pill ${c}">${esc(s||"-")}</span>`}
@@ -195,13 +234,13 @@
     async function resetSelectedAgent(){if(!selectedAgent)return toast("Select an agent first");const j=await post(`/api/admin/reset_agent_account/${encodeURIComponent(selectedAgent.id)}`);toast(`Temporary password: ${j.temp_password||"-"}`);alert(`Email: ${j.email||"-"}\nTemporary password: ${j.temp_password||"-"}`);await refreshCore()}
     async function blockSelectedAgent(){if(!selectedAgent)return toast("Select an agent first");await post(`/api/admin/agent_set_status/${encodeURIComponent(selectedAgent.id)}`,{status:"BLOCKED"});toast("Agent blocked");await refreshCore()}
     function openSelectedProfile(){if(selectedAgent)location.href=`/admin/agent/${encodeURIComponent(selectedAgent.id)}`}
-    async function approveRow(kind,id){await post(`/api/admin/approve_${kind}`,{id});toast(`${kind} approved`);await refreshCore()}
-    async function rejectRow(kind,id){const reason=prompt(`Reason to reject this ${kind}?`,"Admin rejected");if(!reason)return;await post(`/api/admin/reject_${kind}`,{id,reason});toast(`${kind} rejected`);await refreshCore()}
+    async function approveRow(kind,id){showAdminBusy(`Approving ${kind}...`);try{await post(`/api/admin/approve_${kind}`,{id});toast(`${kind} approved`);showAdminFeedback(`${kind}sAdminFeedback`,`${kind} approved successfully.`,"success");await refreshCore()}catch(e){showAdminFeedback(`${kind}sAdminFeedback`,e.message||`Could not approve ${kind}`,"error");throw e}finally{hideAdminBusy()}}
+    async function rejectRow(kind,id){const reason=prompt(`Reason to reject this ${kind}?`,"Admin rejected");if(!reason)return;showAdminBusy(`Rejecting ${kind}...`);try{await post(`/api/admin/reject_${kind}`,{id,reason});toast(`${kind} rejected`);showAdminFeedback(`${kind}sAdminFeedback`,`${kind} rejected successfully.`,"success");await refreshCore()}catch(e){showAdminFeedback(`${kind}sAdminFeedback`,e.message||`Could not reject ${kind}`,"error");throw e}finally{hideAdminBusy()}}
     function visibleIds(kind){const rows=kind==="driver"?visibleDrivers:(kind==="client"?visibleClients:visibleAgents);return rows.map(r=>String(r.id||"")).filter(Boolean)}
     function selectedIds(kind){return [...document.querySelectorAll(`.${kind}-check:checked`)].map(cb=>cb.value).filter(Boolean)}
     function setAllVisible(kind,checked){document.querySelectorAll(`.${kind}-check`).forEach(cb=>{cb.checked=checked});updateBulkCount(kind)}
-    async function bulkApprove(kind,allFiltered=false){const ids=allFiltered?visibleIds(kind):selectedIds(kind);if(!ids.length)return toast(`No ${kind}s selected`);if(allFiltered&&!confirm(`Approve all ${ids.length} filtered ${kind}s?`))return;await post(`/api/admin/bulk_approve_${kind}s`,{ids});toast(`${ids.length} ${kind}s approved`);await refreshCore()}
-    async function bulkReject(kind,allFiltered=false){const ids=allFiltered?visibleIds(kind):selectedIds(kind);if(!ids.length)return toast(`No ${kind}s selected`);const reason=prompt(`Reason to reject ${ids.length} ${kind}s?`,"Admin rejected");if(!reason)return;await post(`/api/admin/bulk_reject_${kind}s`,{ids,reason});toast(`${ids.length} ${kind}s rejected`);await refreshCore()}
+    async function bulkApprove(kind,allFiltered=false){const ids=allFiltered?visibleIds(kind):selectedIds(kind);if(!ids.length)return toast(`No ${kind}s selected`);if(!confirm(`Approve ${ids.length} ${allFiltered?"filtered":"selected"} ${kind}s?`))return;showAdminBusy(`Approving ${ids.length} ${kind}s...`);try{const j=await post(`/api/admin/bulk_approve_${kind}s`,{ids});const count=j.count??ids.length;toast(`${count} ${kind}s approved`);showAdminFeedback(`${kind}sAdminFeedback`,`Approved ${count} ${kind}s.`,"success");await refreshCore()}catch(e){showAdminFeedback(`${kind}sAdminFeedback`,e.message||`Could not approve ${kind}s`,"error");throw e}finally{hideAdminBusy()}}
+    async function bulkReject(kind,allFiltered=false){const ids=allFiltered?visibleIds(kind):selectedIds(kind);if(!ids.length)return toast(`No ${kind}s selected`);const reason=prompt(`Reason to reject ${ids.length} ${kind}s?`,"Admin rejected");if(!reason)return;showAdminBusy(`Rejecting ${ids.length} ${kind}s...`);try{const j=await post(`/api/admin/bulk_reject_${kind}s`,{ids,reason});const count=j.count??ids.length;toast(`${count} ${kind}s rejected`);showAdminFeedback(`${kind}sAdminFeedback`,`Rejected ${count} ${kind}s.`,"success");await refreshCore()}catch(e){showAdminFeedback(`${kind}sAdminFeedback`,e.message||`Could not reject ${kind}s`,"error");throw e}finally{hideAdminBusy()}}
 
     function renderPaymentRules(){const r=paymentRules[0]||{};$("payDriver").value=$("payDriver").value||r.driver_reg||r.driver_register_amount||r.driver_amount||0;$("payClient").value=$("payClient").value||r.client_reg||r.client_register_amount||r.client_amount||0;$("payDailyDriver").value=$("payDailyDriver").value||r.daily_5_drivers_bonus||r.driver_daily_bonus||0;$("payDailyClient").value=$("payDailyClient").value||r.daily_5_clients_bonus||r.client_daily_bonus||0;$("payDailyDriverThreshold").value=$("payDailyDriverThreshold").value||r.daily_driver_threshold||r.driver_daily_threshold||5;$("payDailyClientThreshold").value=$("payDailyClientThreshold").value||r.daily_client_threshold||r.client_daily_threshold||5;$("payWeekly").value=$("payWeekly").value||r.weekly_30_activations_bonus||r.activation_bonus||0;$("payWeeklyThreshold").value=$("payWeeklyThreshold").value||r.weekly_activation_threshold||r.weekly_threshold||30;$("payStatus").value=String(r.status||"Active").toLowerCase()==="inactive"?"Inactive":"Active"}
     async function savePaymentRules(){const current=paymentRules[0]||{};await post("/api/admin/payment_rules",{id:current.id,driver_reg:$("payDriver").value,client_reg:$("payClient").value,daily_5_drivers_bonus:$("payDailyDriver").value,daily_5_clients_bonus:$("payDailyClient").value,daily_driver_threshold:$("payDailyDriverThreshold").value,daily_client_threshold:$("payDailyClientThreshold").value,weekly_30_activations_bonus:$("payWeekly").value,weekly_activation_threshold:$("payWeeklyThreshold").value,status:$("payStatus").value});toast("Finance rules saved");await loadPaymentRules()}
@@ -227,5 +266,9 @@
     async function refreshAll(){await refreshCore();await Promise.allSettled([loadFinance(),loadPaymentRules(),loadJobs(),loadBroadcasts()]);await loadReportPreview().catch(()=>{});toast("Refreshed")}
     bindTabs();initDates();$("reportWeek").addEventListener("change",syncReportWeekEnd);togglePeriodInputs();refreshAll();
   </script>
+
+<div id="adminBusyOverlay" class="admin-busy-overlay">
+  <div class="admin-busy-box" id="adminBusyText">Working...</div>
+</div>
 </body>
 </html>

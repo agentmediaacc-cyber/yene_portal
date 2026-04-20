@@ -340,7 +340,7 @@ def protect_role_scoped_api_routes():
         if role != "AGENT" or not email:
             return jsonify({"ok": False, "error": "Agent login required"}), 401
         profile = _lookup_profile("agent_profiles", email)
-        if not profile or _role_is_admin(profile):
+        if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
             return jsonify({"ok": False, "error": "Agent account is blocked or unavailable"}), 403
 
 
@@ -771,10 +771,8 @@ def login():
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     if request.method == "GET":
-        dashboard = _current_dashboard_for_session()
-        wants_form = (request.args.get("force") or request.args.get("login") or "").lower() in {"1", "true", "yes"}
-        if dashboard and not wants_form:
-            return redirect(dashboard)
+        # Always show the admin login form here.
+        # Do not redirect an active agent session into agent dashboard.
         return render_template("login.html", login_mode="admin")
 
     email = (request.form.get("email") or "").strip().lower()
