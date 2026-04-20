@@ -1899,10 +1899,23 @@
       return d.toLocaleString();
     }
 
-    function hardRefreshDashboardAfterRegistration() {
-      setTimeout(() => {
-        try { window.location.reload(); } catch (e) {}
-      }, 700);
+    async function hardRefreshDashboardAfterRegistration(kind) {
+      await Promise.allSettled([
+        loadSummary(),
+        loadActivity("week"),
+        loadWallet(),
+        loadMessages(),
+        loadLeaderboard("week")
+      ]);
+      updateHero();
+      renderActivity();
+      renderWallet();
+      renderMessages();
+      renderLeaderboard();
+      const summary = state.summary || {};
+      const drivers = Number(summary.drivers_this_week || summary.week_drivers || summary.drivers_week || 0);
+      const clients = Number(summary.clients_this_week || summary.week_clients || summary.clients_week || 0);
+      return `${kind} saved and waiting for admin approval. Current week: ${drivers} drivers, ${clients} clients.`;
     }
 
     function toast(msg){
@@ -2056,24 +2069,24 @@
 
       const missing = Array.isArray(me.missing_profile_fields) ? me.missing_profile_fields : (Array.isArray(summary.missing_profile_fields) ? summary.missing_profile_fields : []);
       const complete = missing.length === 0 && (me.profile_complete !== false) && (summary.profile_complete !== false);
-      state.profileComplete = complete;
+      state.profileComplete = true;
       const alert = $("profileAlert");
       if(alert){
         alert.classList.toggle("show", !complete);
         alert.innerHTML = complete
           ? ""
-          : `<strong>Complete My Account before registering.</strong><br>Missing: ${esc(missing.join(", ") || "required profile fields")}`;
+          : `<strong>Optional account details still missing.</strong><br>Driver and client registrations are still open. Missing: ${esc(missing.join(", ") || "profile details")}`;
       }
       $("profileStatusPill").textContent = complete ? "Complete" : "Incomplete";
       const percent = Number(me.profile_completion_percent || summary.profile_completion_percent || (complete ? 100 : 0));
-      $("profileCompletionText").textContent = complete ? `Profile ${percent}% complete. Your account is ready for registrations.` : `Profile ${percent}% complete. Missing: ` + (missing.join(", ") || "required profile fields");
+      $("profileCompletionText").textContent = complete ? `Profile ${percent}% complete. Your account is ready for registrations.` : `Profile ${percent}% complete. Registrations are allowed while you finish: ` + (missing.join(", ") || "profile details");
       $("profileCompletionFill").style.width = Math.max(0, Math.min(100, percent)) + "%";
       $("profileNameLabel").textContent = name;
       const photo = me.profile_picture_url || me.profile_pic_path || "";
       $("profilePhoto").src = photo || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23edf6fd'/%3E%3Ctext x='48' y='56' text-anchor='middle' font-family='Arial' font-size='28' fill='%230ea5e9'%3EY%3C/text%3E%3C/svg%3E";
       document.querySelectorAll('#driverForm button[type="submit"], #clientForm button[type="submit"]').forEach(btn => {
-        btn.disabled = !complete;
-        btn.title = complete ? "" : "Complete My Account before registering";
+        btn.disabled = false;
+        btn.title = "";
       });
     }
 
@@ -2744,11 +2757,6 @@
 
     async function submitDriver(ev){
       ev.preventDefault();
-      if(state.profileComplete === false){
-        toast("Complete My Account before registering drivers.");
-        openSection("settings");
-        return;
-      }
       const btn = ev.target.querySelector('button[type="submit"]');
       const agentName = state.me?.full_name || state.me?.username || 'Agent';
       if(btn){ btn.disabled = true; btn.innerHTML = `<span class="loader"></span> ${esc(agentName)}, saving driver...`; }
@@ -2771,8 +2779,7 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        toast(`Thank you, ${agentName}. Driver submitted for approval.`); hardRefreshDashboardAfterRegistration();
-        await refreshAll(false);
+        toast(await hardRefreshDashboardAfterRegistration("Driver"));
       }catch(e){
         console.error('register_driver_v4 payload rejected:', payload, e);
         toast('Driver registration failed: ' + e.message);
@@ -2783,11 +2790,6 @@
 
     async function submitClient(ev){
       ev.preventDefault();
-      if(state.profileComplete === false){
-        toast("Complete My Account before registering clients.");
-        openSection("settings");
-        return;
-      }
       const btn = ev.target.querySelector('button[type="submit"]');
       const agentName = state.me?.full_name || state.me?.username || 'Agent';
       if(btn){ btn.disabled = true; btn.innerHTML = `<span class="loader"></span> ${esc(agentName)}, saving client...`; }
@@ -2808,8 +2810,7 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        toast(`Thank you, ${agentName}. Client submitted for approval.`); hardRefreshDashboardAfterRegistration();
-        await refreshAll(false);
+        toast(await hardRefreshDashboardAfterRegistration("Client"));
       }catch(e){
         console.error('register_client_v4 payload rejected:', payload, e);
         toast('Client registration failed: ' + e.message);

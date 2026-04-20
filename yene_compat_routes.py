@@ -1239,13 +1239,13 @@ def register_yene_compat_routes(app, sb_admin):
     def _admin_weekly_report_data():
         today = datetime.utcnow().date()
         default_start = today - timedelta(days=today.weekday())
-        start = _parse_date(_clean(request.args.get("week_start")), default_start)
-        end = _parse_date(_clean(request.args.get("week_end")), start + timedelta(days=6))
+        json_data = request.get_json(silent=True) or {}
+        start = _parse_date(_clean(request.args.get("week_start") or json_data.get("week_start")), default_start)
+        end = _parse_date(_clean(request.args.get("week_end") or json_data.get("week_end")), start + timedelta(days=6))
         if end < start:
             end = start + timedelta(days=6)
 
         incoming = _payment_rules_latest() or {}
-        json_data = request.get_json(silent=True) or {}
 
         def pick_value(*keys, fallback=0):
             for key in keys:
@@ -1273,8 +1273,12 @@ def register_yene_compat_routes(app, sb_admin):
         }
         rules["is_active"] = rules["status"].lower() not in {"inactive", "disabled", "off", "false"}
 
-        selected_agent_id = _clean(request.args.get("agent_id"))
-        selected_agent_ids = [_clean(x) for x in (request.args.get("agent_ids") or "").split(",") if _clean(x)]
+        selected_agent_id = _clean(request.args.get("agent_id") or json_data.get("agent_id"))
+        raw_agent_ids = request.args.get("agent_ids") or json_data.get("agent_ids") or ""
+        if isinstance(raw_agent_ids, list):
+            selected_agent_ids = [_clean(x) for x in raw_agent_ids if _clean(x)]
+        else:
+            selected_agent_ids = [_clean(x) for x in str(raw_agent_ids).split(",") if _clean(x)]
         if selected_agent_id:
             selected_agent_ids = [selected_agent_id]
         agents = [a for a in (_agent_by_id(aid) for aid in selected_agent_ids) if a] if selected_agent_ids else _all_agents()
@@ -1287,6 +1291,11 @@ def register_yene_compat_routes(app, sb_admin):
         weekly_clients = [r for r in _clients() if in_range(r)]
         identity_fields = ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")
         day_labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        paid_refs = {
+            _clean(row.get("reference"))
+            for row in _safe_select("agent_wallet_ledger", {}, "reference", 20000)
+            if str(row.get("reference") or "").startswith(("weekly-payout-driver-", "weekly-payout-client-"))
+        }
 
         def empty_daily():
             out = {}
@@ -1311,7 +1320,7 @@ def register_yene_compat_routes(app, sb_admin):
             return rules["driver_reg"] if row.get("type") == "Driver" else rules["client_reg"]
 
         def is_payable(row):
-            return rules["is_active"] and _approved(row.get("status"))
+            return rules["is_active"] and _approved(row.get("status")) and not row.get("already_paid")
 
         def agent_name(agent):
             return agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent"
@@ -1373,9 +1382,17 @@ def register_yene_compat_routes(app, sb_admin):
                     "rows": [],
                 })
                 amount = row_payment(row)
+                payout_reference = f"weekly-payout-{row.get('type', '').lower()}-{row.get('id')}"
+                row["payout_reference"] = payout_reference
+                row["already_paid"] = payout_reference in paid_refs
                 row["payment_rate"] = amount
                 row["payment_due"] = amount if is_payable(row) else 0.0
-                row["payable_status"] = "Payable" if is_payable(row) else "Pending approval"
+                if row["already_paid"]:
+                    row["payable_status"] = "Already paid"
+                elif is_payable(row):
+                    row["payable_status"] = "Payable"
+                else:
+                    row["payable_status"] = "Pending approval"
                 bucket["rows"].append(row)
                 if row.get("type") == "Driver":
                     bucket["drivers"] += 1
@@ -1388,7 +1405,7 @@ def register_yene_compat_routes(app, sb_admin):
                 if is_payable(row):
                     bucket["amount"] += amount
                     base_total += amount
-                else:
+                elif not row["already_paid"]:
                     pending_value += amount
                     bucket["pending"] += 1
 
@@ -1436,7 +1453,8 @@ def register_yene_compat_routes(app, sb_admin):
                 "client_count": client_count,
                 "approved_driver_count": approved_driver_count,
                 "approved_client_count": approved_client_count,
-                "pending_count": len([r for r in rows if not is_payable(r)]),
+                "pending_count": len([r for r in rows if (not _approved(r.get("status"))) and not r.get("already_paid")]),
+                "already_paid_count": len([r for r in rows if r.get("already_paid")]),
                 "base_total": round(base_total, 2),
                 "bonus_total": round(bonus_total, 2),
                 "bonus_lines": bonus_lines,
@@ -1453,6 +1471,7 @@ def register_yene_compat_routes(app, sb_admin):
             "approved_drivers": sum(x["approved_driver_count"] for x in report_rows),
             "approved_clients": sum(x["approved_client_count"] for x in report_rows),
             "pending": sum(x["pending_count"] for x in report_rows),
+            "already_paid": sum(x["already_paid_count"] for x in report_rows),
             "base": round(sum(x["base_total"] for x in report_rows), 2),
             "bonus": round(sum(x["bonus_total"] for x in report_rows), 2),
             "payout": round(sum(x["agent_total"] for x in report_rows), 2),
@@ -1491,6 +1510,7 @@ def register_yene_compat_routes(app, sb_admin):
                 "approved_drivers": item["approved_driver_count"],
                 "approved_clients": item["approved_client_count"],
                 "pending": item["pending_count"],
+                "already_paid": item["already_paid_count"],
                 "base_total": item["base_total"],
                 "bonus_total": item["bonus_total"],
                 "agent_total": item["agent_total"],
@@ -1504,6 +1524,91 @@ def register_yene_compat_routes(app, sb_admin):
             "totals": report["totals"],
             "rows": rows,
         })
+
+    @app.post("/api/admin/weekly_agent_report_finalize")
+    def admin_weekly_agent_report_finalize():
+        report = _admin_weekly_report_data()
+        start = report["start"].isoformat()
+        end = report["end"].isoformat()
+        processed_agents = []
+        processed_rows = 0
+        total_amount = 0.0
+        errors = []
+
+        for item in report["report_rows"]:
+            agent = item["agent"]
+            payable_rows = [row for row in item["rows"] if _safe_float(row.get("payment_due")) > 0 and not row.get("already_paid")]
+            amount = round(sum(_safe_float(row.get("payment_due")) for row in payable_rows) + _safe_float(item.get("bonus_total")), 2)
+            if not payable_rows and amount <= 0:
+                continue
+
+            item_refs_ok = True
+            for row in payable_rows:
+                payload = {
+                    "agent_id": str(agent.get("id") or ""),
+                    "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                    "agent_email": agent.get("email") or row.get("recruiter_email") or "",
+                    "agent_name": item["agent_name"],
+                    "entry_type": "payout_item",
+                    "amount": 0,
+                    "reference": row.get("payout_reference"),
+                    "note": f"{row.get('type')} registration included in weekly payout {start} to {end}",
+                    "status": "processed",
+                    "created_at": _now_iso(),
+                }
+                res = _safe_insert("agent_wallet_ledger", payload)
+                if isinstance(res, Exception):
+                    item_refs_ok = False
+                    errors.append({"reference": row.get("payout_reference"), "error": str(res)})
+            if not item_refs_ok:
+                continue
+
+            payout_ref = f"weekly-payout-agent-{agent.get('id')}-{start}-to-{end}"
+            if not _safe_select("agent_wallet_ledger", {"reference": payout_ref}, "id", 1):
+                res = _safe_insert("agent_wallet_ledger", {
+                    "agent_id": str(agent.get("id") or ""),
+                    "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                    "agent_email": agent.get("email") or "",
+                    "agent_name": item["agent_name"],
+                    "entry_type": "debit",
+                    "amount": amount,
+                    "reference": payout_ref,
+                    "note": f"Weekly payout processed for {start} to {end}",
+                    "status": "processed",
+                    "created_at": _now_iso(),
+                })
+                if isinstance(res, Exception):
+                    errors.append({"reference": payout_ref, "error": str(res)})
+                    continue
+
+            _safe_insert("agent_messages", {
+                "agent_id": str(agent.get("id") or ""),
+                "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                "agent_email": agent.get("email") or "",
+                "agent_name": item["agent_name"],
+                "subject": "Weekly payout processed",
+                "message": f"Your weekly payout for {start} to {end} was processed. Amount included: {_fmt_money(amount)}.",
+                "status": "unread",
+                "created_at": _now_iso(),
+            })
+            processed_agents.append({
+                "agent_id": agent.get("id"),
+                "agent_name": item["agent_name"],
+                "amount": amount,
+                "rows": len(payable_rows),
+            })
+            processed_rows += len(payable_rows)
+            total_amount += amount
+
+        return jsonify({
+            "ok": not errors,
+            "processed_agents": processed_agents,
+            "processed_rows": processed_rows,
+            "total_amount": round(total_amount, 2),
+            "week_start": start,
+            "week_end": end,
+            "errors": errors[:20],
+        }), (207 if errors else 200)
 
     @app.get("/api/admin/weekly_agent_report_pdf")
     def admin_weekly_agent_report_pdf():
@@ -1575,11 +1680,11 @@ def register_yene_compat_routes(app, sb_admin):
             c.drawRightString(right - 8, y, "Due")
             return y - 16
 
-            draw_header()
+        draw_header()
         y = h - 108
         c.setFillColor(soft)
         c.roundRect(left, y - 48, right - left, 56, 6, fill=1, stroke=0)
-        draw_text(left + 12, y - 4, f"Agents: {totals['agents']} | Drivers: {totals['drivers']} | Clients: {totals['clients']} | Pending rows: {totals['pending']}", 10, True)
+        draw_text(left + 12, y - 4, f"Agents: {totals['agents']} | Drivers: {totals['drivers']} | Clients: {totals['clients']} | Pending rows: {totals['pending']} | Already paid: {totals.get('already_paid', 0)}", 10, True)
         draw_text(left + 12, y - 20, f"Rates: Driver {_fmt_money(rules['driver_reg'])} | Client {_fmt_money(rules['client_reg'])} | Driver daily bonus {_fmt_money(rules['daily_5_drivers_bonus'])} at {rules['daily_driver_threshold']} | Client daily bonus {_fmt_money(rules['daily_5_clients_bonus'])} at {rules['daily_client_threshold']}", 8)
         draw_text(left + 12, y - 36, f"Base: {_fmt_money(totals['base'])} | Bonuses: {_fmt_money(totals['bonus'])} | Pending value not due: {_fmt_money(totals['pending_value'])} | Grand payout: {_fmt_money(totals['payout'])}", 8, True, primary)
         y -= 72
@@ -1609,13 +1714,13 @@ def register_yene_compat_routes(app, sb_admin):
                 draw_text(
                     left + 18,
                     y,
-                    f"{values.get('label') or day} {day}: drivers {values['drivers']} | clients {values['clients']} | approved {values['approved_drivers'] + values['approved_clients']} | pending {values['pending']} | base {_fmt_money(values['amount'])} | bonus {_fmt_money(values['bonus'])}",
+                    f"{values.get('label') or day} {day}: drivers {values['drivers']} | clients {values['clients']} | payable {values['approved_drivers'] + values['approved_clients']} | pending {values['pending']} | base {_fmt_money(values['amount'])} | bonus {_fmt_money(values['bonus'])}",
                     7,
                 )
                 y -= 11
                 for row in values.get("rows", [])[:18]:
                     y = ensure_space(y, 45)
-                    draw_text(left + 28, y, f"- {row.get('type')}: {text_fit(row.get('name'), 22)} | {text_fit(row.get('phone'), 16)} | {text_fit(row.get('town'), 16)} | {text_fit(row.get('status'), 12)} | {str(row.get('created_at') or '')[:16]}", 6)
+                    draw_text(left + 28, y, f"- {row.get('type')}: {text_fit(row.get('name'), 22)} | {text_fit(row.get('phone'), 16)} | {text_fit(row.get('town'), 16)} | {text_fit(row.get('payable_status'), 14)} | {str(row.get('created_at') or '')[:16]}", 6)
                     y -= 9
             y -= 5
 

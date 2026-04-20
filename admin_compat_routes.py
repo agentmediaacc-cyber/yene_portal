@@ -88,6 +88,15 @@ def register_admin_compat_routes(app, sb_admin):
             best = max(best, _safe_float(r.get("client_reg")))
         return best
 
+    def _payment_amount(kind):
+        rows = _safe_select("weekly_payment_settings", {}, "*", 1, "updated_at", True)
+        if not rows:
+            rows = _safe_select("payment_rules", {}, "*", 1, "updated_at", True)
+        row = rows[0] if rows else {}
+        if kind == "driver":
+            return _safe_float(row.get("driver_reg") or row.get("driver_register_amount") or row.get("driver_amount"))
+        return _safe_float(row.get("client_reg") or row.get("client_register_amount") or row.get("client_amount"))
+
     def _agent_directory():
         rows = _safe_select("agent_profiles", {}, "*", 5000)
         if rows:
@@ -102,6 +111,108 @@ def register_admin_compat_routes(app, sb_admin):
         if rows:
             return rows[0]
         return None
+
+    def _agent_for_registration(row):
+        candidates = [
+            row.get("recruiter_agent_id"),
+            row.get("agent_id"),
+            row.get("agent_auth_id"),
+            row.get("recruiter_auth_id"),
+        ]
+        for value in candidates:
+            if value:
+                agent = _agent_by_id(str(value))
+                if agent:
+                    return agent
+                rows = _safe_select("agent_profiles", {"auth_id": value}, "*", 1)
+                if rows:
+                    return rows[0]
+                rows = _safe_select("agent_profiles", {"user_id": value}, "*", 1)
+                if rows:
+                    return rows[0]
+        email = str(row.get("recruiter_email") or row.get("agent_email") or "").strip().lower()
+        if email:
+            rows = _safe_select("agent_profiles", {"email": email}, "*", 1)
+            if rows:
+                return rows[0]
+            rows = _safe_select("agents", {"email": email}, "*", 1)
+            if rows:
+                return rows[0]
+        return None
+
+    def _notify_agent(agent, subject, message, registration_type="", registration_id=""):
+        if not agent:
+            return
+        payload = {
+            "agent_id": str(agent.get("id") or ""),
+            "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "agent_email": agent.get("email") or "",
+            "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+            "registration_type": registration_type,
+            "registration_id": str(registration_id or ""),
+            "subject": subject,
+            "message": message,
+            "status": "unread",
+            "created_at": _now_iso(),
+        }
+        res = _safe_insert("agent_messages", payload)
+        if isinstance(res, Exception):
+            _safe_insert("agent_notifications", {
+                "agent_id": payload["agent_id"],
+                "agent_email": payload["agent_email"],
+                "title": subject,
+                "body": message,
+                "status": "unread",
+                "created_at": payload["created_at"],
+            })
+
+    def _credit_approval(table, row_id, kind):
+        rows = _safe_select(table, {"id": row_id}, "*", 1)
+        if not rows:
+            return {"credited": False, "amount": 0.0, "reason": "row_not_found"}
+        row = rows[0]
+        agent = _agent_for_registration(row)
+        amount = _payment_amount(kind)
+        if amount <= 0:
+            _notify_agent(
+                agent,
+                f"{kind.title()} approved",
+                f"Your {kind} registration was approved. No wallet amount was added because the active admin rate is zero.",
+                kind,
+                row_id,
+            )
+            return {"credited": False, "amount": 0.0, "reason": "zero_rate"}
+
+        reference = f"{kind}-approval-{row_id}"
+        existing = _safe_select("agent_wallet_ledger", {"reference": reference}, "id", 1)
+        if existing:
+            return {"credited": False, "amount": amount, "reason": "duplicate_reference"}
+
+        agent_id = str((agent or {}).get("id") or row.get("recruiter_agent_id") or row.get("agent_id") or "")
+        payload = {
+            "agent_id": agent_id,
+            "agent_auth_id": str((agent or {}).get("auth_id") or (agent or {}).get("user_id") or row.get("agent_auth_id") or ""),
+            "agent_email": (agent or {}).get("email") or row.get("recruiter_email") or "",
+            "agent_name": (agent or {}).get("full_name") or (agent or {}).get("username") or row.get("recruiter_name") or "",
+            "entry_type": "credit",
+            "amount": amount,
+            "reference": reference,
+            "note": f"{kind.title()} registration approved by admin",
+            "status": "approved",
+            "created_at": _now_iso(),
+        }
+        res = _safe_insert("agent_wallet_ledger", payload)
+        if isinstance(res, Exception):
+            return {"credited": False, "amount": amount, "reason": str(res)}
+
+        _notify_agent(
+            agent,
+            f"{kind.title()} approved and wallet credited",
+            f"Admin approved your {kind} registration. N$ {amount:,.2f} was added to your wallet.",
+            kind,
+            row_id,
+        )
+        return {"credited": True, "amount": amount, "reason": ""}
 
     def _agent_name_map():
         out = {}
@@ -155,10 +266,17 @@ def register_admin_compat_routes(app, sb_admin):
         row_id = str(data.get("id") or "").strip()
         if not row_id:
             return jsonify({"ok": False, "error": "Driver id required"}), 400
-        res = _safe_update("drivers", {"id": row_id}, {"status": "APPROVED", "admin_approved": True})
+        res = _safe_update("drivers", {"id": row_id}, {
+            "status": "APPROVED",
+            "approval_state": "APPROVED",
+            "approved_at": _now_iso(),
+            "rejection_reason": None,
+            "admin_approved": True,
+        })
         if isinstance(res, Exception):
             return jsonify({"ok": False, "error": str(res)}), 500
-        return jsonify({"ok": True, "message": "Driver approved"})
+        credit = _credit_approval("drivers", row_id, "driver")
+        return jsonify({"ok": True, "message": "Driver approved", "wallet": credit})
 
     @app.post("/api/admin/approve_client")
     def admin_approve_client():
@@ -166,10 +284,101 @@ def register_admin_compat_routes(app, sb_admin):
         row_id = str(data.get("id") or "").strip()
         if not row_id:
             return jsonify({"ok": False, "error": "Client id required"}), 400
-        res = _safe_update("clients", {"id": row_id}, {"status": "APPROVED", "admin_approved": True})
+        res = _safe_update("clients", {"id": row_id}, {
+            "status": "APPROVED",
+            "approval_state": "APPROVED",
+            "approved_at": _now_iso(),
+            "rejection_reason": None,
+            "admin_approved": True,
+        })
         if isinstance(res, Exception):
             return jsonify({"ok": False, "error": str(res)}), 500
-        return jsonify({"ok": True, "message": "Client approved"})
+        credit = _credit_approval("clients", row_id, "client")
+        return jsonify({"ok": True, "message": "Client approved", "wallet": credit})
+
+    def _bulk_ids():
+        data = request.get_json(silent=True) or {}
+        ids = data.get("ids") or []
+        if isinstance(ids, str):
+            ids = [x.strip() for x in ids.split(",")]
+        return [str(x).strip() for x in ids if str(x or "").strip()], data
+
+    def _bulk_approve(table, kind):
+        ids, _ = _bulk_ids()
+        results = []
+        for row_id in ids:
+            res = _safe_update(table, {"id": row_id}, {
+                "status": "APPROVED",
+                "approval_state": "APPROVED",
+                "approved_at": _now_iso(),
+                "rejection_reason": None,
+                "admin_approved": True,
+            })
+            if isinstance(res, Exception):
+                results.append({"id": row_id, "ok": False, "error": str(res)})
+                continue
+            results.append({"id": row_id, "ok": True, "wallet": _credit_approval(table, row_id, kind)})
+        return jsonify({"ok": True, "count": len([r for r in results if r.get("ok")]), "results": results})
+
+    def _bulk_reject(table, kind):
+        ids, data = _bulk_ids()
+        reason = str(data.get("reason") or "Admin rejected").strip()
+        results = []
+        for row_id in ids:
+            rows = _safe_select(table, {"id": row_id}, "*", 1)
+            agent = _agent_for_registration(rows[0]) if rows else None
+            res = _safe_update(table, {"id": row_id}, {
+                "status": "REJECTED",
+                "approval_state": "REJECTED",
+                "rejected_at": _now_iso(),
+                "rejection_reason": reason,
+                "admin_approved": False,
+            })
+            if isinstance(res, Exception):
+                results.append({"id": row_id, "ok": False, "error": str(res)})
+                continue
+            _notify_agent(agent, f"{kind.title()} rejected", f"Admin rejected your {kind} registration. Reason: {reason}", kind, row_id)
+            results.append({"id": row_id, "ok": True})
+        return jsonify({"ok": True, "count": len([r for r in results if r.get("ok")]), "results": results})
+
+    @app.post("/api/admin/bulk_approve_drivers")
+    def admin_bulk_approve_drivers():
+        return _bulk_approve("drivers", "driver")
+
+    @app.post("/api/admin/bulk_reject_drivers")
+    def admin_bulk_reject_drivers():
+        return _bulk_reject("drivers", "driver")
+
+    @app.post("/api/admin/bulk_approve_clients")
+    def admin_bulk_approve_clients():
+        return _bulk_approve("clients", "client")
+
+    @app.post("/api/admin/bulk_reject_clients")
+    def admin_bulk_reject_clients():
+        return _bulk_reject("clients", "client")
+
+    @app.post("/api/admin/bulk_approve_agents")
+    def admin_bulk_approve_agents():
+        ids, _ = _bulk_ids()
+        results = []
+        for agent_id in ids:
+            payload = {"status": "ACTIVE", "approval_state": "APPROVED", "approved_at": _now_iso(), "rejection_reason": None}
+            res = _safe_update("agent_profiles", {"id": agent_id}, payload)
+            _safe_update("agents", {"id": agent_id}, payload)
+            results.append({"id": agent_id, "ok": not isinstance(res, Exception), "error": str(res) if isinstance(res, Exception) else ""})
+        return jsonify({"ok": True, "count": len([r for r in results if r.get("ok")]), "results": results})
+
+    @app.post("/api/admin/bulk_reject_agents")
+    def admin_bulk_reject_agents():
+        ids, data = _bulk_ids()
+        reason = str(data.get("reason") or "Admin rejected").strip()
+        results = []
+        for agent_id in ids:
+            payload = {"status": "REJECTED", "approval_state": "REJECTED", "rejected_at": _now_iso(), "rejection_reason": reason}
+            res = _safe_update("agent_profiles", {"id": agent_id}, payload)
+            _safe_update("agents", {"id": agent_id}, payload)
+            results.append({"id": agent_id, "ok": not isinstance(res, Exception), "error": str(res) if isinstance(res, Exception) else ""})
+        return jsonify({"ok": True, "count": len([r for r in results if r.get("ok")]), "results": results})
 
     @app.get("/api/admin/finance/summary")
     @app.get("/api/admin/finance_summary")

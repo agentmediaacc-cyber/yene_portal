@@ -279,7 +279,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         return str(value or "").strip().lower()
 
     def _leaderboard_period_bounds(period):
-        now = datetime.now(UTC)
+        now = datetime.now(APP_TZ)
         period = (period or "week").strip().lower()
         if period == "all":
             return "all", None, None
@@ -936,6 +936,22 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         try:
             res = _fallback_insert("drivers", payload, ("phone", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email", "external_code"))
             inserted = res.data or []
+            try:
+                row_id = (inserted[0] or {}).get("id") if inserted else ""
+                _fallback_insert("agent_messages", {
+                    "agent_id": str(agent.get("id") or ""),
+                    "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                    "agent_email": agent.get("email") or "",
+                    "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                    "registration_type": "driver",
+                    "registration_id": str(row_id or ""),
+                    "subject": "Driver registration submitted",
+                    "message": f"Driver {full_name} was saved and is waiting for admin approval.",
+                    "status": "unread",
+                    "created_at": iso(datetime.now(UTC)),
+                }, ("agent_auth_id", "registration_type", "registration_id"))
+            except Exception:
+                app.logger.warning("agent_register_driver_v4_message_failed agent_id=%s", agent.get("id"))
             safe_log("REGISTER_DRIVER", f"Agent {agent.get('email')} registered driver {full_name}")
             app.logger.info(
                 "agent_register_driver_v4 insert_ok agent_id=%s inserted_rows=%s created_id=%s duration_ms=%s",
@@ -1043,6 +1059,22 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         try:
             res = _fallback_insert("clients", payload, ("phone", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email", "external_code"))
             inserted = res.data or []
+            try:
+                row_id = (inserted[0] or {}).get("id") if inserted else ""
+                _fallback_insert("agent_messages", {
+                    "agent_id": str(agent.get("id") or ""),
+                    "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                    "agent_email": agent.get("email") or "",
+                    "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                    "registration_type": "client",
+                    "registration_id": str(row_id or ""),
+                    "subject": "Client registration submitted",
+                    "message": f"Client {full_name} was saved and is waiting for admin approval.",
+                    "status": "unread",
+                    "created_at": iso(datetime.now(UTC)),
+                }, ("agent_auth_id", "registration_type", "registration_id"))
+            except Exception:
+                app.logger.warning("agent_register_client_v4_message_failed agent_id=%s", agent.get("id"))
             safe_log("REGISTER_CLIENT", f"Agent {agent.get('email')} registered client {phone}")
             app.logger.info(
                 "agent_register_client_v4 insert_ok agent_id=%s inserted_rows=%s created_id=%s duration_ms=%s",
