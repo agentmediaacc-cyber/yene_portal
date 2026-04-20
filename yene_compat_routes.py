@@ -178,8 +178,13 @@ def register_yene_compat_routes(app, sb_admin):
             ),
             "daily_5_drivers_bonus": _safe_float(rules.get("daily_5_drivers_bonus")),
             "daily_5_clients_bonus": _safe_float(rules.get("daily_5_clients_bonus")),
+            "daily_driver_threshold": int(_safe_float(rules.get("daily_driver_threshold") or rules.get("driver_daily_threshold") or 5, 5)),
+            "daily_client_threshold": int(_safe_float(rules.get("daily_client_threshold") or rules.get("client_daily_threshold") or 5, 5)),
+            "weekly_activation_threshold": int(_safe_float(rules.get("weekly_activation_threshold") or rules.get("weekly_threshold") or 30, 30)),
             "weekly_30_activations_bonus": _safe_float(rules.get("weekly_30_activations_bonus")),
             "first_trip_bonus": _safe_float(rules.get("first_trip_bonus")),
+            "status": _clean(rules.get("status") or "Active"),
+            "is_active": str(rules.get("status") or "Active").strip().lower() not in {"inactive", "disabled", "off", "false"},
         }
 
     def _row_date(row):
@@ -287,6 +292,50 @@ def register_yene_compat_routes(app, sb_admin):
 
     def _clients():
         return _safe_select("clients", {}, "*", 10000, "created_at", True)
+
+    def _agent_lookup_maps():
+        by_id = {}
+        by_email = {}
+        for agent in _all_agents():
+            name = agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent"
+            shaped = {
+                "id": agent.get("id"),
+                "name": name,
+                "email": agent.get("email"),
+                "phone": agent.get("phone") or agent.get("phone_number"),
+                "referral_code": agent.get("referral_code"),
+            }
+            for key in ("id", "auth_id", "user_id"):
+                val = _clean(agent.get(key))
+                if val:
+                    by_id[val] = shaped
+            email = _clean(agent.get("email")).lower()
+            if email:
+                by_email[email] = shaped
+        return by_id, by_email
+
+    def _with_recruiter_details(rows):
+        by_id, by_email = _agent_lookup_maps()
+        out = []
+        for row in rows:
+            shaped = dict(row)
+            recruiter = None
+            for key in ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id"):
+                val = _clean(row.get(key))
+                if val and val in by_id:
+                    recruiter = by_id[val]
+                    break
+            email = _clean(row.get("recruiter_email")).lower()
+            if not recruiter and email:
+                recruiter = by_email.get(email)
+            if recruiter:
+                shaped.setdefault("recruiter_agent_id", recruiter.get("id"))
+                shaped["recruiter_name"] = row.get("recruiter_name") or recruiter.get("name")
+                shaped["recruiter_email"] = row.get("recruiter_email") or recruiter.get("email")
+                shaped["recruiter_phone"] = row.get("recruiter_phone") or recruiter.get("phone")
+                shaped["recruiter_referral_code"] = recruiter.get("referral_code")
+            out.append(shaped)
+        return out
 
     def _agent_registration_rows(agent_or_id, date_from=None, date_to=None):
         agent = agent_or_id if isinstance(agent_or_id, dict) else _agent_by_id(agent_or_id)
@@ -555,7 +604,12 @@ def register_yene_compat_routes(app, sb_admin):
 
     @app.get("/api/agent/messages/summary")
     def agent_messages_summary():
-        rows = agent_messages().json.get("rows", [])
+        resp = agent_messages()
+        if isinstance(resp, tuple):
+            payload = resp[0].get_json(silent=True) if hasattr(resp[0], "get_json") else {}
+        else:
+            payload = resp.get_json(silent=True) if hasattr(resp, "get_json") else {}
+        rows = (payload or {}).get("rows", [])
         unread = len([r for r in rows if str(r.get("status") or "").lower() not in {"read", "closed"}])
         _debug("agent_messages_summary", total=len(rows), unread=unread)
         return jsonify({"ok": True, "unread": unread, "total": len(rows)})
@@ -686,13 +740,13 @@ def register_yene_compat_routes(app, sb_admin):
 
     @app.get("/api/admin/drivers")
     def admin_drivers():
-        rows = _drivers()
+        rows = _with_recruiter_details(_drivers())
         _debug("admin_drivers", drivers=len(rows))
         return jsonify({"ok": True, "data": rows, "rows": rows})
 
     @app.get("/api/admin/clients")
     def admin_clients():
-        rows = _clients()
+        rows = _with_recruiter_details(_clients())
         _debug("admin_clients", clients=len(rows))
         return jsonify({"ok": True, "data": rows, "rows": rows})
 
@@ -714,9 +768,34 @@ def register_yene_compat_routes(app, sb_admin):
         payload = dict(data)
         payload["updated_at"] = _now_iso()
         row_id = _clean(payload.pop("id", ""))
-        res = _safe_update("payment_rules", {"id": row_id}, payload) if row_id else _safe_insert("payment_rules", payload)
+        payload_attempts = [payload]
+        slim = {
+            "driver_reg": payload.get("driver_reg") or payload.get("driver_register_amount") or 0,
+            "client_reg": payload.get("client_reg") or payload.get("client_register_amount") or 0,
+            "daily_5_drivers_bonus": payload.get("daily_5_drivers_bonus") or 0,
+            "daily_5_clients_bonus": payload.get("daily_5_clients_bonus") or 0,
+            "weekly_30_activations_bonus": payload.get("weekly_30_activations_bonus") or 0,
+            "first_trip_bonus": payload.get("first_trip_bonus") or 0,
+            "status": payload.get("status") or "Active",
+            "updated_at": payload["updated_at"],
+        }
+        payload_attempts.append(slim)
+        legacy = {
+            "driver_reg": slim["driver_reg"],
+            "client_reg": slim["client_reg"],
+            "status": slim["status"],
+            "updated_at": slim["updated_at"],
+        }
+        payload_attempts.append(legacy)
+        res = None
+        last_error = None
+        for body in payload_attempts:
+            res = _safe_update("payment_rules", {"id": row_id}, body) if row_id else _safe_insert("payment_rules", body)
+            if not isinstance(res, Exception):
+                break
+            last_error = res
         if isinstance(res, Exception):
-            return jsonify({"ok": False, "error": str(res)}), 500
+            return jsonify({"ok": False, "error": str(last_error or res)}), 500
         return jsonify({"ok": True})
 
     @app.post("/api/admin/broadcast")
@@ -1108,7 +1187,9 @@ def register_yene_compat_routes(app, sb_admin):
         today = datetime.utcnow().date()
         default_start = today - timedelta(days=today.weekday())
         start = _parse_date(_clean(request.args.get("week_start")), default_start)
-        end = start + timedelta(days=6)
+        end = _parse_date(_clean(request.args.get("week_end")), start + timedelta(days=6))
+        if end < start:
+            end = start + timedelta(days=6)
 
         incoming = _payment_rules_latest() or {}
         json_data = request.get_json(silent=True) or {}
@@ -1141,42 +1222,133 @@ def register_yene_compat_routes(app, sb_admin):
             "client_reg": _pick_value("client_reg", "client_amount", fallback=0),
             "daily_5_drivers_bonus": _pick_value("daily_5_drivers_bonus", fallback=0),
             "daily_5_clients_bonus": _pick_value("daily_5_clients_bonus", fallback=0),
+            "daily_driver_threshold": int(_pick_value("daily_driver_threshold", "driver_daily_threshold", fallback=5) or 5),
+            "daily_client_threshold": int(_pick_value("daily_client_threshold", "client_daily_threshold", fallback=5) or 5),
+            "weekly_activation_threshold": int(_pick_value("weekly_activation_threshold", "weekly_threshold", fallback=30) or 30),
             "weekly_30_activations_bonus": _pick_value("weekly_30_activations_bonus", fallback=0),
             "first_trip_bonus": _pick_value("first_trip_bonus", fallback=0),
+            "status": _clean(request.args.get("status") or json_data.get("status") or incoming.get("status") or "Active"),
         }
+        rules["is_active"] = rules["status"].lower() not in {"inactive", "disabled", "off", "false"}
 
         selected_agent_id = _clean(request.args.get("agent_id"))
+        selected_agent_ids = [
+            _clean(x)
+            for x in (request.args.get("agent_ids") or "").split(",")
+            if _clean(x)
+        ]
         if selected_agent_id:
-            one = _agent_by_id(selected_agent_id)
-            agents = [one] if one else []
+            selected_agent_ids = [selected_agent_id]
+        if selected_agent_ids:
+            agents = [a for a in (_agent_by_id(aid) for aid in selected_agent_ids) if a]
         else:
             agents = _all_agents()
 
         def registration_payment(row):
             return rules["driver_reg"] if row.get("type") == "Driver" else rules["client_reg"]
 
-        def approved_rows(rows):
-            return [r for r in rows if _approved(r.get("status"))]
+        def payable(row):
+            return rules["is_active"] and _approved(row.get("status"))
+
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+        def row_in_selected_week(row):
+            day = _row_date(row)
+            return bool(day and start <= day <= end)
+
+        weekly_drivers = [r for r in _drivers() if row_in_selected_week(r)]
+        weekly_clients = [r for r in _clients() if row_in_selected_week(r)]
+
+        def agent_weekly_rows(agent):
+            values = _identity_values(agent)
+            fields = ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")
+            rows = []
+            for d in weekly_drivers:
+                if not _matches_identity(d, values, fields):
+                    continue
+                rows.append({
+                    "type": "Driver",
+                    "name": d.get("full_name") or d.get("name") or "",
+                    "phone": d.get("phone") or d.get("phone_number") or "",
+                    "town": d.get("town") or d.get("region") or "",
+                    "code": d.get("external_code") or d.get("license_number") or "",
+                    "created_at": d.get("created_at"),
+                    "status": d.get("status"),
+                    "trips_completed": d.get("trips_completed") or 0,
+                    "verified_trips": d.get("verified_trips") or 0,
+                    "registered_by": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                })
+            for c_row in weekly_clients:
+                if not _matches_identity(c_row, values, fields):
+                    continue
+                rows.append({
+                    "type": "Client",
+                    "name": c_row.get("full_name") or c_row.get("name") or "",
+                    "phone": c_row.get("phone") or c_row.get("phone_number") or "",
+                    "town": c_row.get("town") or c_row.get("region") or "",
+                    "code": c_row.get("external_code") or c_row.get("yene_code") or "",
+                    "created_at": c_row.get("created_at"),
+                    "status": c_row.get("status"),
+                    "registered_by": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                })
+            rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+            return rows
+
+        def empty_daily():
+            out = {}
+            for offset, name in enumerate(day_names):
+                date_key = (start + timedelta(days=offset)).isoformat()
+                out[date_key] = {
+                    "label": name,
+                    "drivers": 0,
+                    "clients": 0,
+                    "approved_drivers": 0,
+                    "approved_clients": 0,
+                    "pending": 0,
+                    "amount": 0.0,
+                }
+            return out
 
         report_rows = []
         grand_total = 0.0
+        grand_base = 0.0
+        grand_bonus = 0.0
         grand_drivers = 0
         grand_clients = 0
+        grand_pending_value = 0.0
         for agent in agents:
-            rows = _agent_registration_rows(agent, start.isoformat(), end.isoformat())
-            rows = approved_rows(rows)
+            rows = agent_weekly_rows(agent)
             if not rows:
                 continue
 
-            daily = {}
+            daily = empty_daily()
             base_total = 0.0
+            pending_value = 0.0
             for row in rows:
                 day = str(row.get("created_at") or "")[:10] or "Unknown"
-                bucket = daily.setdefault(day, {"drivers": 0, "clients": 0, "amount": 0.0})
+                bucket = daily.setdefault(day, {
+                    "label": day,
+                    "drivers": 0,
+                    "clients": 0,
+                    "approved_drivers": 0,
+                    "approved_clients": 0,
+                    "pending": 0,
+                    "amount": 0.0,
+                })
                 amount = registration_payment(row)
-                row["payment_due"] = amount
-                bucket["amount"] += amount
-                base_total += amount
+                row["payment_rate"] = amount
+                row["payment_due"] = amount if payable(row) else 0.0
+                row["payable_status"] = "Payable" if payable(row) else "Pending approval"
+                if payable(row):
+                    bucket["amount"] += amount
+                    base_total += amount
+                    if row.get("type") == "Driver":
+                        bucket["approved_drivers"] += 1
+                    else:
+                        bucket["approved_clients"] += 1
+                else:
+                    pending_value += amount
+                    bucket["pending"] += 1
                 if row.get("type") == "Driver":
                     bucket["drivers"] += 1
                 else:
@@ -1185,48 +1357,57 @@ def register_yene_compat_routes(app, sb_admin):
             bonus_total = 0.0
             bonus_lines = []
             for day, values in sorted(daily.items()):
-                if values["drivers"] >= 5 and rules["daily_5_drivers_bonus"]:
+                if values["approved_drivers"] >= rules["daily_driver_threshold"] and rules["daily_5_drivers_bonus"] and rules["is_active"]:
                     bonus_total += rules["daily_5_drivers_bonus"]
-                    bonus_lines.append(f"{day}: daily driver threshold bonus {_fmt_money(rules['daily_5_drivers_bonus'])}")
-                if values["clients"] >= 5 and rules["daily_5_clients_bonus"]:
+                    bonus_lines.append(f"{day}: driver threshold {values['approved_drivers']}/{rules['daily_driver_threshold']} bonus {_fmt_money(rules['daily_5_drivers_bonus'])}")
+                if values["approved_clients"] >= rules["daily_client_threshold"] and rules["daily_5_clients_bonus"] and rules["is_active"]:
                     bonus_total += rules["daily_5_clients_bonus"]
-                    bonus_lines.append(f"{day}: daily client threshold bonus {_fmt_money(rules['daily_5_clients_bonus'])}")
+                    bonus_lines.append(f"{day}: client threshold {values['approved_clients']}/{rules['daily_client_threshold']} bonus {_fmt_money(rules['daily_5_clients_bonus'])}")
 
             driver_count = len([r for r in rows if r.get("type") == "Driver"])
             client_count = len([r for r in rows if r.get("type") == "Client"])
+            approved_driver_count = len([r for r in rows if r.get("type") == "Driver" and payable(r)])
+            approved_client_count = len([r for r in rows if r.get("type") == "Client" and payable(r)])
             first_trip_count = len([
                 r for r in rows
                 if r.get("type") == "Driver"
+                and payable(r)
                 and (
                     _safe_float(r.get("verified_trips")) > 0
                     or _safe_float(r.get("trips_completed")) > 0
                 )
             ])
-            if first_trip_count and rules["first_trip_bonus"]:
+            if first_trip_count and rules["first_trip_bonus"] and rules["is_active"]:
                 first_trip_total = first_trip_count * rules["first_trip_bonus"]
                 bonus_total += first_trip_total
                 bonus_lines.append(f"First trip bonus: {first_trip_count} drivers x {_fmt_money(rules['first_trip_bonus'])} = {_fmt_money(first_trip_total)}")
-            if (driver_count + client_count) >= 30 and rules["weekly_30_activations_bonus"]:
+            if (approved_driver_count + approved_client_count) >= rules["weekly_activation_threshold"] and rules["weekly_30_activations_bonus"] and rules["is_active"]:
                 bonus_total += rules["weekly_30_activations_bonus"]
-                bonus_lines.append(f"Weekly 30 activation bonus {_fmt_money(rules['weekly_30_activations_bonus'])}")
+                bonus_lines.append(f"Weekly activation threshold {approved_driver_count + approved_client_count}/{rules['weekly_activation_threshold']} bonus {_fmt_money(rules['weekly_30_activations_bonus'])}")
 
             agent_total = base_total + bonus_total
             grand_total += agent_total
+            grand_base += base_total
+            grand_bonus += bonus_total
             grand_drivers += driver_count
             grand_clients += client_count
+            grand_pending_value += pending_value
             report_rows.append({
                 "agent": agent,
                 "rows": rows,
                 "daily": daily,
                 "driver_count": driver_count,
                 "client_count": client_count,
+                "approved_driver_count": approved_driver_count,
+                "approved_client_count": approved_client_count,
                 "base_total": base_total,
                 "bonus_total": bonus_total,
                 "bonus_lines": bonus_lines,
                 "agent_total": agent_total,
+                "pending_value": pending_value,
             })
 
-        report_rows.sort(key=lambda item: item["agent_total"], reverse=True)
+        report_rows.sort(key=lambda item: (-(item["driver_count"] + item["client_count"]), str(item["agent"].get("full_name") or item["agent"].get("email") or "").lower()))
 
         buf = BytesIO()
         c = canvas.Canvas(buf, pagesize=A4)
@@ -1272,7 +1453,7 @@ def register_yene_compat_routes(app, sb_admin):
             c.drawString(left, h - 38, "YENE Weekly Agent Payment Report")
             c.setFont("Helvetica", 9)
             c.drawString(left, h - 56, f"Report week: {start.isoformat()} to {end.isoformat()}")
-            c.drawString(left, h - 72, f"Rates: Driver {_fmt_money(rules['driver_reg'])} | Client {_fmt_money(rules['client_reg'])} | Source {rules['source']}")
+            c.drawString(left, h - 72, f"Generated: {datetime.utcnow().isoformat(timespec='seconds')}Z | Rule status: {rules['status']} | Source {rules['source']}")
             c.setFillColor(dark)
 
         def draw_table_header(y):
@@ -1282,9 +1463,10 @@ def register_yene_compat_routes(app, sb_admin):
             c.line(left, y - 4, right, y - 4)
             draw_text(left + 8, y, "Date", 7, True)
             draw_text(left + 66, y, "Type", 7, True)
-            draw_text(left + 114, y, "Registered person", 7, True)
+            draw_text(left + 114, y, "Registered person / by", 7, True)
             draw_text(left + 270, y, "Phone", 7, True)
             draw_text(left + 360, y, "Town", 7, True)
+            draw_text(left + 435, y, "Status", 7, True)
             c.setFont("Helvetica-Bold", 7)
             c.drawRightString(right - 8, y, "Due")
             return y - 16
@@ -1293,14 +1475,15 @@ def register_yene_compat_routes(app, sb_admin):
         y = h - 108
         c.setFillColor(soft)
         c.roundRect(left, y - 34, right - left, 42, 6, fill=1, stroke=0)
-        draw_text(left + 12, y - 4, f"Agents with approved activity: {len(report_rows)}", 10, True)
+        draw_text(left + 12, y - 4, f"Agents with weekly activity: {len(report_rows)}", 10, True)
         draw_text(left + 210, y - 4, f"Drivers: {grand_drivers}", 10, True)
         draw_text(left + 300, y - 4, f"Clients: {grand_clients}", 10, True)
         draw_text(left + 390, y - 4, f"Grand total: {_fmt_money(grand_total)}", 10, True, primary)
+        draw_text(left + 12, y - 22, f"Base: {_fmt_money(grand_base)} | Bonuses: {_fmt_money(grand_bonus)} | Pending value not due: {_fmt_money(grand_pending_value)}", 8)
         y -= 58
 
         if not report_rows:
-            draw_text(left, y, "No approved weekly registration activity found for this period.", 10)
+            draw_text(left, y, "No weekly registration activity found for this period.", 10)
         for item in report_rows:
             y = ensure_space(y, 150)
             agent = item["agent"]
@@ -1309,20 +1492,37 @@ def register_yene_compat_routes(app, sb_admin):
             c.setStrokeColor(line)
             draw_text(left + 12, y - 8, text_fit(agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent", 76), 12, True, primary)
             draw_text(left + 12, y - 24, f"Email: {agent.get('email') or '-'}", 8)
-            draw_text(left + 12, y - 38, f"Town/Region: {agent.get('town') or '-'} / {agent.get('region') or agent.get('operation_region') or '-'}", 8)
-            draw_text(left + 300, y - 24, f"Drivers: {item['driver_count']} | Clients: {item['client_count']}", 8, True)
-            draw_text(left + 300, y - 38, f"Base: {_fmt_money(item['base_total'])} | Bonuses: {_fmt_money(item['bonus_total'])}", 8)
+            draw_text(left + 12, y - 38, f"Phone: {agent.get('phone') or agent.get('phone_number') or '-'} | Referral: {agent.get('referral_code') or '-'}", 8)
+            draw_text(left + 12, y - 52, f"Town/Region: {agent.get('town') or '-'} / {agent.get('region') or agent.get('operation_region') or '-'}", 8)
+            draw_text(left + 300, y - 24, f"Drivers: {item['driver_count']} ({item['approved_driver_count']} payable) | Clients: {item['client_count']} ({item['approved_client_count']} payable)", 8, True)
+            draw_text(left + 300, y - 38, f"Rates: driver {_fmt_money(rules['driver_reg'])} | client {_fmt_money(rules['client_reg'])}", 8)
             draw_text(left + 300, y - 52, f"Total due: {_fmt_money(item['agent_total'])}", 10, True, primary)
             y -= 80
+
+            y = ensure_space(y, 82)
+            draw_text(left + 8, y, "Monday to Sunday counts", 8, True)
+            y -= 13
+            for day, values in sorted(item["daily"].items()):
+                y = ensure_space(y, 50)
+                total = values["drivers"] + values["clients"]
+                draw_text(
+                    left + 18,
+                    y,
+                    f"{values.get('label') or day} {day}: drivers {values['drivers']} | clients {values['clients']} | approved {values['approved_drivers'] + values['approved_clients']} | pending {values['pending']} | due {_fmt_money(values['amount'])}",
+                    7,
+                )
+                y -= 11
+            y -= 5
 
             y = draw_table_header(y)
             for row in item["rows"]:
                 y = ensure_space(y, 54)
-                draw_text(left + 8, y, str(row.get("created_at") or "")[:10], 7)
+                draw_text(left + 8, y, str(row.get("created_at") or "")[:19].replace("T", " "), 7)
                 draw_text(left + 66, y, text_fit(row.get("type"), 9), 7)
-                draw_text(left + 114, y, text_fit(row.get("name"), 30), 7)
+                draw_text(left + 114, y, text_fit(f"{row.get('name') or '-'} / {row.get('registered_by') or '-'}", 30), 7)
                 draw_text(left + 270, y, text_fit(row.get("phone"), 17), 7)
-                draw_text(left + 360, y, text_fit(row.get("town"), 20), 7)
+                draw_text(left + 360, y, text_fit(row.get("town"), 13), 7)
+                draw_text(left + 435, y, text_fit(row.get("status") or "-", 13), 7)
                 draw_money(right - 8, y, row.get("payment_due"), 7)
                 c.setStrokeColor(colors.HexColor("#edf2f7"))
                 c.line(left, y - 4, right, y - 4)
@@ -1330,12 +1530,8 @@ def register_yene_compat_routes(app, sb_admin):
 
             y -= 6
             y = ensure_space(y, 70)
-            draw_text(left + 8, y, "Daily totals", 8, True)
-            y -= 12
-            for day, values in sorted(item["daily"].items()):
-                y = ensure_space(y, 50)
-                draw_text(left + 18, y, f"{day}: drivers {values['drivers']} | clients {values['clients']} | base {_fmt_money(values['amount'])}", 7)
-                y -= 11
+            draw_text(left + 8, y, f"Base pay: {_fmt_money(item['base_total'])} | Bonuses: {_fmt_money(item['bonus_total'])} | Pending value not due: {_fmt_money(item['pending_value'])}", 8, True)
+            y -= 14
             if item["bonus_lines"]:
                 y = ensure_space(y, 50)
                 draw_text(left + 8, y, "Bonus lines", 8, True)
@@ -1350,7 +1546,11 @@ def register_yene_compat_routes(app, sb_admin):
 
         c.save()
         buf.seek(0)
-        report_name = f"yene_weekly_report_{start.isoformat()}.pdf" if not selected_agent_id else f"yene_agent_{selected_agent_id}_{start.isoformat()}.pdf"
+        report_name = (
+            f"yene_weekly_report_{start.isoformat()}_to_{end.isoformat()}.pdf"
+            if not selected_agent_ids
+            else f"yene_agent_report_{start.isoformat()}_to_{end.isoformat()}.pdf"
+        )
         return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=report_name)
 
     @app.get("/api/admin/agent_center_pdf/<agent_id>")

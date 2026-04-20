@@ -1445,7 +1445,7 @@
                 </div>
                 <div class="stat-ico">👤</div>
               </div>
-              <div class="stat-sub" id="rankClientsWeekSub">Waiting for live data...</div>
+              <div class="stat-sub" id="rankClientsWeekSub">Loading real leaderboard data...</div>
             </div>
 
             <div class="card stat">
@@ -1456,7 +1456,7 @@
                 </div>
                 <div class="stat-ico">🚗</div>
               </div>
-              <div class="stat-sub" id="rankDriversWeekSub">Waiting for live data...</div>
+              <div class="stat-sub" id="rankDriversWeekSub">Loading real leaderboard data...</div>
             </div>
 
             <div class="card stat spark">
@@ -1530,7 +1530,7 @@
                 </div>
                 <div class="card-body">
                   <div class="list compact-list" id="rivalTrackerList">
-                    <div class="muted">Waiting for leaderboard...</div>
+                    <div class="muted">Register more to improve your position</div>
                   </div>
                 </div>
               </div>
@@ -1565,7 +1565,7 @@
                 </div>
                 <div class="progress-wrap"><div class="progress-bar" id="barDrivers50"></div></div>
                 <div class="list compact-list" id="closeDrivers50" style="margin-top:12px;">
-                  <div class="muted">No close agents yet.</div>
+                  <div class="muted">Your progress will grow as you add more registrations.</div>
                 </div>
               </div>
             </div>
@@ -1582,7 +1582,7 @@
                 </div>
                 <div class="progress-wrap"><div class="progress-bar" id="barActivatedDrivers50"></div></div>
                 <div class="list compact-list" id="closeActivatedDrivers50" style="margin-top:12px;">
-                  <div class="muted">No close agents yet.</div>
+                  <div class="muted">Your progress will grow as you add more registrations.</div>
                 </div>
               </div>
             </div>
@@ -1599,7 +1599,7 @@
                 </div>
                 <div class="progress-wrap"><div class="progress-bar" id="barActivatedClients150"></div></div>
                 <div class="list compact-list" id="closeActivatedClients150" style="margin-top:12px;">
-                  <div class="muted">No close agents yet.</div>
+                  <div class="muted">Your progress will grow as you add more registrations.</div>
                 </div>
               </div>
             </div>
@@ -1817,7 +1817,7 @@
                   <input class="field" name="next_of_kin_phone" id="setKinPhone" placeholder="Next of kin phone" />
                   <input class="field full" name="residential_address" id="setAddress" placeholder="Residential address" />
                   <textarea class="textarea full" name="bio" id="setBio" placeholder="Bio / about"></textarea>
-                  <input class="field full" name="profile_picture_url" id="setProfilePicture" placeholder="Profile picture URL" />
+                  <input class="field full" name="profile_picture_url" id="setProfilePicture" placeholder="Profile picture (optional) URL" />
                   <input class="field full" id="setReferral" placeholder="Referral code" readonly />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Save My Account</button>
@@ -1831,14 +1831,14 @@
             <div class="card">
               <div class="card-header">
                 <h3>Registration Requirements</h3>
-                <div class="pill">Required</div>
+                <div class="pill">Optional</div>
               </div>
               <div class="card-body">
                 <div class="list">
-                  <div class="list-item"><div class="stack"><div class="title">Profile picture</div><div class="sub">Shown on profile views and ready for leaderboard displays.</div></div></div>
+                  <div class="list-item"><div class="stack"><div class="title">Profile picture (optional)</div><div class="sub">Optional. You can add a picture later.</div></div></div>
                   <div class="list-item"><div class="stack"><div class="title">Full identity</div><div class="sub">Full name, username, phone, town, region, and residential address are required.</div></div></div>
                   <div class="list-item"><div class="stack"><div class="title">Password & security</div><div class="sub">Use the password page if admin issued a temporary password or you need to update credentials.</div></div></div>
-                  <div class="list-item"><div class="stack"><div class="title">Registration access</div><div class="sub">Driver and client submissions unlock once the required account fields are complete.</div></div></div>
+                  <div class="list-item"><div class="stack"><div class="title">Registration access</div><div class="sub">Driver and client submissions are allowed even if account setup is incomplete.</div></div></div>
                 </div>
               </div>
             </div>
@@ -1897,6 +1897,12 @@
       const d = new Date(v);
       if(isNaN(d.getTime())) return String(v);
       return d.toLocaleString();
+    }
+
+    function hardRefreshDashboardAfterRegistration() {
+      setTimeout(() => {
+        try { window.location.reload(); } catch (e) {}
+      }, 700);
     }
 
     function toast(msg){
@@ -2127,7 +2133,7 @@
       const body = $("activityTableBody");
 
       if(!rows.length){
-        recent.innerHTML = '<div class="muted">No activity loaded.</div>';
+        recent.innerHTML = '<div class="muted">Loading your saved registrations...</div>';
         body.innerHTML = '<tr><td colspan="5" class="muted">No rows</td></tr>';
         buildCharts([]);
         return;
@@ -2322,7 +2328,7 @@
         if(!el) return;
         const ranked = [...rows].filter(r => getCount(r) > 0).sort((a,b) => getCount(b) - getCount(a)).slice(0,3);
         if(!ranked.length){
-          el.innerHTML = '<div class="muted">No close agents yet.</div>';
+          el.innerHTML = '<div class="muted">Your progress will grow as you add more registrations.</div>';
           return;
         }
         el.innerHTML = ranked.map((r, i) => {
@@ -2765,7 +2771,7 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        toast(`Thank you, ${agentName}. Driver submitted for approval.`);
+        toast(`Thank you, ${agentName}. Driver submitted for approval.`); hardRefreshDashboardAfterRegistration();
         await refreshAll(false);
       }catch(e){
         console.error('register_driver_v4 payload rejected:', payload, e);
@@ -2802,7 +2808,7 @@
           body: JSON.stringify(payload)
         });
         ev.target.reset();
-        toast(`Thank you, ${agentName}. Client submitted for approval.`);
+        toast(`Thank you, ${agentName}. Client submitted for approval.`); hardRefreshDashboardAfterRegistration();
         await refreshAll(false);
       }catch(e){
         console.error('register_client_v4 payload rejected:', payload, e);
@@ -3083,6 +3089,222 @@
       setTimeout(forceRenderCompetitionCards, 800);
       setInterval(forceRenderCompetitionCards, 2000);
     });
+
+
+    function escHtml(v) {
+      return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function renderTruthRecentRegistrations(rows) {
+      let wrap =
+        document.getElementById("recentRegistrations") ||
+        document.getElementById("recentActivityRows") ||
+        document.getElementById("activityRows");
+
+      if (!wrap) {
+        const heading = Array.from(document.querySelectorAll("h1,h2,h3,h4,.title,.section-title"))
+          .find(el => /Recent Registrations/i.test(el.textContent || ""));
+        if (heading) {
+          const section =
+            heading.closest(".card, .panel, .section, .box, .content-card, .dashboard-card") ||
+            heading.parentElement;
+          if (section) {
+            wrap =
+              section.querySelector("#recentRegistrations, #recentActivityRows, #activityRows") ||
+              section.querySelector(".list, .list-wrap, .items, .rows, .content, .muted") ||
+              section;
+          }
+        }
+      }
+
+      if (!wrap) return;
+
+      if (!Array.isArray(rows) || !rows.length) {
+        wrap.innerHTML = '<div class="empty">Loading your saved registrations...</div>';
+        return;
+      }
+
+      wrap.innerHTML = rows.map((r) => {
+        const kind = (r.kind || r.__kind || "").toLowerCase();
+        const isDriver = kind === "driver";
+        const icon = isDriver ? "🚗" : "👤";
+        const label = isDriver ? "Driver" : "Client";
+        const name = escHtml(r.full_name || r.name || "Unknown");
+        const phone = escHtml(r.phone || r.phone_number || "-");
+        const town = escHtml(r.town || r.region || "-");
+        const when = r.created_at ? new Date(r.created_at).toLocaleString() : "-";
+
+        return `
+          <div class="list-item">
+            <div class="stack">
+              <div class="title">${icon} ${name}</div>
+              <div class="sub">${label} • ${phone} • ${town}</div>
+            </div>
+            <div class="sub">${when}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderRankProgress(driverRows, clientRows, debugData) {
+      const meId = String(debugData?.agent?.id || "");
+      const myDriverRank = Array.isArray(driverRows) ? driverRows.findIndex(r => String(r.agent_id || "") === meId) : -1;
+      const myClientRank = Array.isArray(clientRows) ? clientRows.findIndex(r => String(r.agent_id || "") === meId) : -1;
+
+      const driversAll = Number(debugData?.counts?.drivers_all || 0);
+      const clientsAll = Number(debugData?.counts?.clients_all || 0);
+
+      const driverRankEl = document.getElementById("yourDriverRank");
+      const clientRankEl = document.getElementById("yourClientRank");
+      const driverSubEl = document.getElementById("rankDriversWeekSub");
+      const clientSubEl = document.getElementById("rankClientsWeekSub");
+
+      if (driverRankEl) driverRankEl.textContent = myDriverRank >= 0 ? String(myDriverRank + 1) : "-";
+      if (clientRankEl) clientRankEl.textContent = myClientRank >= 0 ? String(myClientRank + 1) : "-";
+
+      if (driverSubEl) {
+        driverSubEl.textContent = driversAll > 0
+          ? `${driversAll} total driver registration${driversAll === 1 ? "" : "s"}`
+          : "Start with your first driver";
+      }
+
+      if (clientSubEl) {
+        clientSubEl.textContent = clientsAll > 0
+          ? `${clientsAll} total client registration${clientsAll === 1 ? "" : "s"}`
+          : "Start with your first client";
+      }
+
+      const rivalry = document.getElementById("rivalTracker") || document.getElementById("rivalTrackerBox");
+      if (rivalry && myDriverRank < 0 && myClientRank < 0) {
+        rivalry.innerHTML = '<div class="empty">Keep registering to appear in the visible rank.</div>';
+      }
+    }
+
+    async function loadTruthOverviewAndLeaderboard() {
+      const $ = (id) => document.getElementById(id);
+      const num = (v) => Number(v || 0);
+      const setText = (id, v) => { const el = $(id); if (el) el.textContent = String(v); };
+      const money = (v) => `N$ ${Number(v || 0).toFixed(2)}`;
+
+      async function getJson(url) {
+        const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+        let data = {};
+        try { data = await res.json(); } catch (e) {}
+        return { ok: res.ok, status: res.status, data };
+      }
+
+      try {
+        // 1) Main summary
+        const summaryRes = await getJson('/api/agent/summary_v4');
+        let summary = (summaryRes.data && summaryRes.data.ok) ? summaryRes.data : null;
+
+        // 2) Truth fallback
+        const debugRes = await getJson('/api/agent/debug_links_v4');
+        const debugData = (debugRes.data && debugRes.data.ok) ? debugRes.data : null;
+
+        const truthDriversAll = debugData ? num(debugData.counts?.drivers_all) : num(summary?.drivers_total || summary?.drivers_all || summary?.drivers);
+        const truthClientsAll = debugData ? num(debugData.counts?.clients_all) : num(summary?.clients_total || summary?.clients_all || summary?.clients);
+        const truthDriversWeek = debugData ? num(debugData.counts?.drivers_week) : num(summary?.drivers_this_week || summary?.week_drivers || summary?.drivers_week);
+        const truthClientsWeek = debugData ? num(debugData.counts?.clients_week) : num(summary?.clients_this_week || summary?.week_clients || summary?.clients_week);
+
+        // Prefer truth endpoint for visible dashboard values.
+        const visibleDrivers = truthDriversWeek || truthDriversAll;
+        const visibleClients = truthClientsWeek || truthClientsAll;
+
+        const teamCount = num(summary?.team_agents || summary?.team_agents_count || summary?.team_total || summary?.team_size || 0);
+        const weekStart = summary?.week_start || '';
+        const weekEnd = summary?.week_end || '';
+        const weekLabel = document.querySelector('[data-current-week-range]') || document.getElementById('currentWeekRange');
+        if (weekLabel && weekStart && weekEnd) {
+          weekLabel.textContent = `${weekStart} → ${weekEnd}`;
+        }
+        const walletBalance = num(summary?.wallet_balance || 0);
+        const earningsWeek = num(summary?.earnings_week || 0);
+        const qualityScore = num(summary?.quality_score || 0);
+        const pendingApprovals = num(summary?.pending_approvals || 0);
+        const weekDelta = num(summary?.week_delta || 0);
+
+        // HERO / OVERVIEW cards
+        setText('heroDrivers', visibleDrivers);
+        setText('heroClients', visibleClients);
+        setText('heroTeam', teamCount);
+
+        setText('driversThisWeek', truthDriversWeek || visibleDrivers);
+        setText('clientsThisWeek', truthClientsWeek || visibleClients);
+
+        if ($('earningsWeek')) $('earningsWeek').textContent = money(earningsWeek);
+        if ($('walletBalance')) $('walletBalance').textContent = money(walletBalance);
+        setText('qualityScore', qualityScore);
+        setText('pendingApprovals', pendingApprovals);
+        setText('weekDelta', weekDelta >= 0 ? `+${weekDelta}` : weekDelta);
+
+        // If there are alternate ids in older markup, update them too
+        ['driversAll','totalDrivers','overviewDrivers'].forEach(id => setText(id, truthDriversAll));
+        ['clientsAll','totalClients','overviewClients'].forEach(id => setText(id, truthClientsAll));
+        ['clientsAll','totalClients','overviewClients'].forEach(id => setText(id, truthClientsAll));
+        ['teamAgents','overviewTeam','teamCount'].forEach(id => setText(id, teamCount));
+        ['weeklyDrivers','weekDrivers'].forEach(id => setText(id, truthDriversWeek));
+        ['weeklyClients','weekClients'].forEach(id => setText(id, truthClientsWeek));
+
+        // RECENT REGISTRATIONS fallback from debug endpoint if activity section is stale
+        const recent = debugData ? []
+            .concat((debugData.drivers || []).map(r => ({...r, kind:'driver'})))
+            .concat((debugData.clients || []).map(r => ({...r, kind:'client'})))
+            .sort((a,b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+            .slice(0, 8) : [];
+
+        renderTruthRecentRegistrations(recent);
+
+        // LEADERBOARD
+        const period = (window.state && window.state.leaderboardPeriod) || 'week';
+        const lbRes = await getJson('/api/agent/leaderboard_v4?period=' + encodeURIComponent(period));
+        const lb = (lbRes.ok && lbRes.data && lbRes.data.ok) ? lbRes.data : null;
+
+        const driverRows = Array.isArray(lb?.top_driver_recruiters) ? lb.top_driver_recruiters : [];
+        const clientRows = Array.isArray(lb?.top_client_recruiters) ? lb.top_client_recruiters : [];
+
+        const driverTarget = $('leaderboardDriversRows') || $('topDriverRecruitersRows') || $('driverLeaderboardRows');
+        const clientTarget = $('leaderboardClientsRows') || $('topClientRecruitersRows') || $('clientLeaderboardRows');
+
+        const renderRows = (rows, metric) => rows.map((r, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${String(r.agent_name || r.full_name || r.email || 'Agent').replace(/</g,'&lt;')}</td>
+            <td>${Number(r[metric] || r.count || 0)}</td>
+            <td>${String(r.town || '-').replace(/</g,'&lt;')}</td>
+          </tr>
+        `).join('');
+
+        if (driverTarget) {
+          driverTarget.innerHTML = driverRows.length
+            ? renderRows(driverRows, 'drivers')
+            : '<tr><td colspan="4">Leaderboard temporarily unavailable.</td></tr>';
+        }
+
+        if (clientTarget) {
+          clientTarget.innerHTML = clientRows.length
+            ? renderRows(clientRows, 'clients')
+            : '<tr><td colspan="4">Leaderboard temporarily unavailable.</td></tr>';
+        }
+
+        // YOUR RANK
+        if (debugData && debugData.agent) {
+          renderRankProgress(driverRows, clientRows, debugData);
+        }
+
+      } catch (err) {
+        if (String(err?.message || err).toLowerCase().includes('abort')) {
+        return;
+      }
+      console.error('loadTruthOverviewAndLeaderboard failed', err);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(loadTruthOverviewAndLeaderboard, 300);
+      setInterval(() => { try { loadTruthOverviewAndLeaderboard(); } catch (e) {} }, 30000);
+    });
+
   </script>
 </body>
 </html>
@@ -3178,7 +3400,7 @@
       .slice(0,3);
 
     if(!ranked.length){
-      el.innerHTML = '<div class="muted">No close agents yet.</div>';
+      el.innerHTML = '<div class="muted">Your progress will grow as you add more registrations.</div>';
       return;
     }
 

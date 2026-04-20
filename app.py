@@ -7,6 +7,7 @@ import json
 # Supabase token auth (Agent API)
 # -----------------------------
 import os
+import time
 import tempfile
 from datetime import datetime, timedelta
 from functools import wraps
@@ -190,22 +191,53 @@ def _role_is_admin(profile):
     return str(profile.get("role") or "").strip().upper() == "ADMIN"
 
 def _lookup_profile(table_name, email):
-    try:
-        rows = (
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+
+    cache_key = f"_profile_cache_{table_name}_{email}"
+    cached = session.get(cache_key)
+
+    def _query():
+        return (
             sb_admin.table(table_name)
             .select("*")
             .eq("email", email)
             .limit(1)
-            .execute()
-            .data or []
         )
-        return rows[0] if rows else None
-    except Exception as exc:
-        app.logger.warning("profile_lookup_failed table=%s email=%s error=%s", table_name, email, exc)
-        return None
+
+    last_exc = None
+    for attempt in range(4):
+        try:
+            rows = _query().execute().data or []
+            if rows:
+                row = rows[0]
+                session[cache_key] = {
+                    "id": row.get("id"),
+                    "auth_id": row.get("auth_id"),
+                    "user_id": row.get("user_id"),
+                    "email": row.get("email"),
+                    "full_name": row.get("full_name"),
+                    "username": row.get("username"),
+                    "role": row.get("role"),
+                    "status": row.get("status"),
+                }
+                return row
+            return cached if isinstance(cached, dict) else None
+        except Exception as exc:
+            last_exc = exc
+            app.logger.warning(
+                "profile_lookup_failed table=%s email=%s attempt=%s error=%s",
+                table_name, email, attempt + 1, exc
+            )
+            time.sleep(0.2 * (attempt + 1))
+    return cached if isinstance(cached, dict) else None
 
 def _sign_in_supabase(email, password):
-    return supabase.auth.sign_in_with_password({"email": email, "password": password})
+    return supabase.auth.sign_in_with_password({
+        "email": email,
+        "password": password,
+    })
 
 def _safe_log_system_event(event_type, details, user_id=None):
     try:
@@ -308,7 +340,7 @@ def protect_role_scoped_api_routes():
         if role != "AGENT" or not email:
             return jsonify({"ok": False, "error": "Agent login required"}), 401
         profile = _lookup_profile("agent_profiles", email)
-        if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
+        if not profile or _role_is_admin(profile):
             return jsonify({"ok": False, "error": "Agent account is blocked or unavailable"}), 403
 
 
@@ -774,6 +806,53 @@ def admin_login():
 def logout():
     session.clear()
     return redirect("/login")
+
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "GET":
+        return render_template("register.html")
+
+    full_name = (request.form.get("full_name") or "").strip()
+    username = (request.form.get("username") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    gender = (request.form.get("gender") or "").strip()
+    password = request.form.get("password") or ""
+
+    if not all([full_name, username, phone, email, gender, password]):
+        flash("All fields are required")
+        return redirect("/register")
+
+    try:
+        # 1. Create Supabase auth user
+        supabase.auth.sign_up({
+            "email": email,
+            "password": password
+        })
+
+        # 2. Create agent profile
+        sb_admin.table("agent_profiles").insert({
+            "username": username,
+            "full_name": full_name,
+            "phone_number": phone,
+            "email": email,
+            "gender": gender,
+            "auth_method": "email",
+            "status": "PENDING_APPROVAL",
+            "role": "AGENT"
+        }).execute()
+
+        session.clear()
+        _set_agent_session(email)
+        flash("Account created successfully.")
+        return redirect("/agent/dashboard")
+
+    except Exception as e:
+        app.logger.exception("register_failed")
+        flash(f"Registration failed: {e}")
+        return redirect("/register")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

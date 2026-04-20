@@ -1,6 +1,7 @@
 import base64
 import time
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from flask import jsonify, request, session, redirect
 from yene_shared import (
     agent_quality_score,
@@ -14,6 +15,7 @@ from yene_shared import (
 
 def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_event=None):
     UTC = timezone.utc
+    APP_TZ = ZoneInfo("Africa/Windhoek")
 
     def safe_log(action, message):
         try:
@@ -72,14 +74,14 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         raise last_exc
 
     def week_range():
-        now = datetime.now(UTC)
+        now = datetime.now(APP_TZ)
         monday = now - timedelta(days=now.weekday())
         monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
         sunday = monday + timedelta(days=6, hours=23, minutes=59, seconds=59)
         return monday, sunday
 
     def day_range():
-        now = datetime.now(UTC)
+        now = datetime.now(APP_TZ)
         start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + timedelta(days=1, seconds=-1)
         return start, end
@@ -156,20 +158,58 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         if not email:
             return None, "Missing session email"
 
-        try:
-            rows = (
+        cached = session.get("_agent_profile_cache") or {}
+        if isinstance(cached, dict) and str(cached.get("email") or "").strip().lower() != email:
+            cached = {}
+
+        def build():
+            return (
                 sb_admin.table("agent_profiles")
                 .select("*")
                 .eq("email", email)
                 .limit(1)
-                .execute()
-                .data or []
             )
+
+        try:
+            rows = _execute_with_retry("get_agent_profile", build, retries=3, delay=0.35).data or []
             debug("get_agent", {"email": email}, agent_profiles=len(rows))
-            if not rows:
-                return None, f"Agent profile not found for {email}"
-            return rows[0], None
+            if rows:
+                agent = rows[0]
+                session["_agent_profile_cache"] = {
+                    "id": agent.get("id"),
+                    "auth_id": agent.get("auth_id"),
+                    "user_id": agent.get("user_id"),
+                    "email": agent.get("email"),
+                    "full_name": agent.get("full_name"),
+                    "username": agent.get("username"),
+                    "phone": agent.get("phone") or agent.get("phone_number"),
+                    "phone_number": agent.get("phone_number"),
+                    "town": agent.get("town"),
+                    "region": agent.get("region"),
+                    "operation_region": agent.get("operation_region"),
+                    "referral_code": agent.get("referral_code"),
+                    "status": agent.get("status"),
+                    "profile_picture_url": agent.get("profile_picture_url"),
+                    "profile_pic_path": agent.get("profile_pic_path"),
+                    "residential_address": agent.get("residential_address") or agent.get("address"),
+                    "address": agent.get("address"),
+                    "gender": agent.get("gender"),
+                    "date_of_birth": agent.get("date_of_birth") or agent.get("dob"),
+                    "national_id": agent.get("national_id") or agent.get("id_number"),
+                    "id_number": agent.get("id_number"),
+                    "bio": agent.get("bio") or agent.get("about"),
+                    "about": agent.get("about"),
+                    "must_change_password": agent.get("must_change_password"),
+                }
+                return agent, None
+            if cached:
+                app.logger.warning("get_agent_using_cached_profile email=%s", email)
+                return cached, None
+            return None, f"Agent profile not found for {email}"
         except Exception as e:
+            if cached:
+                app.logger.warning("get_agent_retry_failed_using_cache email=%s error=%s", email, e)
+                return cached, None
             return None, str(e)
 
     def get_rates():
@@ -249,301 +289,228 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         return "week", start, end
 
     def _leaderboard_people(table, start=None, end=None):
-        column_sets = [
-            (
-            "id,full_name,town,created_at,recruiter_agent_id,agent_id,"
-            "agent_auth_id,recruiter_auth_id,recruiter_email"
-            ),
-            "id,full_name,town,created_at,recruiter_agent_id,agent_id",
-            "id,full_name,created_at,recruiter_agent_id",
-        ]
-        last_exc = None
-        for cols in column_sets:
-            try:
-                def build(cols=cols):
-                    q = sb_admin.table(table).select(cols)
-                    if start:
-                        q = q.gte("created_at", iso(start))
-                    if end:
-                        q = q.lte("created_at", iso(end))
-                    return q.limit(10000)
-                rows = _execute_with_retry(f"leaderboard_{table}", build, retries=1).data or []
-                return rows
-            except Exception as exc:
-                last_exc = exc
-                app.logger.warning(
-                    "leaderboard_table_query_failed table=%s columns=%s error=%s",
-                    table,
-                    cols,
-                    exc,
-                )
-        raise last_exc
+        people = _select_all(table, 10000)
+        if start or end:
+            people = _filter_created(people, start, end)
 
-    def _agent_identity_index(agents):
-        index = {}
+        grouped = {}
+        for r in people:
+            agent_id = str(
+                r.get("recruiter_agent_id")
+                or r.get("agent_id")
+                or r.get("recruiter_auth_id")
+                or r.get("agent_auth_id")
+                or r.get("recruiter_email")
+                or ""
+            ).strip()
+            if not agent_id:
+                continue
+
+            entry = grouped.setdefault(agent_id, {
+                "agent_id": str(r.get("recruiter_agent_id") or r.get("agent_id") or ""),
+                "agent_name": r.get("recruiter_name") or r.get("agent_name") or r.get("recruiter_email") or "Agent",
+                "email": r.get("recruiter_email") or "",
+                "town_counts": {},
+                "count": 0,
+            })
+            entry["count"] += 1
+            town = (r.get("town") or r.get("region") or "-").strip() if isinstance((r.get("town") or r.get("region") or "-"), str) else "-"
+            entry["town_counts"][town] = entry["town_counts"].get(town, 0) + 1
+
+        results = []
+        metric_name = "drivers" if table == "drivers" else "clients"
+        for _, entry in grouped.items():
+            top_town = "-"
+            if entry["town_counts"]:
+                top_town = sorted(entry["town_counts"].items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+            results.append({
+                "agent_id": entry["agent_id"],
+                "agent_name": entry["agent_name"],
+                "email": entry["email"],
+                metric_name: entry["count"],
+                "count": entry["count"],
+                "town": top_town,
+            })
+
+        results.sort(key=lambda x: (-int(x.get(metric_name) or 0), str(x.get("agent_name") or "")))
+        return results[:50]
+
+    def _agent_for_leaderboard_key(key, agents):
+        key_norm = _norm_identity(key)
+        if not key_norm:
+            return None
         for agent in agents:
-            for key in ("id", "auth_id", "user_id", "email"):
-                ident = _norm_identity(agent.get(key))
-                if ident and ident not in index:
-                    index[ident] = agent
-        return index
-
-    def _leaderboard_agent_for_row(row, agent_index):
-        for key in ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email"):
-            ident = _norm_identity(row.get(key))
-            if ident and ident in agent_index:
-                return agent_index[ident]
+            values = {_norm_identity(v) for v in _identity_values(agent)}
+            if key_norm in values:
+                return agent
         return None
 
     def _aggregate_leaderboard(rows, agents, metric):
-        agent_index = _agent_identity_index(agents)
-        by_id = {}
+        out = []
         unmatched = 0
-
         for row in rows:
-            agent = _leaderboard_agent_for_row(row, agent_index)
+            raw_key = row.get("agent_id") or row.get("email") or row.get("agent_name")
+            agent = _agent_for_leaderboard_key(raw_key, agents)
             if not agent:
                 unmatched += 1
-                continue
+            count = int(row.get(metric) or row.get("count") or 0)
+            shaped = {
+                "agent_id": (agent or {}).get("id") or row.get("agent_id") or "",
+                "agent_name": (
+                    (agent or {}).get("full_name")
+                    or (agent or {}).get("username")
+                    or row.get("agent_name")
+                    or row.get("email")
+                    or "Agent"
+                ),
+                "email": (agent or {}).get("email") or row.get("email") or "",
+                "town": (agent or {}).get("town") or (agent or {}).get("operation_region") or row.get("town") or "-",
+                metric: count,
+                "count": count,
+            }
+            out.append(shaped)
+        out.sort(key=lambda x: (-int(x.get(metric) or 0), str(x.get("agent_name") or "").lower()))
+        for idx, row in enumerate(out, start=1):
+            row["rank"] = idx
+        return out[:50], unmatched
 
-            aid = str(agent.get("id") or agent.get("email") or "").strip()
-            if not aid:
-                unmatched += 1
-                continue
+    def _row_created_dt(row):
+        raw = (row or {}).get("created_at")
+        if not raw:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed
+        except Exception:
+            return None
 
-            item = by_id.setdefault(aid, {
-                "agent_id": agent.get("id"),
-                "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
-                "full_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
-                "email": agent.get("email") or "",
-                "count": 0,
-                "town": agent.get("operation_region") or agent.get("town") or "Unknown",
-                "_towns": {},
-            })
-            item["count"] += 1
-            town = (row.get("town") or agent.get("operation_region") or agent.get("town") or "Unknown").strip()
-            item["_towns"][town] = item["_towns"].get(town, 0) + 1
-
-        ranked = []
-        for item in by_id.values():
-            towns = item.pop("_towns", {})
-            if towns:
-                item["town"] = max(towns, key=towns.get)
-            item[metric] = item["count"]
-            ranked.append(item)
-
-        ranked.sort(key=lambda item: item["count"], reverse=True)
-        return ranked[:20], unmatched
-
-    def _same_period_last_week(rows):
-        ws, we = week_range()
-        prev_start = ws - timedelta(days=7)
-        prev_end = we - timedelta(days=7)
-        return _filter_created(rows, prev_start, prev_end)
-
-    def _daily_counts(rows):
-        days = {name: {"drivers": 0, "clients": 0} for name in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}
-        for row in rows:
-            raw = row.get("created_at")
-            try:
-                day = datetime.fromisoformat(str(raw).replace("Z", "+00:00")).strftime("%a")
-            except Exception:
-                continue
-            if day not in days:
-                continue
-            key = "drivers" if str(row.get("subject_type") or row.get("type") or "").lower() == "driver" else "clients"
-            days[day][key] += 1
-        return days
-
-    def _duplicate_phone_exists(table, phone):
-        for column in ("phone_number", "phone"):
-            try:
-                rows = (
-                    _execute_with_retry(
-                        f"{table}_duplicate_{column}",
-                        lambda column=column: sb_admin.table(table).select("id").eq(column, phone).limit(1),
-                        retries=1,
-                    ).data or []
-                )
-                if rows:
-                    return True, column, None
-            except Exception as exc:
-                app.logger.warning(
-                    "registration_duplicate_check_failed table=%s column=%s phone_present=%s error=%s",
-                    table,
-                    column,
-                    bool(phone),
-                    exc,
-                )
-                if _is_transient_error(exc):
-                    return False, column, exc
-                continue
-        return False, None, None
-
-    def _duplicate_value_exists(table, value, columns):
-        value = str(value or "").strip()
-        if not value:
-            return False, None, None
-        for column in columns:
-            try:
-                rows = (
-                    _execute_with_retry(
-                        f"{table}_duplicate_{column}",
-                        lambda column=column: sb_admin.table(table).select("id").eq(column, value).limit(1),
-                        retries=1,
-                    ).data or []
-                )
-                if rows:
-                    return True, column, None
-            except Exception as exc:
-                app.logger.warning(
-                    "registration_duplicate_value_check_failed table=%s column=%s error=%s",
-                    table,
-                    column,
-                    exc,
-                )
-                if _is_transient_error(exc):
-                    return False, column, exc
-                continue
-        return False, None, None
-
-    def driver_rows(agent_or_id, start=None, end=None):
-        if isinstance(agent_or_id, dict):
-            values = _identity_values(agent_or_id)
-        else:
-            values = [str(agent_or_id)]
-        rows = _select_all("drivers", 10000)
-        rows = [
-            r for r in rows
-            if _matches_identity(r, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email"))
-        ]
+    def _agent_people(agent, table, start=None, end=None):
+        rows = _select_all(table, 10000)
         rows = _filter_created(rows, start, end)
-        debug("driver_rows", {"ids": values[:3]}, drivers=len(rows))
-        return rows
+        ids = _identity_values(agent)
+        fields = ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")
+        owned = [r for r in rows if _matches_identity(r, ids, fields)]
+        owned.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
+        return owned
 
-    def client_rows(agent_or_id, start=None, end=None):
-        if isinstance(agent_or_id, dict):
-            values = _identity_values(agent_or_id)
-        else:
-            values = [str(agent_or_id)]
-        rows = _select_all("clients", 10000)
-        rows = [
-            r for r in rows
-            if _matches_identity(r, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email"))
-        ]
-        rows = _filter_created(rows, start, end)
-        debug("client_rows", {"ids": values[:3]}, clients=len(rows))
-        return rows
+    def _shape_activity_row(row, kind):
+        return {
+            "id": row.get("id"),
+            "subject_type": kind,
+            "type": kind.title(),
+            "full_name": row.get("full_name") or row.get("name") or "",
+            "name": row.get("full_name") or row.get("name") or "",
+            "phone": row.get("phone") or row.get("phone_number") or "",
+            "town": row.get("town") or row.get("region") or "",
+            "region": row.get("region") or row.get("town") or "",
+            "external_code": row.get("external_code") or row.get("license_number") or row.get("yene_code") or "",
+            "status": row.get("status"),
+            "created_at": row.get("created_at"),
+            "recruiter_name": row.get("recruiter_name") or row.get("agent_name") or "",
+        }
 
-    def activity(agent, period="week"):
-        aid = agent.get("id")
-        if period == "all":
-            drows = driver_rows(agent)
-            crows = client_rows(agent)
-        elif period == "day":
-            ds, de = day_range()
-            drows = driver_rows(agent, ds, de)
-            crows = client_rows(agent, ds, de)
-        else:
-            ws, we = week_range()
-            drows = driver_rows(agent, ws, we)
-            crows = client_rows(agent, ws, we)
+    def _agent_activity(agent, start=None, end=None, limit=100):
+        drivers = [_shape_activity_row(r, "driver") for r in _agent_people(agent, "drivers", start, end)]
+        clients = [_shape_activity_row(r, "client") for r in _agent_people(agent, "clients", start, end)]
+        rows = drivers + clients
+        rows.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
+        return rows[:limit]
 
+    def _period_bounds(period):
+        period = (period or "week").strip().lower()
+        now = datetime.now(APP_TZ)
+        if period in {"all", "all_time"}:
+            return "all", None, None
+        if period in {"today", "day"}:
+            return "today", *day_range()
+        if period == "month":
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            return "month", start, now
+        start, end = week_range()
+        return "week", start, end
+
+    def _team_rows(agent):
+        if not agent:
+            return []
+        agent_id = str(agent.get("id") or "").strip()
+        referral_code = str(agent.get("referral_code") or "").strip()
         rows = []
-        for r in crows:
+        for child in _select_all("agent_profiles", 10000):
+            child_id = str(child.get("id") or "").strip()
+            if not child_id or child_id == agent_id:
+                continue
+            linked = (
+                str(child.get("team_leader_id") or "").strip() == agent_id
+                or str(child.get("referred_by") or "").strip() == agent_id
+                or str(child.get("referred_by_id") or "").strip() == agent_id
+                or (referral_code and str(child.get("referred_by_code") or "").strip() == referral_code)
+            )
+            if not linked:
+                continue
+            day_start, day_end = day_range()
+            week_start, week_end = week_range()
+            child_drivers_all = _agent_people(child, "drivers")
+            child_clients_all = _agent_people(child, "clients")
+            child_drivers_day = _agent_people(child, "drivers", day_start, day_end)
+            child_clients_day = _agent_people(child, "clients", day_start, day_end)
+            child_drivers_week = _agent_people(child, "drivers", week_start, week_end)
+            child_clients_week = _agent_people(child, "clients", week_start, week_end)
             rows.append({
-                "subject_type": "client",
-                "full_name": r.get("full_name") or "",
-                "phone": r.get("phone") or r.get("phone_number") or "",
-                "town": r.get("town") or r.get("region") or "",
-                "external_code": r.get("external_code") or r.get("yene_code") or "",
-                "created_at": r.get("created_at"),
-                "status": r.get("status") or "",
+                "id": child_id,
+                "full_name": child.get("full_name") or child.get("username") or child.get("email") or "Agent",
+                "username": child.get("username"),
+                "email": child.get("email"),
+                "phone": child.get("phone") or child.get("phone_number"),
+                "town": child.get("town"),
+                "region": child.get("region") or child.get("operation_region"),
+                "status": child.get("status"),
+                "created_at": child.get("created_at"),
+                "drivers_day": len(child_drivers_day),
+                "clients_day": len(child_clients_day),
+                "drivers_week": len(child_drivers_week),
+                "clients_week": len(child_clients_week),
+                "drivers_all": len(child_drivers_all),
+                "clients_all": len(child_clients_all),
             })
-        for r in drows:
-            rows.append({
-                "subject_type": "driver",
-                "full_name": r.get("full_name") or "",
-                "phone": r.get("phone") or r.get("phone_number") or "",
-                "town": r.get("town") or "",
-                "external_code": r.get("external_code") or "",
-                "created_at": r.get("created_at"),
-                "status": r.get("status") or "",
-            })
-
-        rows.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+        rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
         return rows
 
     def team_agents(agent):
-        ids = _identity_values(agent)
-        rows = []
-        refs = _select_all("agent_referrals", 5000)
-        child_ids = set()
-        for r in refs:
-            if _matches_identity(r, ids, ("parent_agent_id", "parent_agent_auth_id", "parent_agent_email", "referred_by")):
-                child = str(r.get("child_agent_id") or r.get("agent_id") or "").strip()
-                if child:
-                    child_ids.add(child)
-                rows.append({
-                    "child_agent_id": child,
-                    "full_name": r.get("child_agent_name") or "",
-                    "email": r.get("child_agent_email") or "",
-                    "username": r.get("child_agent_username") or "",
-                    "phone": r.get("child_agent_phone") or "",
-                    "town": r.get("child_agent_town") or "",
-                    "region": r.get("child_agent_region") or "",
-                    "status": r.get("status") or "",
-                    "profile_picture_url": r.get("child_profile_picture_url") or "",
-                    "joined_at": r.get("created_at"),
-                    "created_at": r.get("created_at"),
-                })
+        return _team_rows(agent)
 
-        leader_code = str(agent.get("referral_code") or "").strip()
-        all_agents = _select_all("agent_profiles", 5000)
-        for child in all_agents:
-            child_id = str(child.get("id") or "").strip()
-            if child_id == str(agent.get("id") or "") or child_id in child_ids:
-                continue
-            if (
-                str(child.get("team_leader_id") or "").strip() in ids
-                or str(child.get("referred_by") or "").strip() in ids
-                or (leader_code and str(child.get("referred_by_code") or "").strip() == leader_code)
-            ):
-                child_ids.add(child_id)
-                rows.append({
-                    "child_agent_id": child_id,
-                    "full_name": child.get("full_name") or child.get("username") or "",
-                    "username": child.get("username") or "",
-                    "email": child.get("email") or "",
-                    "phone": child.get("phone") or child.get("phone_number") or "",
-                    "town": child.get("town") or "",
-                    "region": child.get("region") or child.get("operation_region") or "",
-                    "status": child.get("status") or "",
-                    "profile_picture_url": _profile_photo(child) or "",
-                    "joined_at": child.get("created_at"),
-                    "created_at": child.get("created_at"),
-                })
+    def _duplicate_value_exists(table, value, columns):
+        value_norm = str(value or "").strip().lower()
+        if not value_norm:
+            return False, None, None
+        try:
+            rows = _select_all(table, 10000, "created_at", True)
+            for row in rows:
+                for column in columns:
+                    candidate = str(row.get(column) or "").strip().lower()
+                    if candidate and candidate == value_norm:
+                        return True, column, None
+            return False, None, None
+        except Exception as exc:
+            return False, None, exc
 
-        ds, de = day_range()
-        ws, we = week_range()
-        for r in rows:
-            child = r.get("child_agent_id")
-            r["drivers_day"] = len(driver_rows(child, ds, de)) if child else 0
-            r["clients_day"] = len(client_rows(child, ds, de)) if child else 0
-            r["drivers_week"] = len(driver_rows(child, ws, we)) if child else 0
-            r["clients_week"] = len(client_rows(child, ws, we)) if child else 0
-            r["drivers_all"] = len(driver_rows(child)) if child else 0
-            r["clients_all"] = len(client_rows(child)) if child else 0
-
-        debug("team_agents", {"agent_id": agent.get("id"), "email": agent.get("email")}, team=len(rows))
-        return rows
-
-    @app.route("/join")
-    def join_agent_team():
-        ref = (request.args.get("ref") or "").strip()
-        if ref:
-            session["agent_ref"] = ref
-        return redirect("/register")
+    def _duplicate_phone_exists(table, phone):
+        normalized = str(phone or "").strip()
+        digits = "".join(ch for ch in normalized if ch.isdigit())
+        try:
+            rows = _select_all(table, 10000, "created_at", True)
+            for row in rows:
+                for column in ("phone", "phone_number", "mobile", "cellphone"):
+                    candidate = str(row.get(column) or "").strip()
+                    if not candidate:
+                        continue
+                    candidate_digits = "".join(ch for ch in candidate if ch.isdigit())
+                    if candidate == normalized or (digits and candidate_digits == digits):
+                        return True, column, None
+            return False, None, None
+        except Exception as exc:
+            return False, None, exc
 
     @app.route("/api/agent/me_v4", methods=["GET"], endpoint="agent_me_v4")
     @require_login("AGENT")
@@ -551,117 +518,13 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         agent, err = get_agent()
         if err:
             return jsonify({"ok": False, "error": err}), 401
-
-        return jsonify({
-            "ok": True,
-            "profile": {
-                "id": agent.get("id"),
-                "full_name": agent.get("full_name"),
-                "email": agent.get("email"),
-                "phone": agent.get("phone") or agent.get("phone_number"),
-                "phone_number": agent.get("phone_number"),
-                "gender": agent.get("gender"),
-                "date_of_birth": agent.get("date_of_birth") or agent.get("dob"),
-                "national_id": agent.get("national_id") or agent.get("id_number"),
-                "id_number": agent.get("id_number"),
-                "next_of_kin_name": agent.get("next_of_kin_name"),
-                "next_of_kin_phone": agent.get("next_of_kin_phone"),
-                "bio": agent.get("bio") or agent.get("about"),
-                "about": agent.get("about"),
-                "status": agent.get("status"),
-                "town": agent.get("town"),
-                "region": agent.get("region") or agent.get("operation_region"),
-                "badge": agent.get("badge") or agent.get("role"),
-                "referral_code": agent.get("referral_code"),
-                "username": agent.get("username"),
-                "profile_picture_url": _profile_photo(agent),
-                "profile_pic_path": agent.get("profile_pic_path"),
-                "residential_address": agent.get("residential_address") or agent.get("address"),
-                "address": agent.get("address"),
-                "operation_region": agent.get("operation_region"),
-                "pin": agent.get("pin"),
-                "must_change_password": bool(agent.get("must_change_password")),
-                "profile_complete": not bool(_profile_missing(agent)),
-                "missing_profile_fields": _profile_missing(agent),
-                "profile_completion_percent": _profile_completion(agent),
-            }
-        })
-
-    @app.route("/api/agent/summary_v4", methods=["GET"], endpoint="agent_summary_v4")
-    @require_login("AGENT")
-    def agent_summary_v4():
-        agent, err = get_agent()
-        if err:
-            return jsonify({"ok": False, "error": err}), 401
-
-        ws, we = week_range()
-        rates = get_rates()
-
-        wk_d = driver_rows(agent, ws, we)
-        wk_c = client_rows(agent, ws, we)
-        all_d = driver_rows(agent)
-        all_c = client_rows(agent)
-        team = team_agents(agent)
-        approved_wk_d = [r for r in wk_d if _approved(r)]
-        approved_wk_c = [r for r in wk_c if _approved(r)]
-        pending_approvals = len([r for r in wk_d + wk_c if not _approved(r)])
-
-        earnings_week = (
-            len(approved_wk_c) * safe_float(rates["client_register_amount"]) +
-            len(approved_wk_d) * safe_float(rates["driver_register_amount"])
-        )
-        previous_week_total = len(_same_period_last_week(all_d)) + len(_same_period_last_week(all_c))
-        this_week_total = len(wk_d) + len(wk_c)
-        quality_score = agent_quality_score(agent, all_d, all_c, team)
-        alerts = []
         missing = _profile_missing(agent)
-        if missing:
-            alerts.append({"type": "profile", "level": "warning", "message": "Complete profile: " + ", ".join(missing)})
-        if pending_approvals:
-            alerts.append({"type": "approvals", "level": "info", "message": f"{pending_approvals} registrations are still pending approval"})
-        if this_week_total == 0:
-            alerts.append({"type": "activity", "level": "info", "message": "No registrations recorded this week yet"})
-        if len(all_d) >= 45 and len(all_d) < 50:
-            alerts.append({"type": "milestone", "level": "success", "message": f"{50 - len(all_d)} drivers left to reach 50"})
-        debug(
-            "agent_summary_v4",
-            {"agent_id": agent.get("id"), "email": agent.get("email")},
-            drivers_week=len(wk_d),
-            clients_week=len(wk_c),
-            drivers_all=len(all_d),
-            clients_all=len(all_c),
-            team=len(team),
-        )
-
-        return jsonify({
-            "ok": True,
-            "week_start": ws.date().isoformat(),
-            "week_end": we.date().isoformat(),
-            "drivers_week": len(wk_d),
-            "clients_week": len(wk_c),
-            "approved_drivers_week": len(approved_wk_d),
-            "approved_clients_week": len(approved_wk_c),
-            "pending_approvals": pending_approvals,
-            "drivers_all": len(all_d),
-            "clients_all": len(all_c),
-            "earnings_week": round(earnings_week, 2),
-            "wallet_balance": round(get_wallet(agent), 2),
-            "team_agents_count": len(team),
-            "previous_week_registrations": previous_week_total,
-            "week_delta": this_week_total - previous_week_total,
-            "quality_score": quality_score,
-            "alerts": alerts,
-            "daily": _daily_counts(activity(agent, "week")),
-            "referral_link": f"/join?ref={agent.get('referral_code') or agent.get('email') or ''}",
-            "matched_agent": {
-                "id": agent.get("id"),
-                "full_name": agent.get("full_name"),
-                "email": agent.get("email"),
-            },
-            "profile_complete": not bool(_profile_missing(agent)),
-            "missing_profile_fields": _profile_missing(agent),
-            "profile_completion_percent": _profile_completion(agent),
-        })
+        shaped = dict(agent)
+        shaped["profile_picture_url"] = _profile_photo(agent)
+        shaped["missing_profile_fields"] = missing
+        shaped["profile_complete"] = len(missing) == 0
+        shaped["profile_completion_percent"] = _profile_completion(agent)
+        return jsonify({"ok": True, "agent": shaped, "profile": shaped, "me": shaped})
 
     @app.route("/api/agent/activity_v4", methods=["GET"], endpoint="agent_activity_v4")
     @require_login("AGENT")
@@ -669,23 +532,100 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         agent, err = get_agent()
         if err:
             return jsonify({"ok": False, "error": err}), 401
+        period, start, end = _period_bounds(request.args.get("period"))
+        rows = _agent_activity(agent, start, end, 200)
+        debug("agent_activity_v4", {"agent_id": agent.get("id"), "period": period}, rows=len(rows))
+        return jsonify({"ok": True, "period": period, "rows": rows, "activity": rows})
 
-        period = (request.args.get("period") or "week").strip().lower()
-        if period not in {"day", "week", "all"}:
-            period = "week"
-
-        return jsonify({"ok": True, "rows": activity(agent, period)})
-
-    @app.route("/api/agent/team_v4", methods=["GET"], endpoint="agent_team_v4")
+    @app.route("/api/agent/debug_links_v4", methods=["GET"], endpoint="agent_debug_links_v4")
     @require_login("AGENT")
-    def agent_team_v4():
+    def agent_debug_links_v4():
         agent, err = get_agent()
         if err:
             return jsonify({"ok": False, "error": err}), 401
+        week_start, week_end = week_range()
+        drivers_all = _agent_people(agent, "drivers")
+        clients_all = _agent_people(agent, "clients")
+        drivers_week = _agent_people(agent, "drivers", week_start, week_end)
+        clients_week = _agent_people(agent, "clients", week_start, week_end)
+        payload = {
+            "ok": True,
+            "agent": {
+                "id": agent.get("id"),
+                "auth_id": agent.get("auth_id"),
+                "user_id": agent.get("user_id"),
+                "email": agent.get("email"),
+                "full_name": agent.get("full_name") or agent.get("username") or agent.get("email"),
+                "identity_values": _identity_values(agent),
+            },
+            "counts": {
+                "drivers_all": len(drivers_all),
+                "clients_all": len(clients_all),
+                "drivers_week": len(drivers_week),
+                "clients_week": len(clients_week),
+            },
+            "drivers": [_shape_activity_row(r, "driver") for r in drivers_all[:50]],
+            "clients": [_shape_activity_row(r, "client") for r in clients_all[:50]],
+        }
+        return jsonify(payload)
 
-        return jsonify({"ok": True, "rows": team_agents(agent)})
+    @app.route("/api/agent/summary_v4", methods=["GET"], endpoint="agent_summary_v4")
+    @require_login("AGENT")
+    def agent_summary_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+        day_start, day_end = day_range()
+        week_start, week_end = week_range()
+        drivers_all = _agent_people(agent, "drivers")
+        clients_all = _agent_people(agent, "clients")
+        drivers_day = _agent_people(agent, "drivers", day_start, day_end)
+        clients_day = _agent_people(agent, "clients", day_start, day_end)
+        drivers_week = _agent_people(agent, "drivers", week_start, week_end)
+        clients_week = _agent_people(agent, "clients", week_start, week_end)
+        approved_drivers_week = [r for r in drivers_week if _approved(r)]
+        approved_clients_week = [r for r in clients_week if _approved(r)]
+        rates = get_rates()
+        wallet_balance = get_wallet(agent)
+        team = _team_rows(agent)
+        missing = _profile_missing(agent)
+        recent = _agent_activity(agent, None, None, 12)
+        earnings_week = (
+            len(approved_drivers_week) * rates["driver_register_amount"]
+            + len(approved_clients_week) * rates["client_register_amount"]
+        )
+        pending_approvals = len([r for r in drivers_week + clients_week if not _approved(r)])
+        summary = {
+            "agent_id": agent.get("id"),
+            "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+            "week_start": week_start.date().isoformat(),
+            "week_end": week_end.date().isoformat(),
+            "drivers_total": len(drivers_all),
+            "clients_total": len(clients_all),
+            "drivers_all": len(drivers_all),
+            "clients_all": len(clients_all),
+            "drivers_today": len(drivers_day),
+            "clients_today": len(clients_day),
+            "drivers_this_week": len(drivers_week),
+            "clients_this_week": len(clients_week),
+            "week_drivers": len(drivers_week),
+            "week_clients": len(clients_week),
+            "team_agents": len(team),
+            "team_agents_count": len(team),
+            "wallet_balance": wallet_balance,
+            "earnings_week": round(earnings_week, 2),
+            "earnings_this_week": round(earnings_week, 2),
+            "pending_approvals": pending_approvals,
+            "quality_score": agent_quality_score(agent, drivers_all, clients_all, team),
+            "profile_complete": len(missing) == 0,
+            "profile_completion_percent": _profile_completion(agent),
+            "missing_profile_fields": missing,
+            "recent": recent,
+            "alerts": [],
+        }
+        debug("agent_summary_v4", {"agent_id": agent.get("id")}, drivers=len(drivers_all), clients=len(clients_all), team=len(team))
+        return jsonify({"ok": True, "summary": summary, "data": summary, **summary})
 
-    
     @app.route("/api/agent/leaderboard_v4", methods=["GET"], endpoint="agent_leaderboard_v4")
     @require_login("AGENT")
     def agent_leaderboard_v4():
@@ -880,10 +820,19 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         try:
             storage = sb_admin.storage.from_(bucket)
             try:
-                storage.upload(path, raw, {"content-type": mime, "upsert": True})
+                storage.upload(path, raw, {"content-type": mime})
             except TypeError:
-                storage.upload(path, raw, file_options={"content-type": mime, "upsert": True})
+                storage.upload(path, raw, file_options={"content-type": mime})
             public_url = storage.get_public_url(path)
+            if isinstance(public_url, dict):
+                public_url = public_url.get("publicURL") or public_url.get("publicUrl") or public_url.get("data", {}).get("publicUrl") or str(public_url)
+            elif hasattr(public_url, "get"):
+                try:
+                    public_url = public_url.get("publicURL") or public_url.get("publicUrl") or str(public_url)
+                except Exception:
+                    public_url = str(public_url)
+            elif not isinstance(public_url, str):
+                public_url = getattr(public_url, "public_url", None) or getattr(public_url, "publicURL", None) or str(public_url)
             updates = {"profile_picture_url": public_url, "profile_pic_path": public_url}
             try:
                 sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
@@ -891,10 +840,10 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 sb_admin.table("agent_profiles").update({"profile_picture_url": public_url}).eq("id", agent.get("id")).execute()
             return jsonify({"ok": True, "url": public_url, "path": path})
         except Exception as exc:
-            app.logger.warning("profile_photo_upload_failed agent_id=%s error=%s", agent.get("id"), exc)
+            app.logger.exception("profile_photo_upload_failed agent_id=%s", agent.get("id"))
             return jsonify({
                 "ok": False,
-                "error": "Could not upload profile photo. Create a public Supabase Storage bucket named agent-profile-photos.",
+                "error": f"Could not upload profile photo: {exc}",
             }), 500
 
     @app.route("/api/agent/register_driver_v4", methods=["POST"], endpoint="agent_register_driver_v4")
@@ -904,13 +853,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         agent, err = get_agent()
         if err:
             return jsonify({"ok": False, "error": err}), 401
-        missing_profile = _profile_missing(agent)
-        if missing_profile:
-            return jsonify({
-                "ok": False,
-                "error": "Complete your profile before registering drivers. Missing: " + ", ".join(missing_profile),
-                "missing_profile_fields": missing_profile,
-            }), 403
+        # Profile completion is optional. Do not block driver registration.
 
         data = request.get_json(silent=True) or {}
         full_name = (data.get("full_name") or "").strip()
@@ -1019,13 +962,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         agent, err = get_agent()
         if err:
             return jsonify({"ok": False, "error": err}), 401
-        missing_profile = _profile_missing(agent)
-        if missing_profile:
-            return jsonify({
-                "ok": False,
-                "error": "Complete your profile before registering clients. Missing: " + ", ".join(missing_profile),
-                "missing_profile_fields": missing_profile,
-            }), 403
+        # Profile completion is optional. Do not block client registration.
 
         data = request.get_json(silent=True) or {}
         full_name = (data.get("full_name") or "").strip()
