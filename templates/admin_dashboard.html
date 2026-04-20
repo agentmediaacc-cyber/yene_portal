@@ -30,6 +30,10 @@
   border-radius:16px; box-shadow:0 18px 50px rgba(0,0,0,.35);
   border:1px solid rgba(255,255,255,.08); font-weight:700;
 }
+.admin-progress-track{height:10px;background:rgba(255,255,255,.18);border-radius:999px;overflow:hidden;margin-top:12px}
+.admin-progress-fill{height:100%;width:0%;background:#22c55e;transition:width .18s ease}
+.admin-progress-meta{margin-top:10px;color:#dbeafe;font-size:13px;line-height:1.45}
+.admin-progress-errors{margin-top:10px;max-height:120px;overflow:auto;color:#fecaca;font-size:12px;line-height:1.35}
 .admin-feedback{
   margin:12px 0; padding:12px 14px; border-radius:12px; font-weight:700;
 }
@@ -174,10 +178,20 @@ function showAdminBusy(message){
   const txt = document.getElementById('adminBusyText');
   if(txt) txt.textContent = message || 'Working...';
   if(wrap) wrap.style.display = 'flex';
+  updateAdminProgress(0, 0, 0, 0, []);
 }
 function hideAdminBusy(){
   const wrap = document.getElementById('adminBusyOverlay');
   if(wrap) wrap.style.display = 'none';
+}
+function updateAdminProgress(processed=0,total=0,succeeded=0,failed=0,errors=[]){
+  const pct = total ? Math.round((processed / total) * 100) : 0;
+  const fill = document.getElementById('adminProgressFill');
+  const meta = document.getElementById('adminProgressMeta');
+  const err = document.getElementById('adminProgressErrors');
+  if(fill) fill.style.width = pct + '%';
+  if(meta) meta.textContent = `${processed}/${total} processed | ${pct}% | ${succeeded} succeeded | ${failed} failed`;
+  if(err) err.innerHTML = errors.length ? errors.map(x => `${esc(x.id || '-')}: ${esc(x.error || x.message || 'failed')}`).join('<br>') : '';
 }
 function showAdminFeedback(targetId, message, type='info'){
   const el = document.getElementById(targetId);
@@ -234,13 +248,39 @@ function toast(msg){$("toast").textContent=msg;$("toast").style.display="block";
     async function resetSelectedAgent(){if(!selectedAgent)return toast("Select an agent first");const j=await post(`/api/admin/reset_agent_account/${encodeURIComponent(selectedAgent.id)}`);toast(`Temporary password: ${j.temp_password||"-"}`);alert(`Email: ${j.email||"-"}\nTemporary password: ${j.temp_password||"-"}`);await refreshCore()}
     async function blockSelectedAgent(){if(!selectedAgent)return toast("Select an agent first");await post(`/api/admin/agent_set_status/${encodeURIComponent(selectedAgent.id)}`,{status:"BLOCKED"});toast("Agent blocked");await refreshCore()}
     function openSelectedProfile(){if(selectedAgent)location.href=`/admin/agent/${encodeURIComponent(selectedAgent.id)}`}
-    async function approveRow(kind,id){showAdminBusy(`Approving ${kind}...`);try{await post(`/api/admin/approve_${kind}`,{id});toast(`${kind} approved`);showAdminFeedback(`${kind}sAdminFeedback`,`${kind} approved successfully.`,"success");await refreshCore()}catch(e){showAdminFeedback(`${kind}sAdminFeedback`,e.message||`Could not approve ${kind}`,"error");throw e}finally{hideAdminBusy()}}
-    async function rejectRow(kind,id){const reason=prompt(`Reason to reject this ${kind}?`,"Admin rejected");if(!reason)return;showAdminBusy(`Rejecting ${kind}...`);try{await post(`/api/admin/reject_${kind}`,{id,reason});toast(`${kind} rejected`);showAdminFeedback(`${kind}sAdminFeedback`,`${kind} rejected successfully.`,"success");await refreshCore()}catch(e){showAdminFeedback(`${kind}sAdminFeedback`,e.message||`Could not reject ${kind}`,"error");throw e}finally{hideAdminBusy()}}
+    async function processApprovalBatch(kind, action, ids, reason=""){
+      const total = ids.length;
+      const label = `${action === "approve" ? "Approving" : "Rejecting"} ${total} ${kind}${total === 1 ? "" : "s"}`;
+      showAdminBusy(label + "...");
+      let succeeded = 0, failed = 0;
+      const errors = [];
+      updateAdminProgress(0,total,0,0,errors);
+      for(let i=0;i<ids.length;i++){
+        const id = ids[i];
+        try{
+          const body = action === "approve" ? {id} : {id, reason};
+          await post(`/api/admin/${action}_${kind}`, body);
+          succeeded++;
+        }catch(e){
+          failed++;
+          errors.push({id, error:e.message || "Request failed"});
+        }
+        updateAdminProgress(i+1,total,succeeded,failed,errors);
+      }
+      const summary = `${succeeded}/${total} ${kind}${total === 1 ? "" : "s"} ${action === "approve" ? "approved" : "rejected"}${failed ? `, ${failed} failed` : ""}.`;
+      showAdminFeedback(`${kind}sAdminFeedback`, summary + (errors.length ? " See progress details for failed IDs." : ""), failed ? "error" : "success");
+      toast(summary);
+      await refreshCore();
+      if(!failed) setTimeout(hideAdminBusy, 700);
+      return {processed: total, succeeded, failed, errors};
+    }
+    async function approveRow(kind,id){await processApprovalBatch(kind,"approve",[id])}
+    async function rejectRow(kind,id){const reason=prompt(`Reason to reject this ${kind}?`,"Admin rejected");if(!reason)return;await processApprovalBatch(kind,"reject",[id],reason)}
     function visibleIds(kind){const rows=kind==="driver"?visibleDrivers:(kind==="client"?visibleClients:visibleAgents);return rows.map(r=>String(r.id||"")).filter(Boolean)}
     function selectedIds(kind){return [...document.querySelectorAll(`.${kind}-check:checked`)].map(cb=>cb.value).filter(Boolean)}
     function setAllVisible(kind,checked){document.querySelectorAll(`.${kind}-check`).forEach(cb=>{cb.checked=checked});updateBulkCount(kind)}
-    async function bulkApprove(kind,allFiltered=false){const ids=allFiltered?visibleIds(kind):selectedIds(kind);if(!ids.length)return toast(`No ${kind}s selected`);if(!confirm(`Approve ${ids.length} ${allFiltered?"filtered":"selected"} ${kind}s?`))return;showAdminBusy(`Approving ${ids.length} ${kind}s...`);try{const j=await post(`/api/admin/bulk_approve_${kind}s`,{ids});const count=j.count??ids.length;toast(`${count} ${kind}s approved`);showAdminFeedback(`${kind}sAdminFeedback`,`Approved ${count} ${kind}s.`,"success");await refreshCore()}catch(e){showAdminFeedback(`${kind}sAdminFeedback`,e.message||`Could not approve ${kind}s`,"error");throw e}finally{hideAdminBusy()}}
-    async function bulkReject(kind,allFiltered=false){const ids=allFiltered?visibleIds(kind):selectedIds(kind);if(!ids.length)return toast(`No ${kind}s selected`);const reason=prompt(`Reason to reject ${ids.length} ${kind}s?`,"Admin rejected");if(!reason)return;showAdminBusy(`Rejecting ${ids.length} ${kind}s...`);try{const j=await post(`/api/admin/bulk_reject_${kind}s`,{ids,reason});const count=j.count??ids.length;toast(`${count} ${kind}s rejected`);showAdminFeedback(`${kind}sAdminFeedback`,`Rejected ${count} ${kind}s.`,"success");await refreshCore()}catch(e){showAdminFeedback(`${kind}sAdminFeedback`,e.message||`Could not reject ${kind}s`,"error");throw e}finally{hideAdminBusy()}}
+    async function bulkApprove(kind,allFiltered=false){const ids=allFiltered?visibleIds(kind):selectedIds(kind);if(!ids.length)return toast(`No ${kind}s selected`);if(!confirm(`Approve ${ids.length} ${allFiltered?"filtered":"selected"} ${kind}s?`))return;await processApprovalBatch(kind,"approve",ids)}
+    async function bulkReject(kind,allFiltered=false){const ids=allFiltered?visibleIds(kind):selectedIds(kind);if(!ids.length)return toast(`No ${kind}s selected`);const reason=prompt(`Reason to reject ${ids.length} ${kind}s?`,"Admin rejected");if(!reason)return;await processApprovalBatch(kind,"reject",ids,reason)}
 
     function renderPaymentRules(){const r=paymentRules[0]||{};$("payDriver").value=$("payDriver").value||r.driver_reg||r.driver_register_amount||r.driver_amount||0;$("payClient").value=$("payClient").value||r.client_reg||r.client_register_amount||r.client_amount||0;$("payDailyDriver").value=$("payDailyDriver").value||r.daily_5_drivers_bonus||r.driver_daily_bonus||0;$("payDailyClient").value=$("payDailyClient").value||r.daily_5_clients_bonus||r.client_daily_bonus||0;$("payDailyDriverThreshold").value=$("payDailyDriverThreshold").value||r.daily_driver_threshold||r.driver_daily_threshold||5;$("payDailyClientThreshold").value=$("payDailyClientThreshold").value||r.daily_client_threshold||r.client_daily_threshold||5;$("payWeekly").value=$("payWeekly").value||r.weekly_30_activations_bonus||r.activation_bonus||0;$("payWeeklyThreshold").value=$("payWeeklyThreshold").value||r.weekly_activation_threshold||r.weekly_threshold||30;$("payStatus").value=String(r.status||"Active").toLowerCase()==="inactive"?"Inactive":"Active"}
     async function savePaymentRules(){const current=paymentRules[0]||{};await post("/api/admin/payment_rules",{id:current.id,driver_reg:$("payDriver").value,client_reg:$("payClient").value,daily_5_drivers_bonus:$("payDailyDriver").value,daily_5_clients_bonus:$("payDailyClient").value,daily_driver_threshold:$("payDailyDriverThreshold").value,daily_client_threshold:$("payDailyClientThreshold").value,weekly_30_activations_bonus:$("payWeekly").value,weekly_activation_threshold:$("payWeeklyThreshold").value,status:$("payStatus").value});toast("Finance rules saved");await loadPaymentRules()}
@@ -268,7 +308,13 @@ function toast(msg){$("toast").textContent=msg;$("toast").style.display="block";
   </script>
 
 <div id="adminBusyOverlay" class="admin-busy-overlay">
-  <div class="admin-busy-box" id="adminBusyText">Working...</div>
+  <div class="admin-busy-box">
+    <div id="adminBusyText">Working...</div>
+    <div class="admin-progress-track"><div class="admin-progress-fill" id="adminProgressFill"></div></div>
+    <div class="admin-progress-meta" id="adminProgressMeta">0/0 processed | 0% | 0 succeeded | 0 failed</div>
+    <div class="admin-progress-errors" id="adminProgressErrors"></div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn ghost" type="button" onclick="hideAdminBusy()">Close</button></div>
+  </div>
 </div>
 </body>
 </html>
