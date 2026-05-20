@@ -7,10 +7,12 @@ from zoneinfo import ZoneInfo
 from flask import jsonify, request, session, redirect
 from yene_shared import (
     agent_quality_score,
+    agent_access_state,
     compose_vehicle_details,
     identity_values as shared_identity_values,
     matches_identity as shared_matches_identity,
     normalize_na_phone,
+    region_access_state,
     region_registration_open,
     profile_completion,
     profile_missing,
@@ -139,11 +141,26 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
     def _region_access_rows():
         return _select_all("region_access_settings", 1000, "updated_at", True)
 
+    def _region_access_state(region="", town=""):
+        return region_access_state(_region_access_rows(), region=region, town=town)
+
     def _registration_access_allowed(region="", town=""):
         try:
             return region_registration_open(_region_access_rows(), region=region, town=town)
         except Exception:
             return True, None
+
+    def _agent_region(agent):
+        region = str((agent or {}).get("operation_region") or "").strip() or str((agent or {}).get("region") or "").strip() or "Namibia"
+        town = str((agent or {}).get("current_working_town") or "").strip() or str((agent or {}).get("town") or "").strip() or "All"
+        return region, town
+
+    def _agent_access(agent, region="", town=""):
+        region = region or _agent_region(agent)[0]
+        town = town or _agent_region(agent)[1]
+        region_state = _region_access_state(region=region, town=town)
+        access_state = agent_access_state(agent, region_state)
+        return access_state, region_state
 
     def _status_value(row):
         return str((row or {}).get("approval_status") or (row or {}).get("status") or "").strip()
@@ -637,6 +654,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             )
             return jsonify({"ok": False, "error": err}), 401
         missing = _profile_missing(agent)
+        access_state, region_state = _agent_access(agent)
         shaped = dict(agent)
         shaped["profile_photo_url"] = _profile_photo(agent)
         shaped["profile_picture_url"] = _profile_photo(agent)
@@ -646,6 +664,8 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         shaped["profile_completion_percent"] = _profile_completion(agent)
         shaped["role"] = agent.get("role") or "AGENT"
         shaped["status"] = agent.get("status") or "ACTIVE"
+        shaped.update(access_state)
+        shaped["region_access"] = region_state
         return jsonify({"ok": True, "agent": shaped, "profile": shaped, "me": shaped})
 
     @app.route("/api/agent/activity_v4", methods=["GET"], endpoint="agent_activity_v4")
@@ -736,6 +756,7 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         team = _team_rows(agent)
         missing = _profile_missing(agent)
         recent = _agent_activity(agent, None, None, 12)
+        access_state, region_state = _agent_access(agent)
         earnings_week = (
             len(approved_drivers_week) * rates["driver_register_amount"]
             + len(approved_clients_week) * rates["client_register_amount"]
@@ -768,6 +789,15 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "profile_complete": len(missing) == 0,
             "profile_completion_percent": _profile_completion(agent),
             "missing_profile_fields": missing,
+            "account_status": access_state.get("account_status"),
+            "login_allowed": access_state.get("login_allowed"),
+            "registration_allowed": access_state.get("registration_allowed"),
+            "allow_driver_registration": access_state.get("allow_driver_registration"),
+            "allow_client_registration": access_state.get("allow_client_registration"),
+            "can_register_any": access_state.get("can_register_any"),
+            "driver_registration_open": access_state.get("driver_registration_open"),
+            "client_registration_open": access_state.get("client_registration_open"),
+            "region_access": region_state,
             "recent": recent,
             "alerts": [],
         }
@@ -1054,9 +1084,11 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             return jsonify({"ok": False, "error": code_error}), 400
         if not full_name or not phone or not town:
             return jsonify({"ok": False, "error": "Full name, phone and town are required"}), 400
-        allowed, _rule = _registration_access_allowed(region=region, town=town)
-        if not allowed:
-            return jsonify({"ok": False, "error": "Registrations are currently closed for your region/town. Contact admin."}), 403
+        access_state, _region_state = _agent_access(agent, region=region, town=town)
+        if not access_state.get("can_register_any"):
+            return jsonify({"ok": False, "error": "Registrations are currently closed for your town or region. Please contact admin."}), 403
+        if not access_state.get("driver_registration_open"):
+            return jsonify({"ok": False, "error": "Driver registration is currently closed for your town or region. Please contact admin."}), 403
 
         app.logger.info(
             "agent_register_driver_v4 payload agent=%s fields=%s phone_present=%s",
@@ -1258,9 +1290,11 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             return jsonify({"ok": False, "error": code_error}), 400
         if not full_name or not phone or not town:
             return jsonify({"ok": False, "error": "Full name, phone and town are required"}), 400
-        allowed, _rule = _registration_access_allowed(region=region, town=town)
-        if not allowed:
-            return jsonify({"ok": False, "error": "Registrations are currently closed for your region/town. Contact admin."}), 403
+        access_state, _region_state = _agent_access(agent, region=region, town=town)
+        if not access_state.get("can_register_any"):
+            return jsonify({"ok": False, "error": "Registrations are currently closed for your town or region. Please contact admin."}), 403
+        if not access_state.get("client_registration_open"):
+            return jsonify({"ok": False, "error": "Client registration is currently closed for your town or region. Please contact admin."}), 403
 
         app.logger.info(
             "agent_register_client_v4 payload agent=%s fields=%s phone_present=%s",

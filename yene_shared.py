@@ -7,6 +7,7 @@ PENDING_STATUSES = {"PENDING", "PENDING_APPROVAL", "UNDER_REVIEW"}
 ONBOARDING_STATUSES = PENDING_STATUSES | {"ONBOARDING"}
 BLOCKED_STATUSES = {"BLOCKED", "REJECTED", "SUSPENDED", "DISABLED", "BANNED"}
 WORKING_AGENT_STATUSES = APPROVED_STATUSES | ONBOARDING_STATUSES
+ALLOWED_ACCOUNT_STATUSES = {"ACTIVE", "BLOCKED", "RESTRICTED", "PENDING_REVIEW"}
 
 NAMIBIA_REGIONS = [
     "Erongo",
@@ -76,6 +77,19 @@ VEHICLE_BRANDS = list(VEHICLE_MODEL_OPTIONS.keys())
 
 def clean(value):
     return str(value or "").strip()
+
+
+def clean_bool(value, default=True):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    raw = clean(value).lower()
+    if raw in {"1", "true", "yes", "y", "on", "active", "open", "allowed"}:
+        return True
+    if raw in {"0", "false", "no", "n", "off", "inactive", "closed", "blocked"}:
+        return False
+    return bool(value)
 
 
 def current_vehicle_year():
@@ -292,18 +306,81 @@ def pick_region_access_rule(rows, region="", town=""):
     return candidates[0][2]
 
 
-def region_registration_open(rows, region="", town=""):
+def region_access_state(rows, region="", town=""):
     rule = pick_region_access_rule(rows, region=region, town=town)
+    state = {
+        "is_active": True,
+        "registration_open": True,
+        "allow_driver_registration": True,
+        "allow_client_registration": True,
+        "allow_agent_login": True,
+        "allow_agent_activation": True,
+        "region": clean(region) or "Namibia",
+        "town": clean(town) or "All",
+        "rule": rule,
+    }
     if not rule:
-        return True, None
-    is_active = rule.get("is_active")
-    if is_active is None:
-        is_active = True
-    registration_open = rule.get("registration_open")
-    if registration_open is None:
-        registration_open = True
-    allowed = bool(is_active) and bool(registration_open)
-    return allowed, rule
+        return state
+    state.update({
+        "is_active": clean_bool(rule.get("is_active"), True),
+        "registration_open": clean_bool(rule.get("registration_open"), True),
+        "allow_driver_registration": clean_bool(rule.get("allow_driver_registration"), True),
+        "allow_client_registration": clean_bool(rule.get("allow_client_registration"), True),
+        "allow_agent_login": clean_bool(rule.get("allow_agent_login"), True),
+        "allow_agent_activation": clean_bool(rule.get("allow_agent_activation"), True),
+        "region": clean(rule.get("region") or region) or "Namibia",
+        "town": clean(rule.get("town") or town) or "All",
+        "rule": rule,
+    })
+    return state
+
+
+def region_registration_open(rows, region="", town=""):
+    state = region_access_state(rows, region=region, town=town)
+    allowed = (
+        state["is_active"]
+        and state["registration_open"]
+        and state["allow_driver_registration"]
+        and state["allow_client_registration"]
+    )
+    return allowed, state["rule"]
+
+
+def agent_access_state(agent, region_rule_state=None):
+    agent = agent or {}
+    account_status = clean(agent.get("account_status") or agent.get("status") or "active").lower() or "active"
+    if account_status.upper() not in ALLOWED_ACCOUNT_STATUSES:
+        account_status = "active"
+    login_allowed = clean_bool(agent.get("login_allowed"), True)
+    registration_allowed = clean_bool(agent.get("registration_allowed"), True)
+    allow_driver_registration = clean_bool(agent.get("allow_driver_registration"), True)
+    allow_client_registration = clean_bool(agent.get("allow_client_registration"), True)
+    region_locked = clean_bool(agent.get("region_locked"), False)
+    state = {
+        "account_status": account_status,
+        "login_allowed": login_allowed,
+        "registration_allowed": registration_allowed,
+        "allow_driver_registration": allow_driver_registration,
+        "allow_client_registration": allow_client_registration,
+        "region_locked": region_locked,
+        "region_locked_at": agent.get("region_locked_at"),
+        "region_locked_by": clean(agent.get("region_locked_by")),
+        "access_note": clean(agent.get("access_note")),
+        "access_updated_by": clean(agent.get("access_updated_by")),
+        "access_updated_at": clean(agent.get("access_updated_at")),
+        "can_login": account_status != "blocked" and login_allowed,
+        "can_register_any": account_status == "active" and login_allowed and registration_allowed,
+        "driver_registration_open": account_status == "active" and login_allowed and registration_allowed and allow_driver_registration,
+        "client_registration_open": account_status == "active" and login_allowed and registration_allowed and allow_client_registration,
+    }
+    if region_rule_state:
+        state["region_rule"] = region_rule_state
+        state["can_login"] = state["can_login"] and region_rule_state.get("allow_agent_login", True)
+        shared_reg = region_rule_state.get("is_active", True) and region_rule_state.get("registration_open", True)
+        state["can_register_any"] = state["can_register_any"] and shared_reg
+        state["driver_registration_open"] = state["driver_registration_open"] and shared_reg and region_rule_state.get("allow_driver_registration", True)
+        state["client_registration_open"] = state["client_registration_open"] and shared_reg and region_rule_state.get("allow_client_registration", True)
+    return state
 
 
 def agent_quality_score(agent, drivers=None, clients=None, team=None):

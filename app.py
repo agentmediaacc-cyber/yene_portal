@@ -49,7 +49,13 @@ from agent_dashboard_v4 import register_agent_dashboard_v4_routes
 from agent_team_features import register_agent_team_routes
 from agent_wallet_v1 import register_agent_wallet_v1_routes
 from yene_compat_routes import register_yene_compat_routes
-from yene_shared import VEHICLE_BRANDS, VEHICLE_MODEL_OPTIONS, current_vehicle_year
+from yene_shared import (
+    VEHICLE_BRANDS,
+    VEHICLE_MODEL_OPTIONS,
+    agent_access_state,
+    current_vehicle_year,
+    region_access_state,
+)
 
 
 def _sb_get_user_id_from_token(access_token: str):
@@ -332,6 +338,14 @@ def agent_dashboard():
             session.clear()
             flash("Your agent account is not available for working access")
             return redirect("/login")
+        access_state, _region_state = _agent_access_context(profile)
+        if not access_state.get("can_login"):
+            session.clear()
+            if str(access_state.get("account_status") or "").lower() == "blocked" or not access_state.get("login_allowed", True):
+                flash("Your YENE account is currently locked. Please contact support or admin to unlock access.")
+            else:
+                flash("YENE access is temporarily closed for your town or region. Please contact support.")
+            return redirect("/login")
         if profile.get("must_change_password"):
             return redirect("/agent/change-password")
     except Exception:
@@ -461,6 +475,40 @@ register_yene_compat_routes(app, sb_admin)
 register_admin_actions_routes(app, sb_admin)
 
 
+def _region_access_rows():
+    try:
+        res = sb_admin.table("region_access_settings").select("*").order("updated_at", desc=True).limit(1000).execute()
+        return res.data or []
+    except Exception:
+        try:
+            res = sb_admin.table("region_access_settings").select("*").limit(1000).execute()
+            return res.data or []
+        except Exception:
+            return []
+
+
+def _agent_region_context(profile):
+    profile = profile or {}
+    region = (
+        str(profile.get("operation_region") or "").strip()
+        or str(profile.get("region") or "").strip()
+        or "Namibia"
+    )
+    town = (
+        str(profile.get("current_working_town") or "").strip()
+        or str(profile.get("town") or "").strip()
+        or "All"
+    )
+    return region, town
+
+
+def _agent_access_context(profile):
+    region, town = _agent_region_context(profile)
+    region_state = region_access_state(_region_access_rows(), region=region, town=town)
+    access_state = agent_access_state(profile, region_state)
+    return access_state, region_state
+
+
 def homepage_stats(sb_admin):
     def _safe_select(
         table, filters=None, cols="*", limit=None, order_col=None, desc=False
@@ -518,7 +566,7 @@ def homepage_stats(sb_admin):
         try:
             return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
         except Exception:
-            return None
+            return []
 
     def _created_this_week(row):
         created = _row_date(row)
@@ -815,13 +863,21 @@ def login():
         if "JWT expired" in msg:
             flash("Session expired. Please login again.")
         else:
-            flash(f"Login error: {msg}")
+            flash("Login could not be completed. Check your email and password, then try again.")
         return redirect("/login")
 
     profile = _lookup_profile("agent_profiles", email)
     if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
         session.clear()
         flash("No working agent profile found for this account")
+        return redirect("/login")
+    access_state, _region_state = _agent_access_context(profile)
+    if not access_state.get("can_login"):
+        session.clear()
+        if str(access_state.get("account_status") or "").lower() == "blocked" or not access_state.get("login_allowed", True):
+            flash("Your YENE account is currently locked. Please contact support or admin to unlock access.")
+        else:
+            flash("YENE access is temporarily closed for your town or region. Please contact support.")
         return redirect("/login")
 
     _set_agent_session(email)

@@ -31,6 +31,19 @@ alter table if exists agent_profiles add column if not exists region_locked_at t
 alter table if exists agent_profiles add column if not exists region_locked_by text;
 alter table if exists agent_profiles add column if not exists current_working_town text;
 alter table if exists agent_profiles add column if not exists operation_region text;
+alter table if exists agent_profiles add column if not exists account_status text default 'active';
+alter table if exists agent_profiles add column if not exists login_allowed boolean default true;
+alter table if exists agent_profiles add column if not exists registration_allowed boolean default true;
+alter table if exists agent_profiles add column if not exists allow_driver_registration boolean default true;
+alter table if exists agent_profiles add column if not exists allow_client_registration boolean default true;
+alter table if exists agent_profiles add column if not exists access_note text;
+alter table if exists agent_profiles add column if not exists access_updated_by text;
+alter table if exists agent_profiles add column if not exists access_updated_at timestamptz;
+
+alter table if exists region_access_settings add column if not exists allow_driver_registration boolean default true;
+alter table if exists region_access_settings add column if not exists allow_client_registration boolean default true;
+alter table if exists region_access_settings add column if not exists allow_agent_login boolean default true;
+alter table if exists region_access_settings add column if not exists allow_agent_activation boolean default true;
 
 create table if not exists finance_statements (
   id text primary key,
@@ -85,6 +98,10 @@ create index if not exists idx_agent_wallet_ledger_agent
   on agent_wallet_ledger (agent_id, agent_email);
 create index if not exists idx_agent_profiles_region_lock
   on agent_profiles (region_locked, region, town);
+create index if not exists idx_agent_profiles_account_status
+  on agent_profiles (account_status);
+create index if not exists idx_agent_profiles_login_allowed
+  on agent_profiles (login_allowed);
 create index if not exists idx_finance_statements_agent
   on finance_statements (agent_id, agent_email, executed_at);
 create index if not exists idx_admin_audit_log_action_time

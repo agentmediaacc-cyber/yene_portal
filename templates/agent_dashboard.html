@@ -860,7 +860,7 @@
 
     @media (max-width:1200px){
       .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
-      .grid-3,.hero-grid,.grid-2,.marketing-grid{grid-template-columns:1fr}
+      .grid-3,.hero-grid,.grid-2,.marketing-grid,.access-grid{grid-template-columns:1fr}
     }
 
     @media (max-width:900px){
@@ -1067,6 +1067,31 @@
     }
     .registration-form .field-group.hidden{
       display:none;
+    }
+    .access-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:10px;
+      margin:0 0 16px;
+    }
+    .access-chip{
+      border:1px solid rgba(20,36,54,.12);
+      border-radius:12px;
+      background:#ffffff;
+      padding:12px;
+    }
+    .access-chip .k{
+      font-size:11px;
+      color:#5d7189;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      font-weight:800;
+    }
+    .access-chip .v{
+      margin-top:6px;
+      font-size:16px;
+      font-weight:900;
+      color:#142231;
     }
     .btn-loading {
       opacity: .75;
@@ -1295,6 +1320,24 @@
         <section id="registrations" class="section">
           <div class="profile-alert" id="profileAlert">
             Optional profile details can be completed anytime. Registrations are open.
+          </div>
+          <div class="access-grid">
+            <div class="access-chip">
+              <div class="k">Account Status</div>
+              <div class="v" id="agentAccessStatus">Checking</div>
+            </div>
+            <div class="access-chip">
+              <div class="k">Overall Registration</div>
+              <div class="v" id="agentRegistrationStatus">Checking</div>
+            </div>
+            <div class="access-chip">
+              <div class="k">Driver Registration</div>
+              <div class="v" id="agentDriverAccessStatus">Checking</div>
+            </div>
+            <div class="access-chip">
+              <div class="k">Client Registration</div>
+              <div class="v" id="agentClientAccessStatus">Checking</div>
+            </div>
           </div>
           <div class="grid-2">
             <div class="card">
@@ -2147,6 +2190,11 @@
     function showInlineFeedback(targetId, message, type = "info") {
       const el = document.getElementById(targetId);
       if (!el) return;
+      if (!String(message || "").trim()) {
+        el.textContent = "";
+        el.style.display = "none";
+        return;
+      }
       el.className = "inline-feedback " + type;
       el.textContent = String(message || "");
       el.style.display = "block";
@@ -2354,12 +2402,41 @@
       if($("setRegion")) $("setRegion").readOnly = regionLocked;
       const regionLockNote = $("regionLockNote");
       if(regionLockNote) regionLockNote.style.display = regionLocked ? "block" : "none";
+      const accountStatus = String(me.account_status || me.status || "active").replaceAll("_", " ");
+      const canRegisterAny = me.can_register_any !== false;
+      const driverOpen = me.driver_registration_open !== false;
+      const clientOpen = me.client_registration_open !== false;
+      setText("agentAccessStatus", accountStatus ? accountStatus.charAt(0).toUpperCase() + accountStatus.slice(1) : "Active");
+      setText("agentRegistrationStatus", canRegisterAny ? "Open" : "Closed");
+      setText("agentDriverAccessStatus", driverOpen ? "Open" : "Closed");
+      setText("agentClientAccessStatus", clientOpen ? "Open" : "Closed");
+      const driverSubmit = document.querySelector('#driverForm button[type="submit"]');
+      const clientSubmit = document.querySelector('#clientForm button[type="submit"]');
+      if(driverSubmit){
+        driverSubmit.disabled = !driverOpen;
+        driverSubmit.title = driverOpen ? "" : "Driver registration is currently closed for your town or region.";
+      }
+      if(clientSubmit){
+        clientSubmit.disabled = !clientOpen;
+        clientSubmit.title = clientOpen ? "" : "Client registration is currently closed for your town or region.";
+      }
+      if(!canRegisterAny){
+        showInlineFeedback("driverFormFeedback", "Registrations are currently closed for your town or region. Please contact admin.", "warning");
+        showInlineFeedback("clientFormFeedback", "Registrations are currently closed for your town or region. Please contact admin.", "warning");
+      } else {
+        if(!driverOpen){
+          showInlineFeedback("driverFormFeedback", "Driver registration is currently closed for your town or region.", "warning");
+        } else {
+          showInlineFeedback("driverFormFeedback", "", "info");
+        }
+        if(!clientOpen){
+          showInlineFeedback("clientFormFeedback", "Client registration is currently closed for your town or region.", "warning");
+        } else {
+          showInlineFeedback("clientFormFeedback", "", "info");
+        }
+      }
       const photo = me.profile_picture_url || me.profile_pic_path || "";
       setSrc("profilePhoto", photo || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23edf6fd'/%3E%3Ctext x='48' y='56' text-anchor='middle' font-family='Arial' font-size='28' fill='%230ea5e9'%3EY%3C/text%3E%3C/svg%3E");
-      document.querySelectorAll('#driverForm button[type="submit"], #clientForm button[type="submit"]').forEach(btn => {
-        btn.disabled = false;
-        btn.title = "";
-      });
     }
 
     function renderAgentAlerts(rows){

@@ -4,7 +4,7 @@ import uuid
 import random
 import string
 from flask import jsonify, request, session
-from yene_shared import pick_region_access_rule
+from yene_shared import agent_access_state, clean_bool, pick_region_access_rule, region_access_state
 
 
 def register_admin_actions_routes(app, sb_admin):
@@ -285,6 +285,49 @@ def register_admin_actions_routes(app, sb_admin):
     def _region_setting_rows():
         return _safe_select("region_access_settings", {}, "*", 1000, "updated_at", True)
 
+    def _agent_region_state(agent):
+        region = _clean(agent.get("operation_region") or agent.get("region") or "Namibia")
+        town = _clean(agent.get("current_working_town") or agent.get("town") or "All")
+        return region_access_state(_region_setting_rows(), region=region, town=town)
+
+    def _agent_access_view(agent):
+        return agent_access_state(agent, _agent_region_state(agent))
+
+    def _agent_access_update_payload(data, allow_pending_review=True):
+        payload = {}
+        if "account_status" in data:
+            account_status = _clean(data.get("account_status")).lower()
+            allowed = {"active", "blocked", "restricted", "pending_review"} if allow_pending_review else {"active", "blocked", "restricted"}
+            if account_status and account_status in allowed:
+                payload["account_status"] = account_status
+                if account_status == "active":
+                    payload["status"] = "ACTIVE"
+                elif account_status == "blocked":
+                    payload["status"] = "BLOCKED"
+                elif account_status == "pending_review":
+                    payload["status"] = "PENDING_REVIEW"
+                else:
+                    payload["status"] = "RESTRICTED"
+        if "login_allowed" in data:
+            payload["login_allowed"] = clean_bool(data.get("login_allowed"), True)
+        if "registration_allowed" in data:
+            payload["registration_allowed"] = clean_bool(data.get("registration_allowed"), True)
+        if "allow_driver_registration" in data:
+            payload["allow_driver_registration"] = clean_bool(data.get("allow_driver_registration"), True)
+        if "allow_client_registration" in data:
+            payload["allow_client_registration"] = clean_bool(data.get("allow_client_registration"), True)
+        if "region_locked" in data:
+            locked = clean_bool(data.get("region_locked"), False)
+            payload["region_locked"] = locked
+            payload["region_locked_at"] = _now_iso() if locked else None
+            payload["region_locked_by"] = _admin_email() if locked else None
+        if "note" in data or "access_note" in data:
+            payload["access_note"] = _clean(data.get("note") or data.get("access_note"))
+        if payload:
+            payload["access_updated_by"] = _admin_email()
+            payload["access_updated_at"] = _now_iso()
+        return payload
+
     def _team_leader_name(agent):
         return agent.get("team_leader_name") or ""
 
@@ -408,11 +451,27 @@ def register_admin_actions_routes(app, sb_admin):
                     if _clean(r.get("approval_status") or r.get("status")).upper() not in {"APPROVED", "ACTIVE", "VERIFIED", "ADMIN_APPROVED", "REJECTED"}
                 ]),
             }
+            access_view = _agent_access_view(row)
+            shaped.update({
+                "account_status": access_view.get("account_status"),
+                "login_allowed": access_view.get("login_allowed"),
+                "registration_allowed": access_view.get("registration_allowed"),
+                "allow_driver_registration": access_view.get("allow_driver_registration"),
+                "allow_client_registration": access_view.get("allow_client_registration"),
+                "can_login": access_view.get("can_login"),
+                "can_register_any": access_view.get("can_register_any"),
+                "driver_registration_open": access_view.get("driver_registration_open"),
+                "client_registration_open": access_view.get("client_registration_open"),
+                "access_note": access_view.get("access_note"),
+                "access_updated_by": access_view.get("access_updated_by"),
+                "access_updated_at": access_view.get("access_updated_at"),
+                "region_rule": access_view.get("region_rule"),
+            })
             if region and _clean(shaped["region"]).lower() != region.lower():
                 continue
             if town and _clean(shaped["town"]).lower() != town.lower():
                 continue
-            if status and status not in _clean(shaped["status"]).upper():
+            if status and status not in _clean(shaped["status"]).upper() and status not in _clean(shaped["account_status"]).upper():
                 continue
             if missing_profile and not any(not _clean(row.get(key)) for key in ("full_name", "username", "phone", "town")):
                 continue
@@ -497,7 +556,16 @@ def register_admin_actions_routes(app, sb_admin):
         if not agent_id:
             return jsonify({"ok": False, "error": "agent_id required"}), 400
 
-        payload = {"status": "ACTIVE"}
+        payload = {
+            "status": "ACTIVE",
+            "account_status": "active",
+            "login_allowed": True,
+            "registration_allowed": True,
+            "allow_driver_registration": True,
+            "allow_client_registration": True,
+            "access_updated_by": _admin_email(),
+            "access_updated_at": _now_iso(),
+        }
         res = _safe_update("agent_profiles", {"id": agent_id}, payload)
         if isinstance(res, Exception):
             return jsonify({"ok": False, "error": str(res)}), 500
@@ -513,7 +581,13 @@ def register_admin_actions_routes(app, sb_admin):
         if not agent_id:
             return jsonify({"ok": False, "error": "agent_id required"}), 400
 
-        payload = {"status": "BLOCKED"}
+        payload = {
+            "status": "BLOCKED",
+            "account_status": "blocked",
+            "login_allowed": False,
+            "access_updated_by": _admin_email(),
+            "access_updated_at": _now_iso(),
+        }
         res = _safe_update("agent_profiles", {"id": agent_id}, payload)
         if isinstance(res, Exception):
             return jsonify({"ok": False, "error": str(res)}), 500
@@ -759,8 +833,12 @@ def register_admin_actions_routes(app, sb_admin):
             "id": _clean(data.get("id")) or str(uuid.uuid4()),
             "region": region,
             "town": town or "All",
-            "is_active": bool(data.get("is_active", True)),
-            "registration_open": bool(data.get("registration_open", True)),
+            "is_active": clean_bool(data.get("is_active"), True),
+            "registration_open": clean_bool(data.get("registration_open"), True),
+            "allow_driver_registration": clean_bool(data.get("allow_driver_registration"), True),
+            "allow_client_registration": clean_bool(data.get("allow_client_registration"), True),
+            "allow_agent_login": clean_bool(data.get("allow_agent_login"), True),
+            "allow_agent_activation": clean_bool(data.get("allow_agent_activation"), True),
             "locked_by": _clean(data.get("locked_by")) or _admin_email(),
             "updated_by": _admin_email(),
             "updated_at": _now_iso(),
@@ -777,6 +855,83 @@ def register_admin_actions_routes(app, sb_admin):
             return jsonify({"ok": False, "error": str(res)}), 500
         _audit_log("region_access_upsert", "region_access_setting", payload["id"], metadata=payload)
         return jsonify({"ok": True, "message": "Region setting saved", "row": payload})
+
+    @app.get("/api/admin/agent_access")
+    def admin_agent_access():
+        region = _clean(request.args.get("region"))
+        town = _clean(request.args.get("town"))
+        status = _clean(request.args.get("status")).upper()
+        rows = []
+        for row in _agents():
+            shaped = {
+                "id": row.get("id"),
+                "full_name": row.get("full_name") or row.get("username") or row.get("email"),
+                "email": row.get("email"),
+                "phone": row.get("phone") or row.get("phone_number"),
+                "town": row.get("town") or row.get("current_working_town"),
+                "region": row.get("region") or row.get("operation_region"),
+                "current_working_town": row.get("current_working_town") or row.get("town"),
+                "operation_region": row.get("operation_region") or row.get("region"),
+                "status": row.get("status") or "PENDING",
+                "region_locked": clean_bool(row.get("region_locked"), False),
+            }
+            shaped.update(_agent_access_view(row))
+            if region and _clean(shaped.get("region")).lower() != region.lower():
+                continue
+            if town and _clean(shaped.get("town")).lower() != town.lower():
+                continue
+            if status and status not in _clean(shaped.get("status")).upper() and status not in _clean(shaped.get("account_status")).upper():
+                continue
+            rows.append(shaped)
+        return jsonify({"ok": True, "rows": rows})
+
+    @app.post("/api/admin/agent_access/update")
+    def admin_agent_access_update():
+        data = request.get_json(force=True) or {}
+        agent_id = _clean(data.get("agent_id"))
+        if not agent_id:
+            return jsonify({"ok": False, "error": "agent_id required"}), 400
+        payload = _agent_access_update_payload(data, allow_pending_review=True)
+        if not payload:
+            return jsonify({"ok": False, "error": "No access fields provided"}), 400
+        res = _safe_update("agent_profiles", {"id": agent_id}, payload)
+        if isinstance(res, Exception):
+            return jsonify({"ok": False, "error": str(res)}), 500
+        _safe_update("agents", {"id": agent_id}, {k: v for k, v in payload.items() if k in {"status", "region_locked"}})
+        _audit_log("agent_access_update", "agent_profile", agent_id, metadata=payload)
+        return jsonify({"ok": True, "message": "Agent access updated", "agent_id": agent_id, "payload": payload})
+
+    @app.post("/api/admin/agent_access/bulk_update")
+    def admin_agent_access_bulk_update():
+        data = request.get_json(force=True) or {}
+        agent_ids = [str(x).strip() for x in (data.get("agent_ids") or []) if str(x).strip()]
+        region = _clean(data.get("region"))
+        town = _clean(data.get("town"))
+        apply_to_filtered = clean_bool(data.get("apply_to_filtered"), False)
+        if apply_to_filtered:
+            for agent in _agents():
+                agent_region = _clean(agent.get("operation_region") or agent.get("region"))
+                agent_town = _clean(agent.get("current_working_town") or agent.get("town"))
+                if region and agent_region.lower() != region.lower():
+                    continue
+                if town and agent_town.lower() != town.lower():
+                    continue
+                agent_ids.append(str(agent.get("id") or "").strip())
+        agent_ids = [x for x in dict.fromkeys(agent_ids) if x]
+        if not agent_ids:
+            return jsonify({"ok": False, "error": "No agents selected"}), 400
+        payload = _agent_access_update_payload(data, allow_pending_review=False)
+        if not payload:
+            return jsonify({"ok": False, "error": "No access fields provided"}), 400
+        updated = []
+        for agent_id in agent_ids:
+            res = _safe_update("agent_profiles", {"id": agent_id}, payload)
+            if isinstance(res, Exception):
+                continue
+            _safe_update("agents", {"id": agent_id}, {k: v for k, v in payload.items() if k in {"status", "region_locked"}})
+            updated.append(agent_id)
+        _audit_log("agent_access_bulk_update", "agent_profile", ",".join(updated[:20]), metadata={"count": len(updated), "payload": payload, "region": region, "town": town, "apply_to_filtered": apply_to_filtered})
+        return jsonify({"ok": True, "message": "Agent access updated", "updated_count": len(updated), "agent_ids": updated, "payload": payload})
 
     @app.get("/api/admin/finance/summary")
     def admin_finance_summary():
@@ -991,9 +1146,11 @@ def register_admin_actions_routes(app, sb_admin):
             "town": _clean(data.get("town")),
             "current_working_town": _clean(data.get("current_working_town") or data.get("town")),
             "operation_region": _clean(data.get("operation_region") or data.get("region")),
-            "region_locked": bool(data.get("region_locked")),
+            "region_locked": clean_bool(data.get("region_locked"), False),
             "region_locked_at": _now_iso() if data.get("region_locked") else None,
             "region_locked_by": _admin_email() if data.get("region_locked") else None,
+            "access_updated_by": _admin_email(),
+            "access_updated_at": _now_iso(),
         }
         payload = {k: v for k, v in payload.items() if v not in ("", None) or k == "region_locked"}
         res = _safe_update("agent_profiles", {"id": agent_id}, payload)
