@@ -1,0 +1,130 @@
+ * Serving Flask app 'app'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.179.30:5000
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [20/Apr/2026 16:00:41] "GET /agent/dashboard HTTP/1.1" 200 -
+[2026-04-20 16:00:42,161] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:7, additional_data:None>
+[2026-04-20 16:00:42,161] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:7, additional_data:None>
+[2026-04-20 16:00:42,163] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:7, additional_data:None>
+[2026-04-20 16:00:42,622] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:00:42] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+[2026-04-20 16:00:42,627] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=2 error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:42,631] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=2 error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:42,632] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:42,633] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:00:42] "[33mGET /api/agent/messages HTTP/1.1[0m" 404 -
+[2026-04-20 16:00:43,213] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=2 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+[2026-04-20 16:00:43,214] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=3 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+[2026-04-20 16:00:43,215] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=3 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+[2026-04-20 16:00:43,216] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+[2026-04-20 16:00:43,216] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+[2026-04-20 16:00:43,216] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+[2026-04-20 16:00:43,217] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+[2026-04-20 16:00:43,217] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+[2026-04-20 16:00:43,219] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:23, additional_data:None>
+127.0.0.1 - - [20/Apr/2026 16:00:43] "[33mGET /api/agent/messages HTTP/1.1[0m" 404 -
+[2026-04-20 16:00:43,827] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=True error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:43,828] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:43,829] WARNING in agent_dashboard_v4: get_agent_retry_failed_using_cache email=final@gmail.com error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:43,830] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:00:43] "[33mGET /api/agent/messages HTTP/1.1[0m" 404 -
+[2026-04-20 16:00:43,835] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=True error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:00:43] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+[2026-04-20 16:00:43,838] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=4 error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:43,842] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=4 error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:43,842] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=True error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:43,842] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=3 error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:43,843] WARNING in agent_dashboard_v4: get_agent_retry_failed_using_cache email=final@gmail.com error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:43,858] WARNING in agent_dashboard_v4: get_agent_retry_failed_using_cache email=final@gmail.com error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:00:43] "GET /api/agent/me_v4 HTTP/1.1" 200 -
+[2026-04-20 16:00:44,226] WARNING in agent_dashboard_v4: Supabase select failed table=clients error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:44,231] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:00:44] "GET /api/agent/activity_v4?period=week HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:44] "[33mGET /api/agent/messages HTTP/1.1[0m" 404 -
+127.0.0.1 - - [20/Apr/2026 16:00:44] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+[2026-04-20 16:00:45,318] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 54] Connection reset by peer
+[2026-04-20 16:00:45,321] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 54] Connection reset by peer
+127.0.0.1 - - [20/Apr/2026 16:00:45] "[33mGET /api/agent/messages HTTP/1.1[0m" 404 -
+127.0.0.1 - - [20/Apr/2026 16:00:45] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+[2026-04-20 16:00:45,352] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=True error=[Errno 54] Connection reset by peer
+[2026-04-20 16:00:45,355] WARNING in agent_dashboard_v4: agent_register_get_agent_failed route=/api/agent/me_v4 error=[Errno 54] Connection reset by peer session_email=final@gmail.com agent_email=final@gmail.com role=AGENT
+127.0.0.1 - - [20/Apr/2026 16:00:45] "[31m[1mGET /api/agent/me_v4 HTTP/1.1[0m" 401 -
+[2026-04-20 16:00:45,360] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=[Errno 54] Connection reset by peer
+127.0.0.1 - - [20/Apr/2026 16:00:45] "GET /agent/dashboard HTTP/1.1" 200 -
+[2026-04-20 16:00:45,364] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=True error=[Errno 54] Connection reset by peer
+[2026-04-20 16:00:45,365] WARNING in agent_dashboard_v4: Supabase select failed table=clients error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:45,367] WARNING in agent_dashboard_v4: agent_register_get_agent_failed route=/api/agent/summary_v4 error=[Errno 54] Connection reset by peer session_email=final@gmail.com agent_email=final@gmail.com role=AGENT
+127.0.0.1 - - [20/Apr/2026 16:00:45] "[31m[1mGET /api/agent/summary_v4 HTTP/1.1[0m" 401 -
+127.0.0.1 - - [20/Apr/2026 16:00:47] "GET /api/agent/me_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:48] "GET /api/agent/activity_v4?period=week HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:49] "GET /api/agent/activity_v4?period=week HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:49] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:49] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:49] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:49] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:50] "GET /agent/dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:50] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [20/Apr/2026 16:00:50] "GET /api/agent/messages HTTP/1.1" 200 -
+[2026-04-20 16:00:50,869] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=False error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:93, additional_data:None>
+[2026-04-20 16:00:50,869] WARNING in agent_dashboard_v4: get_agent_retry_failed_using_cache email=final@gmail.com error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:93, additional_data:None>
+[2026-04-20 16:00:50,874] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:93, additional_data:None>
+[2026-04-20 16:00:50,875] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=False error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:93, additional_data:None>
+[2026-04-20 16:00:50,875] WARNING in agent_dashboard_v4: get_agent_retry_failed_using_cache email=final@gmail.com error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:93, additional_data:None>
+[2026-04-20 16:00:50,877] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=False error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:93, additional_data:None>
+[2026-04-20 16:00:50,877] WARNING in agent_dashboard_v4: get_agent_retry_failed_using_cache email=final@gmail.com error=<ConnectionTerminated error_code:ErrorCodes.PROTOCOL_ERROR, last_stream_id:93, additional_data:None>
+127.0.0.1 - - [20/Apr/2026 16:00:50] "GET /api/agent/me_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:51] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:51] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:52] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:52] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:53] "GET /api/agent/activity_v4?period=week HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:55] "GET /agent/dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:57] "GET /api/agent/me_v4 HTTP/1.1" 200 -
+[2026-04-20 16:00:57,878] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:00:57] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+[2026-04-20 16:00:57,882] WARNING in agent_dashboard_v4: supabase_execute_failed label=get_agent_profile attempt=1 transient=True error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:57,883] WARNING in agent_dashboard_v4: get_agent_retry_failed_using_cache email=final@gmail.com error=[Errno 35] Resource temporarily unavailable
+[2026-04-20 16:00:57,892] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:00:57] "[33mGET /api/agent/messages HTTP/1.1[0m" 404 -
+127.0.0.1 - - [20/Apr/2026 16:00:59] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:00:59] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:00] "GET /api/agent/activity_v4?period=week HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:06] "GET /api/agent/summary_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:11] "GET /api/agent/summary_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:12] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:13] "GET /api/agent/summary_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:18] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [20/Apr/2026 16:01:19] "GET /api/agent/summary_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:20] "GET /login?force=1 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:26] "[32mPOST /login HTTP/1.1[0m" 302 -
+127.0.0.1 - - [20/Apr/2026 16:01:26] "GET /agent/dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:27] "GET /api/agent/me_v4 HTTP/1.1" 200 -
+[2026-04-20 16:01:27,472] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.COMPRESSION_ERROR, last_stream_id:33, additional_data:None>
+[2026-04-20 16:01:27,478] WARNING in app: profile_lookup_failed table=agent_profiles email=final@gmail.com attempt=1 error=<ConnectionTerminated error_code:ErrorCodes.COMPRESSION_ERROR, last_stream_id:33, additional_data:None>
+127.0.0.1 - - [20/Apr/2026 16:01:28] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:28] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:28] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:29] "GET /api/agent/activity_v4?period=week HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:29] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:38] "GET /api/agent/summary_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:42] "GET /api/agent/me_v4 HTTP/1.1" 200 -
+[2026-04-20 16:01:42,862] WARNING in yene_compat_routes: Supabase select failed table=agent_profiles error=[Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [20/Apr/2026 16:01:42] "[33mGET /api/agent/messages HTTP/1.1[0m" 404 -
+127.0.0.1 - - [20/Apr/2026 16:01:43] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:43] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:43] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:43] "GET /api/agent/me_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:44] "GET /api/agent/activity_v4?period=week HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:44] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:44] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:44] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:45] "GET /api/agent/activity_v4?period=week HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:45] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:45] "GET /api/agent/messages/summary HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:49] "GET /api/agent/messages HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:58] "GET /api/agent/me_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:59] "GET /api/agent/summary_v4 HTTP/1.1" 200 -
+127.0.0.1 - - [20/Apr/2026 16:01:59] "GET /api/agent/messages/summary HTTP/1.1" 200 -

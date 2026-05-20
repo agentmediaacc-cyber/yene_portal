@@ -1,0 +1,1136 @@
+import base64
+import time
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+from flask import jsonify, request, session, redirect
+from yene_shared import (
+    agent_quality_score,
+    identity_values as shared_identity_values,
+    matches_identity as shared_matches_identity,
+    normalize_phone,
+    profile_completion,
+    profile_missing,
+    profile_photo,
+)
+
+def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_event=None):
+    UTC = timezone.utc
+    APP_TZ = ZoneInfo("Africa/Windhoek")
+
+    def safe_log(action, message):
+        try:
+            if log_system_event:
+                log_system_event(action, message)
+        except Exception:
+            pass
+
+    def safe_float(v, default=0.0):
+        try:
+            return float(v or 0)
+        except Exception:
+            return default
+
+    def debug(route, identity=None, **counts):
+        try:
+            app.logger.info(
+                "agent_data route=%s identity=%s counts=%s",
+                route,
+                identity or {},
+                counts,
+            )
+        except Exception:
+            pass
+
+    def _is_transient_error(exc):
+        text = str(exc).lower()
+        return (
+            "resource temporarily unavailable" in text
+            or "errno 35" in text
+            or "temporarily unavailable" in text
+            or "timeout" in text
+            or "timed out" in text
+            or "connection reset" in text
+            or "connection aborted" in text
+        )
+
+    def _execute_with_retry(label, query_factory, retries=2, delay=0.25):
+        last_exc = None
+        for attempt in range(retries + 1):
+            try:
+                return query_factory().execute()
+            except Exception as exc:
+                last_exc = exc
+                transient = _is_transient_error(exc)
+                app.logger.warning(
+                    "supabase_execute_failed label=%s attempt=%s transient=%s error=%s",
+                    label,
+                    attempt + 1,
+                    transient,
+                    exc,
+                )
+                if not transient or attempt >= retries:
+                    raise
+                time.sleep(delay * (attempt + 1))
+        raise last_exc
+
+    def week_range():
+        now = datetime.now(APP_TZ)
+        monday = now - timedelta(days=now.weekday())
+        monday = monday.replace(hour=0, minute=0, second=0, microsecond=0)
+        sunday = monday + timedelta(days=6, hours=23, minutes=59, seconds=59)
+        return monday, sunday
+
+    def day_range():
+        now = datetime.now(APP_TZ)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1, seconds=-1)
+        return start, end
+
+    def iso(dt):
+        return dt.astimezone(UTC).isoformat()
+
+    def _identity_values(agent):
+        return shared_identity_values(agent)
+
+    def _matches_identity(row, values, fields):
+        return shared_matches_identity(row, values, fields)
+
+    def _approved(row):
+        return str((row or {}).get("status") or "").strip().upper() in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
+
+    def _profile_photo(agent):
+        return profile_photo(agent)
+
+    def _profile_missing(agent):
+        return profile_missing(agent)
+
+    def _profile_completion(agent):
+        return profile_completion(agent)
+
+    def _normalize_phone(phone):
+        return normalize_phone(phone)
+
+    def _fallback_insert(table, payload, optional_keys):
+        attempts = [payload]
+        slim = dict(payload)
+        for key in optional_keys:
+            slim.pop(key, None)
+        attempts.append(slim)
+        last_exc = None
+        for body in attempts:
+            try:
+                return _execute_with_retry(
+                    f"{table}_insert",
+                    lambda body=body: sb_admin.table(table).insert(body),
+                    retries=2,
+                )
+            except Exception as exc:
+                last_exc = exc
+                app.logger.warning("%s insert attempt failed keys=%s error=%s", table, sorted(body.keys()), exc)
+        raise last_exc
+
+    def _select_all(table, limit=10000, order_col="created_at", desc=True):
+        try:
+            q = sb_admin.table(table).select("*")
+            if order_col:
+                q = q.order(order_col, desc=desc)
+            if limit:
+                q = q.limit(limit)
+            rows = q.execute().data or []
+            debug("_select_all", table=table, rows=len(rows))
+            return rows
+        except Exception as e:
+            if order_col:
+                try:
+                    q = sb_admin.table(table).select("*")
+                    if limit:
+                        q = q.limit(limit)
+                    rows = q.execute().data or []
+                    debug("_select_all_retry_no_order", table=table, rows=len(rows))
+                    return rows
+                except Exception:
+                    pass
+            app.logger.warning("Supabase select failed table=%s error=%s", table, e)
+            return []
+
+    def get_agent():
+        email = (session.get("email") or session.get("agent_email") or "").strip().lower()
+        if not email:
+            return None, "Missing session email"
+
+        cached = session.get("_agent_profile_cache") or {}
+        if isinstance(cached, dict) and str(cached.get("email") or "").strip().lower() != email:
+            cached = {}
+
+        def build():
+            return (
+                sb_admin.table("agent_profiles")
+                .select("*")
+                .eq("email", email)
+                .limit(1)
+            )
+
+        try:
+            rows = _execute_with_retry("get_agent_profile", build, retries=3, delay=0.35).data or []
+            debug("get_agent", {"email": email}, agent_profiles=len(rows))
+            if rows:
+                agent = rows[0]
+                session["_agent_profile_cache"] = {
+                    "id": agent.get("id"),
+                    "auth_id": agent.get("auth_id"),
+                    "user_id": agent.get("user_id"),
+                    "email": agent.get("email"),
+                    "full_name": agent.get("full_name"),
+                    "username": agent.get("username"),
+                    "phone": agent.get("phone") or agent.get("phone_number"),
+                    "phone_number": agent.get("phone_number"),
+                    "town": agent.get("town"),
+                    "region": agent.get("region"),
+                    "operation_region": agent.get("operation_region"),
+                    "referral_code": agent.get("referral_code"),
+                    "status": agent.get("status"),
+                    "profile_picture_url": agent.get("profile_picture_url"),
+                    "profile_pic_path": agent.get("profile_pic_path"),
+                    "residential_address": agent.get("residential_address") or agent.get("address"),
+                    "address": agent.get("address"),
+                    "gender": agent.get("gender"),
+                    "date_of_birth": agent.get("date_of_birth") or agent.get("dob"),
+                    "national_id": agent.get("national_id") or agent.get("id_number"),
+                    "id_number": agent.get("id_number"),
+                    "bio": agent.get("bio") or agent.get("about"),
+                    "about": agent.get("about"),
+                    "must_change_password": agent.get("must_change_password"),
+                }
+                return agent, None
+            if cached:
+                app.logger.warning("get_agent_using_cached_profile email=%s", email)
+                return cached, None
+            return None, f"Agent profile not found for {email}"
+        except Exception as e:
+            if cached:
+                app.logger.warning("get_agent_retry_failed_using_cache email=%s error=%s", email, e)
+                return cached, None
+            return None, str(e)
+
+    def get_rates():
+        for table_name in ["weekly_payment_settings", "payment_rules"]:
+            try:
+                rows = _select_all(table_name, 50, "updated_at", True)
+                debug("get_rates", table=table_name, rows=len(rows))
+                if rows:
+                    row = rows[0]
+                    return {
+                        "client_register_amount": safe_float(
+                            row.get("client_register_amount")
+                            or row.get("client_reg")
+                            or row.get("client_amount")
+                        ),
+                        "driver_register_amount": safe_float(
+                            row.get("driver_register_amount")
+                            or row.get("driver_reg")
+                            or row.get("driver_amount")
+                        ),
+                    }
+            except Exception:
+                continue
+        return {"client_register_amount": 0, "driver_register_amount": 0}
+
+    def get_wallet(agent):
+        ids = _identity_values(agent)
+        try:
+            rows = _select_all("agent_wallets", 5000)
+            rows = [
+                r for r in rows
+                if _matches_identity(r, ids, ("agent_id", "agent_auth_id", "user_id", "auth_id", "agent_email", "email"))
+            ]
+            debug("get_wallet", {"agent_id": agent.get("id"), "email": agent.get("email")}, agent_wallets=len(rows))
+            if rows:
+                row = rows[0]
+                return safe_float(
+                    row.get("available")
+                    or row.get("available_balance")
+                    or row.get("balance")
+                    or row.get("wallet_balance")
+                )
+        except Exception:
+            pass
+        return 0.0
+
+    def _filter_created(rows, start=None, end=None):
+        if not start and not end:
+            return rows
+        out = []
+        for r in rows:
+            raw = r.get("created_at")
+            if not raw:
+                continue
+            try:
+                dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            except Exception:
+                continue
+            if start and dt < start:
+                continue
+            if end and dt > end:
+                continue
+            out.append(r)
+        return out
+
+    def _norm_identity(value):
+        return str(value or "").strip().lower()
+
+    def _leaderboard_period_bounds(period):
+        now = datetime.now(APP_TZ)
+        period = (period or "week").strip().lower()
+        if period == "all":
+            return "all", None, None
+        if period == "month":
+            return "month", now.replace(day=1, hour=0, minute=0, second=0, microsecond=0), now
+        start, end = week_range()
+        return "week", start, end
+
+    def _leaderboard_people(table, start=None, end=None):
+        people = _select_all(table, 10000)
+        if start or end:
+            people = _filter_created(people, start, end)
+
+        grouped = {}
+        for r in people:
+            agent_id = str(
+                r.get("recruiter_agent_id")
+                or r.get("agent_id")
+                or r.get("recruiter_auth_id")
+                or r.get("agent_auth_id")
+                or r.get("recruiter_email")
+                or ""
+            ).strip()
+            if not agent_id:
+                continue
+
+            entry = grouped.setdefault(agent_id, {
+                "agent_id": str(r.get("recruiter_agent_id") or r.get("agent_id") or ""),
+                "agent_name": r.get("recruiter_name") or r.get("agent_name") or r.get("recruiter_email") or "Agent",
+                "email": r.get("recruiter_email") or "",
+                "town_counts": {},
+                "count": 0,
+            })
+            entry["count"] += 1
+            town = (r.get("town") or r.get("region") or "-").strip() if isinstance((r.get("town") or r.get("region") or "-"), str) else "-"
+            entry["town_counts"][town] = entry["town_counts"].get(town, 0) + 1
+
+        results = []
+        metric_name = "drivers" if table == "drivers" else "clients"
+        for _, entry in grouped.items():
+            top_town = "-"
+            if entry["town_counts"]:
+                top_town = sorted(entry["town_counts"].items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+            results.append({
+                "agent_id": entry["agent_id"],
+                "agent_name": entry["agent_name"],
+                "email": entry["email"],
+                metric_name: entry["count"],
+                "count": entry["count"],
+                "town": top_town,
+            })
+
+        results.sort(key=lambda x: (-int(x.get(metric_name) or 0), str(x.get("agent_name") or "")))
+        return results[:50]
+
+    def _agent_for_leaderboard_key(key, agents):
+        key_norm = _norm_identity(key)
+        if not key_norm:
+            return None
+        for agent in agents:
+            values = {_norm_identity(v) for v in _identity_values(agent)}
+            if key_norm in values:
+                return agent
+        return None
+
+    def _aggregate_leaderboard(rows, agents, metric):
+        out = []
+        unmatched = 0
+        for row in rows:
+            raw_key = row.get("agent_id") or row.get("email") or row.get("agent_name")
+            agent = _agent_for_leaderboard_key(raw_key, agents)
+            if not agent:
+                unmatched += 1
+            count = int(row.get(metric) or row.get("count") or 0)
+            shaped = {
+                "agent_id": (agent or {}).get("id") or row.get("agent_id") or "",
+                "agent_name": (
+                    (agent or {}).get("full_name")
+                    or (agent or {}).get("username")
+                    or row.get("agent_name")
+                    or row.get("email")
+                    or "Agent"
+                ),
+                "email": (agent or {}).get("email") or row.get("email") or "",
+                "town": (agent or {}).get("town") or (agent or {}).get("operation_region") or row.get("town") or "-",
+                metric: count,
+                "count": count,
+            }
+            out.append(shaped)
+        out.sort(key=lambda x: (-int(x.get(metric) or 0), str(x.get("agent_name") or "").lower()))
+        for idx, row in enumerate(out, start=1):
+            row["rank"] = idx
+        return out[:50], unmatched
+
+    def _row_created_dt(row):
+        raw = (row or {}).get("created_at")
+        if not raw:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed
+        except Exception:
+            return None
+
+    def _agent_people(agent, table, start=None, end=None):
+        rows = _select_all(table, 10000)
+        rows = _filter_created(rows, start, end)
+        ids = _identity_values(agent)
+        fields = ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")
+        owned = [r for r in rows if _matches_identity(r, ids, fields)]
+        owned.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
+        return owned
+
+    def _shape_activity_row(row, kind):
+        return {
+            "id": row.get("id"),
+            "subject_type": kind,
+            "type": kind.title(),
+            "full_name": row.get("full_name") or row.get("name") or "",
+            "name": row.get("full_name") or row.get("name") or "",
+            "phone": row.get("phone") or row.get("phone_number") or "",
+            "town": row.get("town") or row.get("region") or "",
+            "region": row.get("region") or row.get("town") or "",
+            "external_code": row.get("external_code") or row.get("license_number") or row.get("yene_code") or "",
+            "status": row.get("status"),
+            "created_at": row.get("created_at"),
+            "recruiter_name": row.get("recruiter_name") or row.get("agent_name") or "",
+        }
+
+    def _agent_activity(agent, start=None, end=None, limit=100):
+        drivers = [_shape_activity_row(r, "driver") for r in _agent_people(agent, "drivers", start, end)]
+        clients = [_shape_activity_row(r, "client") for r in _agent_people(agent, "clients", start, end)]
+        rows = drivers + clients
+        rows.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
+        return rows[:limit]
+
+    def _period_bounds(period):
+        period = (period or "week").strip().lower()
+        now = datetime.now(APP_TZ)
+        if period in {"all", "all_time"}:
+            return "all", None, None
+        if period in {"today", "day"}:
+            return "today", *day_range()
+        if period == "month":
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            return "month", start, now
+        start, end = week_range()
+        return "week", start, end
+
+    def _team_rows(agent):
+        if not agent:
+            return []
+        agent_id = str(agent.get("id") or "").strip()
+        referral_code = str(agent.get("referral_code") or "").strip()
+        rows = []
+        for child in _select_all("agent_profiles", 10000):
+            child_id = str(child.get("id") or "").strip()
+            if not child_id or child_id == agent_id:
+                continue
+            linked = (
+                str(child.get("team_leader_id") or "").strip() == agent_id
+                or str(child.get("referred_by") or "").strip() == agent_id
+                or str(child.get("referred_by_id") or "").strip() == agent_id
+                or (referral_code and str(child.get("referred_by_code") or "").strip() == referral_code)
+            )
+            if not linked:
+                continue
+            day_start, day_end = day_range()
+            week_start, week_end = week_range()
+            child_drivers_all = _agent_people(child, "drivers")
+            child_clients_all = _agent_people(child, "clients")
+            child_drivers_day = _agent_people(child, "drivers", day_start, day_end)
+            child_clients_day = _agent_people(child, "clients", day_start, day_end)
+            child_drivers_week = _agent_people(child, "drivers", week_start, week_end)
+            child_clients_week = _agent_people(child, "clients", week_start, week_end)
+            rows.append({
+                "id": child_id,
+                "full_name": child.get("full_name") or child.get("username") or child.get("email") or "Agent",
+                "username": child.get("username"),
+                "email": child.get("email"),
+                "phone": child.get("phone") or child.get("phone_number"),
+                "town": child.get("town"),
+                "region": child.get("region") or child.get("operation_region"),
+                "status": child.get("status"),
+                "created_at": child.get("created_at"),
+                "drivers_day": len(child_drivers_day),
+                "clients_day": len(child_clients_day),
+                "drivers_week": len(child_drivers_week),
+                "clients_week": len(child_clients_week),
+                "drivers_all": len(child_drivers_all),
+                "clients_all": len(child_clients_all),
+            })
+        rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        return rows
+
+    def team_agents(agent):
+        return _team_rows(agent)
+
+    def _duplicate_value_exists(table, value, columns):
+        value_norm = str(value or "").strip().lower()
+        if not value_norm:
+            return False, None, None
+        try:
+            rows = _select_all(table, 10000, "created_at", True)
+            for row in rows:
+                for column in columns:
+                    candidate = str(row.get(column) or "").strip().lower()
+                    if candidate and candidate == value_norm:
+                        return True, column, None
+            return False, None, None
+        except Exception as exc:
+            return False, None, exc
+
+    def _duplicate_phone_exists(table, phone):
+        normalized = str(phone or "").strip()
+        digits = "".join(ch for ch in normalized if ch.isdigit())
+        try:
+            rows = _select_all(table, 10000, "created_at", True)
+            for row in rows:
+                for column in ("phone", "phone_number", "mobile", "cellphone"):
+                    candidate = str(row.get(column) or "").strip()
+                    if not candidate:
+                        continue
+                    candidate_digits = "".join(ch for ch in candidate if ch.isdigit())
+                    if candidate == normalized or (digits and candidate_digits == digits):
+                        return True, column, None
+            return False, None, None
+        except Exception as exc:
+            return False, None, exc
+
+    @app.route("/api/agent/me_v4", methods=["GET"], endpoint="agent_me_v4")
+    @require_login("AGENT")
+    def agent_me_v4():
+        agent, err = get_agent()
+        if err:
+            app.logger.warning(
+                "agent_register_get_agent_failed route=%s error=%s session_email=%s agent_email=%s role=%s",
+                request.path,
+                err,
+                session.get("email"),
+                session.get("agent_email"),
+                session.get("role"),
+            )
+            return jsonify({"ok": False, "error": err}), 401
+        missing = _profile_missing(agent)
+        shaped = dict(agent)
+        shaped["profile_picture_url"] = _profile_photo(agent)
+        shaped["missing_profile_fields"] = missing
+        shaped["profile_complete"] = len(missing) == 0
+        shaped["profile_completion_percent"] = _profile_completion(agent)
+        return jsonify({"ok": True, "agent": shaped, "profile": shaped, "me": shaped})
+
+    @app.route("/api/agent/activity_v4", methods=["GET"], endpoint="agent_activity_v4")
+    @require_login("AGENT")
+    def agent_activity_v4():
+        agent, err = get_agent()
+        if err:
+            app.logger.warning(
+                "agent_register_get_agent_failed route=%s error=%s session_email=%s agent_email=%s role=%s",
+                request.path,
+                err,
+                session.get("email"),
+                session.get("agent_email"),
+                session.get("role"),
+            )
+            return jsonify({"ok": False, "error": err}), 401
+        period, start, end = _period_bounds(request.args.get("period"))
+        rows = _agent_activity(agent, start, end, 200)
+        debug("agent_activity_v4", {"agent_id": agent.get("id"), "period": period}, rows=len(rows))
+        return jsonify({"ok": True, "period": period, "rows": rows, "activity": rows})
+
+    @app.route("/api/agent/debug_links_v4", methods=["GET"], endpoint="agent_debug_links_v4")
+    @require_login("AGENT")
+    def agent_debug_links_v4():
+        agent, err = get_agent()
+        if err:
+            app.logger.warning(
+                "agent_register_get_agent_failed route=%s error=%s session_email=%s agent_email=%s role=%s",
+                request.path,
+                err,
+                session.get("email"),
+                session.get("agent_email"),
+                session.get("role"),
+            )
+            return jsonify({"ok": False, "error": err}), 401
+        week_start, week_end = week_range()
+        drivers_all = _agent_people(agent, "drivers")
+        clients_all = _agent_people(agent, "clients")
+        drivers_week = _agent_people(agent, "drivers", week_start, week_end)
+        clients_week = _agent_people(agent, "clients", week_start, week_end)
+        payload = {
+            "ok": True,
+            "agent": {
+                "id": agent.get("id"),
+                "auth_id": agent.get("auth_id"),
+                "user_id": agent.get("user_id"),
+                "email": agent.get("email"),
+                "full_name": agent.get("full_name") or agent.get("username") or agent.get("email"),
+                "identity_values": _identity_values(agent),
+            },
+            "counts": {
+                "drivers_all": len(drivers_all),
+                "clients_all": len(clients_all),
+                "drivers_week": len(drivers_week),
+                "clients_week": len(clients_week),
+            },
+            "drivers": [_shape_activity_row(r, "driver") for r in drivers_all[:50]],
+            "clients": [_shape_activity_row(r, "client") for r in clients_all[:50]],
+        }
+        return jsonify(payload)
+
+    @app.route("/api/agent/summary_v4", methods=["GET"], endpoint="agent_summary_v4")
+    @require_login("AGENT")
+    def agent_summary_v4():
+        agent, err = get_agent()
+        if err:
+            app.logger.warning(
+                "agent_register_get_agent_failed route=%s error=%s session_email=%s agent_email=%s role=%s",
+                request.path,
+                err,
+                session.get("email"),
+                session.get("agent_email"),
+                session.get("role"),
+            )
+            return jsonify({"ok": False, "error": err}), 401
+        day_start, day_end = day_range()
+        week_start, week_end = week_range()
+        drivers_all = _agent_people(agent, "drivers")
+        clients_all = _agent_people(agent, "clients")
+        drivers_day = _agent_people(agent, "drivers", day_start, day_end)
+        clients_day = _agent_people(agent, "clients", day_start, day_end)
+        drivers_week = _agent_people(agent, "drivers", week_start, week_end)
+        clients_week = _agent_people(agent, "clients", week_start, week_end)
+        approved_drivers_week = [r for r in drivers_week if _approved(r)]
+        approved_clients_week = [r for r in clients_week if _approved(r)]
+        rates = get_rates()
+        wallet_balance = get_wallet(agent)
+        team = _team_rows(agent)
+        missing = _profile_missing(agent)
+        recent = _agent_activity(agent, None, None, 12)
+        earnings_week = (
+            len(approved_drivers_week) * rates["driver_register_amount"]
+            + len(approved_clients_week) * rates["client_register_amount"]
+        )
+        pending_approvals = len([r for r in drivers_week + clients_week if not _approved(r)])
+        summary = {
+            "agent_id": agent.get("id"),
+            "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+            "week_start": week_start.date().isoformat(),
+            "week_end": week_end.date().isoformat(),
+            "drivers_total": len(drivers_all),
+            "clients_total": len(clients_all),
+            "drivers_all": len(drivers_all),
+            "clients_all": len(clients_all),
+            "drivers_today": len(drivers_day),
+            "clients_today": len(clients_day),
+            "drivers_this_week": len(drivers_week),
+            "clients_this_week": len(clients_week),
+            "week_drivers": len(drivers_week),
+            "week_clients": len(clients_week),
+            "team_agents": len(team),
+            "team_agents_count": len(team),
+            "wallet_balance": wallet_balance,
+            "earnings_week": round(earnings_week, 2),
+            "earnings_this_week": round(earnings_week, 2),
+            "pending_approvals": pending_approvals,
+            "quality_score": agent_quality_score(agent, drivers_all, clients_all, team),
+            "profile_complete": len(missing) == 0,
+            "profile_completion_percent": _profile_completion(agent),
+            "missing_profile_fields": missing,
+            "recent": recent,
+            "alerts": [],
+        }
+        debug("agent_summary_v4", {"agent_id": agent.get("id")}, drivers=len(drivers_all), clients=len(clients_all), team=len(team))
+        return jsonify({"ok": True, "summary": summary, "data": summary, **summary})
+
+    @app.route("/api/agent/leaderboard_v4", methods=["GET"], endpoint="agent_leaderboard_v4")
+    @require_login("AGENT")
+    def agent_leaderboard_v4():
+        route_start = time.monotonic()
+        agent, agent_err = get_agent()
+        period, start, end = _leaderboard_period_bounds(request.args.get("period"))
+
+        try:
+            agents = (
+                sb_admin.table("agent_profiles")
+                .select("id,auth_id,user_id,full_name,username,email,town,operation_region")
+                .limit(5000)
+                .execute()
+                .data or []
+            )
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+        try:
+            drivers = _leaderboard_people("drivers", start, end)
+            clients = _leaderboard_people("clients", start, end)
+        except Exception as e:
+            duration_ms = int((time.monotonic() - route_start) * 1000)
+            app.logger.exception(
+                "agent_leaderboard_v4_failed period=%s agent=%s duration_ms=%s error=%s",
+                period,
+                {"id": (agent or {}).get("id"), "email": (agent or {}).get("email"), "err": agent_err},
+                duration_ms,
+                e,
+            )
+            return jsonify({"ok": False, "error": "Could not load leaderboard data"}), 500
+
+        driver_rows_rank, unmatched_drivers = _aggregate_leaderboard(drivers, agents, "drivers")
+        client_rows_rank, unmatched_clients = _aggregate_leaderboard(clients, agents, "clients")
+        duration_ms = int((time.monotonic() - route_start) * 1000)
+
+        app.logger.info(
+            "agent_leaderboard_v4 period=%s agent=%s rows_scanned=%s rows_returned=%s unmatched=%s duration_ms=%s",
+            period,
+            {"id": (agent or {}).get("id"), "email": (agent or {}).get("email"), "err": agent_err},
+            {"drivers": len(drivers), "clients": len(clients), "agents": len(agents)},
+            {"drivers": len(driver_rows_rank), "clients": len(client_rows_rank)},
+            {"drivers": unmatched_drivers, "clients": unmatched_clients},
+            duration_ms,
+        )
+
+        return jsonify({
+            "ok": True,
+            "period": period,
+            "range": {
+                "start": iso(start) if start else None,
+                "end": iso(end) if end else None,
+            },
+            "top_driver_recruiters": driver_rows_rank,
+            "top_client_recruiters": client_rows_rank
+        })
+
+    @app.route("/api/agent/wallet_history_v4", methods=["GET"], endpoint="agent_wallet_history_v4")
+    @require_login("AGENT")
+    def agent_wallet_history_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+
+        try:
+            rows = [
+                r for r in _select_all("agent_wallet_ledger", 5000)
+                if _matches_identity(
+                    r,
+                    _identity_values(agent),
+                    ("agent_id", "agent_auth_id", "user_id", "auth_id", "agent_email", "email"),
+                )
+            ][:100]
+            debug("agent_wallet_history_v4", {"agent_id": agent.get("id")}, agent_wallet_ledger=len(rows))
+            return jsonify({"ok": True, "rows": rows})
+        except Exception as e:
+            return jsonify({
+                "ok": False,
+                "error": str(e),
+                "hint": "Run leaderboard_wallet_schema.sql in Supabase SQL editor first."
+            }), 500
+
+    @app.route("/api/agent/team_summary_v4", methods=["GET"], endpoint="agent_team_summary_v4")
+    @require_login("AGENT")
+    def agent_team_summary_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+
+        team = team_agents(agent)
+        total_agents = len(team)
+        drivers_day = sum(int(x.get("drivers_day") or 0) for x in team)
+        clients_day = sum(int(x.get("clients_day") or 0) for x in team)
+        drivers_week = sum(int(x.get("drivers_week") or 0) for x in team)
+        clients_week = sum(int(x.get("clients_week") or 0) for x in team)
+        drivers_all = sum(int(x.get("drivers_all") or 0) for x in team)
+        clients_all = sum(int(x.get("clients_all") or 0) for x in team)
+
+        return jsonify({
+            "ok": True,
+            "summary": {
+                "team_agents": total_agents,
+                "drivers_day": drivers_day,
+                "clients_day": clients_day,
+                "drivers_week": drivers_week,
+                "clients_week": clients_week,
+                "drivers_all": drivers_all,
+                "clients_all": clients_all,
+            }
+            ,
+            "rows": team[:100],
+            "team": team[:100],
+        })
+
+    @app.route("/api/agent/team_v4", methods=["GET"], endpoint="agent_team_v4")
+    @require_login("AGENT")
+    def agent_team_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+        team = team_agents(agent)
+        return jsonify({"ok": True, "rows": team[:100], "team": team[:100], "count": len(team)})
+
+    @app.route("/api/agent/settings_v4", methods=["POST"], endpoint="agent_settings_v4")
+    @require_login("AGENT")
+    def agent_settings_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+
+        data = request.get_json(silent=True) or {}
+        updates = {
+            "full_name": (data.get("full_name") or "").strip() or agent.get("full_name"),
+            "username": (data.get("username") or "").strip() or agent.get("username"),
+            "phone": (data.get("phone") or "").strip() or agent.get("phone"),
+            "phone_number": (data.get("phone") or "").strip() or agent.get("phone_number") or agent.get("phone"),
+            "email": agent.get("email"),
+            "gender": (data.get("gender") or "").strip() or agent.get("gender"),
+            "date_of_birth": (data.get("date_of_birth") or data.get("dob") or "").strip() or agent.get("date_of_birth"),
+            "national_id": (data.get("national_id") or data.get("id_number") or "").strip() or agent.get("national_id"),
+            "id_number": (data.get("id_number") or data.get("national_id") or "").strip() or agent.get("id_number"),
+            "next_of_kin_name": (data.get("next_of_kin_name") or "").strip() or agent.get("next_of_kin_name"),
+            "next_of_kin_phone": (data.get("next_of_kin_phone") or "").strip() or agent.get("next_of_kin_phone"),
+            "bio": (data.get("bio") or data.get("about") or "").strip() or agent.get("bio"),
+            "about": (data.get("about") or data.get("bio") or "").strip() or agent.get("about"),
+            "town": (data.get("town") or "").strip() or agent.get("town"),
+            "region": (data.get("region") or "").strip() or agent.get("region"),
+            "operation_region": (
+                (data.get("operation_region") or "").strip()
+                or (data.get("region") or "").strip()
+                or agent.get("operation_region")
+            ),
+        }
+        for optional_key in ("profile_picture_url", "profile_pic_path", "residential_address", "address", "pin"):
+            if optional_key in data:
+                updates[optional_key] = (data.get(optional_key) or "").strip()
+
+        try:
+            try:
+                sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
+            except Exception:
+                fallback = dict(updates)
+                for key in ("date_of_birth", "national_id", "id_number", "next_of_kin_name", "next_of_kin_phone", "bio", "about", "phone_number"):
+                    fallback.pop(key, None)
+                sb_admin.table("agent_profiles").update(fallback).eq("id", agent.get("id")).execute()
+            session["email"] = updates["email"]
+            session["agent_email"] = updates["email"]
+            return jsonify({"ok": True, "success": True})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.route("/api/agent/profile_photo_v4", methods=["POST"], endpoint="agent_profile_photo_v4")
+    @require_login("AGENT")
+    def agent_profile_photo_v4():
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+
+        data = request.get_json(silent=True) or {}
+        image_data = str(data.get("image_data") or "")
+        if "," in image_data and image_data.startswith("data:"):
+            header, encoded = image_data.split(",", 1)
+            mime = header.split(";")[0].replace("data:", "") or "image/jpeg"
+        else:
+            encoded = image_data
+            mime = data.get("mime_type") or "image/jpeg"
+        if not encoded:
+            return jsonify({"ok": False, "error": "image_data required"}), 400
+        if mime not in {"image/jpeg", "image/png", "image/webp"}:
+            return jsonify({"ok": False, "error": "Only JPG, PNG, or WEBP photos are supported"}), 400
+        try:
+            raw = base64.b64decode(encoded, validate=True)
+        except Exception:
+            return jsonify({"ok": False, "error": "Invalid image data"}), 400
+        if len(raw) > 5 * 1024 * 1024:
+            return jsonify({"ok": False, "error": "Photo must be 5MB or smaller"}), 400
+
+        bucket = "agent-profile-photos"
+        ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[mime]
+        path = f"agents/{agent.get('id') or agent.get('email')}/profile.{ext}"
+        try:
+            storage = sb_admin.storage.from_(bucket)
+            try:
+                storage.upload(path, raw, {"content-type": mime})
+            except TypeError:
+                storage.upload(path, raw, file_options={"content-type": mime})
+            public_url = storage.get_public_url(path)
+            if isinstance(public_url, dict):
+                public_url = public_url.get("publicURL") or public_url.get("publicUrl") or public_url.get("data", {}).get("publicUrl") or str(public_url)
+            elif hasattr(public_url, "get"):
+                try:
+                    public_url = public_url.get("publicURL") or public_url.get("publicUrl") or str(public_url)
+                except Exception:
+                    public_url = str(public_url)
+            elif not isinstance(public_url, str):
+                public_url = getattr(public_url, "public_url", None) or getattr(public_url, "publicURL", None) or str(public_url)
+            updates = {"profile_picture_url": public_url, "profile_pic_path": public_url}
+            try:
+                sb_admin.table("agent_profiles").update(updates).eq("id", agent.get("id")).execute()
+            except Exception:
+                sb_admin.table("agent_profiles").update({"profile_picture_url": public_url}).eq("id", agent.get("id")).execute()
+            return jsonify({"ok": True, "url": public_url, "path": path})
+        except Exception as exc:
+            app.logger.exception("profile_photo_upload_failed agent_id=%s", agent.get("id"))
+            return jsonify({
+                "ok": False,
+                "error": f"Could not upload profile photo: {exc}",
+            }), 500
+
+    @app.route("/api/agent/register_driver_v4", methods=["POST"], endpoint="agent_register_driver_v4")
+    @require_login("AGENT")
+    def agent_register_driver_v4():
+        route_start = time.monotonic()
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+        # Profile completion is optional. Do not block driver registration.
+
+        data = request.get_json(silent=True) or {}
+        full_name = (data.get("full_name") or "").strip()
+        phone, phone_error = _normalize_phone(data.get("phone"))
+        town = (data.get("town") or "").strip()
+        license_number = (data.get("license_number") or "").strip()
+        car_details = (data.get("car_details") or "").strip()
+        external_code = (data.get("external_code") or "").strip()
+
+        if phone_error:
+            return jsonify({"ok": False, "error": phone_error}), 400
+        if not full_name or not phone or not town or not license_number:
+            return jsonify({"ok": False, "error": "Full name, phone, town and PAR/license number are required"}), 400
+
+        app.logger.info(
+            "agent_register_driver_v4 payload agent=%s fields=%s phone_present=%s",
+            {"id": agent.get("id"), "email": agent.get("email")},
+            sorted([k for k, v in data.items() if v not in (None, "")]),
+            bool(phone),
+        )
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_phone_exists("drivers", phone)
+        if duplicate_error:
+            app.logger.exception(
+                "agent_register_driver_v4_failed phase=duplicate_check agent_id=%s error=%s",
+                agent.get("id"),
+                duplicate_error,
+            )
+            return jsonify({"ok": False, "error": "Could not validate driver phone. Please try again."}), 503
+        app.logger.info(
+            "agent_register_driver_v4 duplicate_check agent_id=%s duplicate=%s column=%s",
+            agent.get("id"),
+            duplicate,
+            duplicate_column,
+        )
+        if duplicate:
+            return jsonify({"ok": False, "error": "Driver phone already exists"}), 400
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_value_exists(
+            "drivers",
+            license_number,
+            ("license_number", "external_code", "driver_code", "par_number"),
+        )
+        if duplicate_error:
+            return jsonify({"ok": False, "error": "Could not validate driver code. Please try again."}), 503
+        if duplicate:
+            return jsonify({"ok": False, "error": f"Driver already exists with this {duplicate_column}"}), 400
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_value_exists(
+            "drivers",
+            full_name,
+            ("full_name", "name"),
+        )
+        if duplicate_error:
+            return jsonify({"ok": False, "error": "Could not validate driver name. Please try again."}), 503
+        if duplicate:
+            return jsonify({"ok": False, "error": "A driver with this name already exists"}), 400
+
+        payload = {
+            "full_name": full_name,
+            "phone_number": phone,
+            "phone": phone,
+            "license_number": license_number,
+            "car_details": car_details,
+            "town": town,
+            "status": "pending_approval",
+            "trips_completed": 0,
+            "verified_trips": 0,
+            "recruiter_agent_id": str(agent.get("id") or ""),
+            "agent_id": str(agent.get("id") or ""),
+            # "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "recruiter_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "recruiter_email": agent.get("email") or "",
+            "recruiter_name": agent.get("full_name") or agent.get("email"),
+        }
+
+        if external_code:
+            payload["external_code"] = external_code
+
+        try:
+            res = _fallback_insert("drivers", payload, ("phone", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email", "external_code"))
+            inserted = res.data or []
+            try:
+                row_id = (inserted[0] or {}).get("id") if inserted else ""
+                _fallback_insert("agent_messages", {
+                    "agent_id": str(agent.get("id") or ""),
+                    # "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                    # "agent_email": agent.get("email") or "",
+                    "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                    "registration_type": "driver",
+                    "registration_id": str(row_id or ""),
+                    "subject": "Driver registration submitted",
+                    "message": f"Driver {full_name} was saved and is waiting for admin approval.",
+                    "status": "unread",
+                    "created_at": iso(datetime.now(UTC)),
+                }, ("agent_auth_id", "registration_type", "registration_id"))
+            except Exception:
+                app.logger.warning("agent_register_driver_v4_message_failed agent_id=%s", agent.get("id"))
+            safe_log("REGISTER_DRIVER", f"Agent {agent.get('email')} registered driver {full_name}")
+            app.logger.info(
+                "agent_register_driver_v4 insert_ok agent_id=%s inserted_rows=%s created_id=%s duration_ms=%s",
+                agent.get("id"),
+                len(inserted),
+                (inserted[0] or {}).get("id") if inserted else None,
+                int((time.monotonic() - route_start) * 1000),
+            )
+            return jsonify({"ok": True, "success": True, "row": inserted[0] if inserted else None})
+        except Exception as e:
+            app.logger.exception(
+                "agent_register_driver_v4_failed phase=insert agent_id=%s duration_ms=%s error=%s",
+                agent.get("id"),
+                int((time.monotonic() - route_start) * 1000),
+                e,
+            )
+            status = 503 if _is_transient_error(e) else 500
+            return jsonify({"ok": False, "error": "Driver registration could not be saved. Please try again."}), status
+
+    @app.route("/api/agent/register_client_v4", methods=["POST"], endpoint="agent_register_client_v4")
+    @require_login("AGENT")
+    def agent_register_client_v4():
+        route_start = time.monotonic()
+        agent, err = get_agent()
+        if err:
+            return jsonify({"ok": False, "error": err}), 401
+        # Profile completion is optional. Do not block client registration.
+
+        data = request.get_json(silent=True) or {}
+        full_name = (data.get("full_name") or "").strip()
+        phone, phone_error = _normalize_phone(data.get("phone"))
+        town = (data.get("town") or "").strip()
+        external_code = (data.get("external_code") or "").strip()
+
+        if phone_error:
+            return jsonify({"ok": False, "error": phone_error}), 400
+        if not full_name or not phone:
+            return jsonify({"ok": False, "error": "Full name and phone are required"}), 400
+
+        app.logger.info(
+            "agent_register_client_v4 payload agent=%s fields=%s phone_present=%s",
+            {"id": agent.get("id"), "email": agent.get("email")},
+            sorted([k for k, v in data.items() if v not in (None, "")]),
+            bool(phone),
+        )
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_phone_exists("clients", phone)
+        if duplicate_error:
+            app.logger.exception(
+                "agent_register_client_v4_failed phase=duplicate_check agent_id=%s error=%s",
+                agent.get("id"),
+                duplicate_error,
+            )
+            return jsonify({"ok": False, "error": "Could not validate client phone. Please try again."}), 503
+        app.logger.info(
+            "agent_register_client_v4 duplicate_check agent_id=%s duplicate=%s column=%s",
+            agent.get("id"),
+            duplicate,
+            duplicate_column,
+        )
+        if duplicate:
+            return jsonify({"ok": False, "error": "Client phone already exists"}), 400
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_value_exists(
+            "clients",
+            external_code,
+            ("external_code", "yene_code", "customer_code", "client_code"),
+        )
+        if duplicate_error:
+            return jsonify({"ok": False, "error": "Could not validate client code. Please try again."}), 503
+        if duplicate:
+            return jsonify({"ok": False, "error": f"Client already exists with this {duplicate_column}"}), 400
+
+        duplicate, duplicate_column, duplicate_error = _duplicate_value_exists(
+            "clients",
+            full_name,
+            ("full_name", "name"),
+        )
+        if duplicate_error:
+            return jsonify({"ok": False, "error": "Could not validate client name. Please try again."}), 503
+        if duplicate:
+            return jsonify({"ok": False, "error": "A client with this name already exists"}), 400
+
+        payload = {
+            "phone_number": phone,
+            "phone": phone,
+            "yene_code": external_code or "PENDING",
+            "status": "pending_approval",
+            "trips_completed": 0,
+            "recruiter_agent_id": str(agent.get("id") or ""),
+            "agent_id": str(agent.get("id") or ""),
+            # "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "recruiter_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+            "recruiter_email": agent.get("email") or "",
+            "recruiter_name": agent.get("full_name") or agent.get("email"),
+        }
+
+        if full_name:
+            payload["full_name"] = full_name
+        if town:
+            payload["town"] = town
+        if external_code:
+            payload["external_code"] = external_code
+
+        try:
+            res = _fallback_insert("clients", payload, ("phone", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email", "external_code"))
+            inserted = res.data or []
+            try:
+                row_id = (inserted[0] or {}).get("id") if inserted else ""
+                _fallback_insert("agent_messages", {
+                    "agent_id": str(agent.get("id") or ""),
+                    # "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                    # "agent_email": agent.get("email") or "",
+                    "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                    "registration_type": "client",
+                    "registration_id": str(row_id or ""),
+                    "subject": "Client registration submitted",
+                    "message": f"Client {full_name} was saved and is waiting for admin approval.",
+                    "status": "unread",
+                    "created_at": iso(datetime.now(UTC)),
+                }, ("agent_auth_id", "registration_type", "registration_id"))
+            except Exception:
+                app.logger.warning("agent_register_client_v4_message_failed agent_id=%s", agent.get("id"))
+            safe_log("REGISTER_CLIENT", f"Agent {agent.get('email')} registered client {phone}")
+            app.logger.info(
+                "agent_register_client_v4 insert_ok agent_id=%s inserted_rows=%s created_id=%s duration_ms=%s",
+                agent.get("id"),
+                len(inserted),
+                (inserted[0] or {}).get("id") if inserted else None,
+                int((time.monotonic() - route_start) * 1000),
+            )
+            return jsonify({"ok": True, "success": True, "row": inserted[0] if inserted else None})
+        except Exception as e:
+            app.logger.exception(
+                "agent_register_client_v4_failed phase=insert agent_id=%s duration_ms=%s error=%s",
+                agent.get("id"),
+                int((time.monotonic() - route_start) * 1000),
+                e,
+            )
+            status = 503 if _is_transient_error(e) else 500
+            return jsonify({"ok": False, "error": "Client registration could not be saved. Please try again."}), status

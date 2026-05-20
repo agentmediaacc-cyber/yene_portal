@@ -1,0 +1,1693 @@
+from datetime import datetime, timedelta
+from io import BytesIO
+import os
+import uuid
+
+from flask import flash, jsonify, redirect, render_template, request, send_file, session
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from yene_shared import agent_quality_score, parse_datetime, profile_completion, profile_missing
+
+
+def register_yene_compat_routes(app, sb_admin):
+    def _now_iso():
+        return datetime.utcnow().isoformat() + "Z"
+
+    def _clean(v):
+        return str(v or "").strip()
+
+    def _safe_float(v, default=0.0):
+        try:
+            return float(v or 0)
+        except Exception:
+            return default
+
+    def _fmt_money(v):
+        return f"N$ {_safe_float(v):,.2f}"
+
+    def _parse_date(value, default):
+        try:
+            return datetime.fromisoformat(str(value)).date()
+        except Exception:
+            return default
+
+    def _debug(route, identity=None, **counts):
+        try:
+            app.logger.info(
+                "compat_data route=%s identity=%s counts=%s env=%s",
+                route,
+                identity or {},
+                counts,
+                {
+                    "url_present": bool(os.getenv("SUPABASE_URL")),
+                    "anon_present": bool(os.getenv("SUPABASE_ANON_KEY")),
+                    "service_present": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SERVICE_KEY")),
+                },
+            )
+        except Exception:
+            pass
+
+    def _safe_select(table, filters=None, cols="*", limit=None, order_col=None, desc=False):
+        filters = filters or {}
+        try:
+            all_rows = []
+            page_size = 1000
+            start = 0
+            remaining = int(limit) if limit else None
+
+            while True:
+                batch_size = page_size if remaining is None else min(page_size, remaining)
+                if batch_size <= 0:
+                    break
+
+                q = sb_admin.table(table).select(cols).range(start, start + batch_size - 1)
+                for k, v in filters.items():
+                    q = q.eq(k, v)
+                if order_col:
+                    q = q.order(order_col, desc=desc)
+
+                res = q.execute()
+                batch = res.data or []
+                _debug("_safe_select_batch", table=table, start=start, rows=len(batch))
+                all_rows.extend(batch)
+
+                if len(batch) < batch_size:
+                    break
+
+                start += batch_size
+                if remaining is not None:
+                    remaining -= len(batch)
+
+            _debug("_safe_select", table=table, rows=len(all_rows))
+            return all_rows
+        except Exception as e:
+            if order_col:
+                try:
+                    all_rows = []
+                    page_size = 1000
+                    start = 0
+                    remaining = int(limit) if limit else None
+
+                    while True:
+                        batch_size = page_size if remaining is None else min(page_size, remaining)
+                        if batch_size <= 0:
+                            break
+
+                        q = sb_admin.table(table).select(cols).range(start, start + batch_size - 1)
+                        for k, v in filters.items():
+                            q = q.eq(k, v)
+
+                        res = q.execute()
+                        batch = res.data or []
+                        _debug("_safe_select_retry_no_order_batch", table=table, start=start, rows=len(batch))
+                        all_rows.extend(batch)
+
+                        if len(batch) < batch_size:
+                            break
+
+                        start += batch_size
+                        if remaining is not None:
+                            remaining -= len(batch)
+
+                    _debug("_safe_select_retry_no_order", table=table, rows=len(all_rows))
+                    return all_rows
+                except Exception:
+                    pass
+            app.logger.warning("Supabase select failed table=%s error=%s", table, e)
+            return []
+
+    def _safe_insert(table, payload):
+        try:
+            return sb_admin.table(table).insert(payload).execute()
+        except Exception as e:
+            return e
+
+    def _safe_update(table, filters, payload):
+        try:
+            q = sb_admin.table(table).update(payload)
+            for k, v in filters.items():
+                q = q.eq(k, v)
+            return q.execute()
+        except Exception as e:
+            return e
+
+    def _safe_delete(table, filters):
+        try:
+            q = sb_admin.table(table).delete()
+            for k, v in filters.items():
+                q = q.eq(k, v)
+            return q.execute()
+        except Exception as e:
+            return e
+
+    def _approved(row_or_status):
+        status = row_or_status.get("status") if isinstance(row_or_status, dict) else row_or_status
+        return str(status or "").upper() in {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
+
+    def _pending(row_or_status):
+        status = row_or_status.get("status") if isinstance(row_or_status, dict) else row_or_status
+        return str(status or "").upper() in {"PENDING", "PENDING_APPROVAL", "UNDER_REVIEW"}
+
+    def _payment_rules_latest():
+        weekly = _safe_select("weekly_payment_settings", {}, "*", 50, "updated_at", True)
+        if weekly:
+            row = weekly[0]
+            row["_source"] = "weekly_payment_settings"
+            return row
+        rules = _safe_select("payment_rules", {}, "*", 100, "updated_at", True)
+        if rules:
+            row = rules[0]
+            row["_source"] = "payment_rules"
+            return row
+        return {"_source": "none"}
+
+    def _payment_amounts():
+        rules = _payment_rules_latest()
+        return {
+            "source": rules.get("_source") or "none",
+            "driver_reg": _safe_float(
+                rules.get("driver_reg")
+                or rules.get("driver_register_amount")
+                or rules.get("driver_amount")
+            ),
+            "client_reg": _safe_float(
+                rules.get("client_reg")
+                or rules.get("client_register_amount")
+                or rules.get("client_amount")
+            ),
+            "daily_5_drivers_bonus": _safe_float(rules.get("daily_5_drivers_bonus")),
+            "daily_5_clients_bonus": _safe_float(rules.get("daily_5_clients_bonus")),
+            "daily_driver_threshold": int(_safe_float(rules.get("daily_driver_threshold") or rules.get("driver_daily_threshold") or 5, 5)),
+            "daily_client_threshold": int(_safe_float(rules.get("daily_client_threshold") or rules.get("client_daily_threshold") or 5, 5)),
+            "weekly_activation_threshold": int(_safe_float(rules.get("weekly_activation_threshold") or rules.get("weekly_threshold") or 30, 30)),
+            "weekly_30_activations_bonus": _safe_float(rules.get("weekly_30_activations_bonus")),
+            "first_trip_bonus": _safe_float(rules.get("first_trip_bonus")),
+            "status": _clean(rules.get("status") or "Active"),
+            "is_active": str(rules.get("status") or "Active").strip().lower() not in {"inactive", "disabled", "off", "false"},
+        }
+
+    def _row_date(row):
+        dt = parse_datetime((row or {}).get("created_at"))
+        return dt.date() if dt else None
+
+    def _this_week(row):
+        today = datetime.utcnow().date()
+        start = today - timedelta(days=today.weekday())
+        end = start + timedelta(days=6)
+        day = _row_date(row)
+        return bool(day and start <= day <= end)
+
+    def _this_month(row):
+        today = datetime.utcnow().date()
+        day = _row_date(row)
+        return bool(day and day.year == today.year and day.month == today.month)
+
+    def _all_agents():
+        return _safe_select("agent_profiles", {}, "*", 5000, "created_at", True)
+
+    def _agent_by_id(agent_id):
+        rows = _safe_select("agent_profiles", {"id": str(agent_id)}, "*", 1)
+        return rows[0] if rows else None
+
+    def _agent_by_email(email):
+        email = _clean(email).lower()
+        rows = _safe_select("agent_profiles", {"email": email}, "*", 1)
+        return rows[0] if rows else None
+
+    def _agent_by_ref(ref):
+        ref = _clean(ref)
+        if not ref:
+            return None
+        for col in ("referral_code", "email", "id"):
+            rows = _safe_select("agent_profiles", {col: ref}, "*", 1)
+            if rows:
+                return rows[0]
+        return None
+
+    def _temp_password_for_agent(agent):
+        base = str((agent or {}).get("phone") or (agent or {}).get("phone_number") or "")[-6:]
+        if not base:
+            base = "123456"
+        return f"Yene@{base}"
+
+    def _link_or_create_auth_user(email, password, full_name="", username=""):
+        try:
+            users = sb_admin.auth.admin.list_users()
+            found = None
+            for u in getattr(users, "users", []) or []:
+                if str(getattr(u, "email", "") or "").strip().lower() == str(email or "").strip().lower():
+                    found = u
+                    break
+
+            if found:
+                uid = getattr(found, "id", None)
+                try:
+                    sb_admin.auth.admin.update_user_by_id(uid, {
+                        "password": password,
+                        "email_confirm": True,
+                        "user_metadata": {
+                            "full_name": full_name or "",
+                            "username": username or "",
+                        }
+                    })
+                except Exception:
+                    pass
+                return uid
+
+            created = sb_admin.auth.admin.create_user({
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "full_name": full_name or "",
+                    "username": username or "",
+                }
+            })
+            return getattr(getattr(created, "user", None), "id", None)
+        except Exception as e:
+            app.logger.warning("link_or_create_auth_user_failed email=%s error=%s", email, e)
+            return None
+
+    def _current_agent():
+        return _agent_by_email(session.get("email") or session.get("agent_email"))
+
+    def _identity_values(agent):
+        vals = []
+        for key in ("id", "auth_id", "user_id", "email"):
+            val = str((agent or {}).get(key) or "").strip()
+            if val and val not in vals:
+                vals.append(val)
+        return vals
+
+    def _matches_identity(row, values, fields):
+        return any(str(row.get(field) or "").strip() in values for field in fields)
+
+    def _agent_rows(table, agent, fields):
+        values = _identity_values(agent)
+        return [r for r in _safe_select(table, {}, "*", 10000, "created_at", True) if _matches_identity(r, values, fields)]
+
+    def _drivers():
+        return _safe_select("drivers", {}, "*", 10000, "created_at", True)
+
+    def _clients():
+        return _safe_select("clients", {}, "*", 10000, "created_at", True)
+
+    def _agent_lookup_maps():
+        by_id = {}
+        by_email = {}
+        for agent in _all_agents():
+            name = agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent"
+            shaped = {
+                "id": agent.get("id"),
+                "name": name,
+                "email": agent.get("email"),
+                "phone": agent.get("phone") or agent.get("phone_number"),
+                "referral_code": agent.get("referral_code"),
+            }
+            for key in ("id", "auth_id", "user_id"):
+                val = _clean(agent.get(key))
+                if val:
+                    by_id[val] = shaped
+            email = _clean(agent.get("email")).lower()
+            if email:
+                by_email[email] = shaped
+        return by_id, by_email
+
+    def _with_recruiter_details(rows):
+        by_id, by_email = _agent_lookup_maps()
+        out = []
+        for row in rows:
+            shaped = dict(row)
+            recruiter = None
+            for key in ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id"):
+                val = _clean(row.get(key))
+                if val and val in by_id:
+                    recruiter = by_id[val]
+                    break
+            email = _clean(row.get("recruiter_email")).lower()
+            if not recruiter and email:
+                recruiter = by_email.get(email)
+            if recruiter:
+                shaped.setdefault("recruiter_agent_id", recruiter.get("id"))
+                shaped["recruiter_name"] = row.get("recruiter_name") or recruiter.get("name")
+                shaped["recruiter_email"] = row.get("recruiter_email") or recruiter.get("email")
+                shaped["recruiter_phone"] = row.get("recruiter_phone") or recruiter.get("phone")
+                shaped["recruiter_referral_code"] = recruiter.get("referral_code")
+            out.append(shaped)
+        return out
+
+    def _agent_registration_rows(agent_or_id, date_from=None, date_to=None):
+        agent = agent_or_id if isinstance(agent_or_id, dict) else _agent_by_id(agent_or_id)
+        values = _identity_values(agent) if agent else [str(agent_or_id)]
+        rows = []
+        for d in _drivers():
+            if not _matches_identity(d, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")):
+                continue
+            rows.append({
+                "id": d.get("id"),
+                "type": "Driver",
+                "name": d.get("full_name") or d.get("name") or "",
+                "phone": d.get("phone") or d.get("phone_number") or "",
+                "town": d.get("town") or "",
+                "region": d.get("region") or d.get("town") or "",
+                "code": d.get("external_code") or d.get("license_number") or "",
+                "created_at": d.get("created_at"),
+                "status": d.get("status"),
+                "registered_by": (agent or {}).get("full_name") or (agent or {}).get("username") or (agent or {}).get("email") or d.get("recruiter_name") or "",
+                "recruiter_name": d.get("recruiter_name") or (agent or {}).get("full_name") or "",
+                "recruiter_email": d.get("recruiter_email") or (agent or {}).get("email") or "",
+                "trips_completed": d.get("trips_completed") or 0,
+                "verified_trips": d.get("verified_trips") or 0,
+            })
+        for c in _clients():
+            if not _matches_identity(c, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")):
+                continue
+            rows.append({
+                "id": c.get("id"),
+                "type": "Client",
+                "name": c.get("full_name") or c.get("name") or "",
+                "phone": c.get("phone") or c.get("phone_number") or "",
+                "town": c.get("town") or c.get("region") or "",
+                "region": c.get("region") or c.get("town") or "",
+                "code": c.get("external_code") or c.get("yene_code") or "",
+                "created_at": c.get("created_at"),
+                "status": c.get("status"),
+                "registered_by": (agent or {}).get("full_name") or (agent or {}).get("username") or (agent or {}).get("email") or c.get("recruiter_name") or "",
+                "recruiter_name": c.get("recruiter_name") or (agent or {}).get("full_name") or "",
+                "recruiter_email": c.get("recruiter_email") or (agent or {}).get("email") or "",
+            })
+
+        def in_range(row):
+            raw = row.get("created_at")
+            if not raw:
+                return False
+            day = str(raw)[:10]
+            if date_from and day < date_from:
+                return False
+            if date_to and day > date_to:
+                return False
+            return True
+
+        if date_from or date_to:
+            rows = [r for r in rows if in_range(r)]
+        rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        _debug("_agent_registration_rows", {"ids": values[:3]}, rows=len(rows))
+        return rows
+
+    def _team_rows_for_agent(agent):
+        if not agent:
+            return []
+        leader_id = _clean(agent.get("id"))
+        leader_code = _clean(agent.get("referral_code"))
+        rows = []
+        for child in _all_agents():
+            child_id = _clean(child.get("id"))
+            if not child_id or child_id == leader_id:
+                continue
+            if (
+                _clean(child.get("team_leader_id")) == leader_id
+                or _clean(child.get("referred_by")) == leader_id
+                or _clean(child.get("referred_by_id")) == leader_id
+                or (leader_code and _clean(child.get("referred_by_code")) == leader_code)
+            ):
+                activity = _agent_registration_rows(child_id)
+                rows.append({
+                    "id": child_id,
+                    "full_name": child.get("full_name") or child.get("username") or child.get("email"),
+                    "username": child.get("username"),
+                    "email": child.get("email"),
+                    "phone": child.get("phone") or child.get("phone_number"),
+                    "town": child.get("town"),
+                    "region": child.get("region") or child.get("operation_region"),
+                    "status": child.get("status"),
+                    "created_at": child.get("created_at"),
+                    "profile_picture_url": child.get("profile_picture_url") or child.get("profile_pic_path"),
+                    "drivers_all": len([r for r in activity if r.get("type") == "Driver"]),
+                    "clients_all": len([r for r in activity if r.get("type") == "Client"]),
+                })
+        rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        return rows
+
+    def _period_from_request():
+        mode = _clean(request.args.get("mode")) or "current_week"
+        today = datetime.utcnow().date()
+        date_from = date_to = None
+        if mode == "all_time":
+            return mode, None, None
+        if mode == "custom":
+            return mode, _clean(request.args.get("date_from")) or None, _clean(request.args.get("date_to")) or None
+        if mode == "day":
+            day = _clean(request.args.get("date_day")) or today.isoformat()
+            return mode, day, day
+        week_start = _clean(request.args.get("week_start"))
+        try:
+            start = datetime.fromisoformat(week_start).date() if week_start else today - timedelta(days=today.weekday())
+        except Exception:
+            start = today - timedelta(days=today.weekday())
+        end = start + timedelta(days=6)
+        return mode, start.isoformat(), end.isoformat()
+
+    @app.get("/api/public-config")
+    def public_config():
+        return jsonify({
+            "ok": True,
+            "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
+            "SUPABASE_ANON_KEY": os.getenv("SUPABASE_ANON_KEY", ""),
+        })
+
+    @app.get("/admin")
+    def admin_root_alias():
+        return redirect("/dashboard/admin")
+
+    @app.get("/admin/agent/<agent_id>")
+    @app.get("/admin/agent_profile/<agent_id>")
+    def admin_agent_profile_page(agent_id):
+        if (session.get("role") or "").upper() != "ADMIN":
+            return redirect("/admin/login")
+        return render_template("admin_agent_profile.html", agent_id=agent_id)
+
+    @app.route("/apply")
+    def apply_alias():
+        return redirect("/register")
+
+    @app.route("/register", methods=["GET", "POST"])
+    def register_agent_public():
+        incoming_ref = _clean(request.args.get("ref") or request.args.get("code"))
+        if incoming_ref:
+            session["agent_ref"] = incoming_ref
+        if request.method == "GET":
+            return render_template("register.html")
+
+        full_name = _clean(request.form.get("full_name"))
+        username = _clean(request.form.get("username")).lower()
+        phone = _clean(request.form.get("phone"))
+        email = _clean(request.form.get("email")).lower()
+        gender = _clean(request.form.get("gender"))
+        password = request.form.get("password") or ""
+
+        if not full_name or not username or not phone or not email or len(password) < 6:
+            flash("Full name, username, phone, email and a 6-character password are required")
+            return redirect("/register")
+
+        if _agent_by_email(email):
+            flash("An agent profile already exists for this email")
+            return redirect("/login")
+
+        auth_id = None
+        auth_error = None
+        try:
+            auth_res = sb_admin.auth.admin.create_user({
+                "email": email,
+                "password": password,
+                "email_confirm": True,
+                "user_metadata": {"full_name": full_name, "username": username},
+            })
+            auth_id = getattr(getattr(auth_res, "user", None), "id", None)
+        except Exception as e:
+            auth_error = str(e)
+
+        agent_id = str(uuid.uuid4())
+        leader = _agent_by_ref(session.get("agent_ref"))
+        payload = {
+            "id": agent_id,
+            "auth_id": auth_id,
+            "user_id": auth_id,
+            "full_name": full_name,
+            "username": username,
+            "phone": phone,
+            "phone_number": phone,
+            "email": email,
+            "gender": gender,
+            "role": "AGENT",
+            "status": "PENDING_APPROVAL",
+            "created_at": _now_iso(),
+        }
+        if leader:
+            payload.update({
+                "team_leader_id": leader.get("id"),
+                "team_leader_name": leader.get("full_name") or leader.get("username") or leader.get("email"),
+                "referred_by": leader.get("id"),
+                "referred_by_code": leader.get("referral_code") or leader.get("email"),
+            })
+
+        res = _safe_insert("agent_profiles", payload)
+        if isinstance(res, Exception):
+            fallback = dict(payload)
+            for key in ("team_leader_id", "team_leader_name", "referred_by", "referred_by_code", "auth_id", "user_id", "created_at"):
+                fallback.pop(key, None)
+            res = _safe_insert("agent_profiles", fallback)
+            if isinstance(res, Exception):
+                flash(f"Registration failed: {res}")
+                return redirect("/register")
+
+        if leader:
+            _safe_insert("agent_referrals", {
+                "parent_agent_id": leader.get("id"),
+                "parent_agent_email": leader.get("email"),
+                "child_agent_id": agent_id,
+                "child_agent_email": email,
+                "child_agent_name": full_name,
+                "created_at": _now_iso(),
+            })
+
+        if not auth_id:
+            flash("Account creation failed. Please try again or contact admin.")
+            return redirect("/register")
+
+        session.clear()
+        session["email"] = email
+        session["agent_email"] = email
+        session["role"] = "AGENT"
+        return redirect("/agent/dashboard")
+
+    @app.get("/api/agent/me")
+    def agent_me_alias():
+        agent = _current_agent()
+        if not agent:
+            return jsonify({"ok": False, "error": "Agent profile not found"}), 404
+        _debug("agent_me", {"agent_id": agent.get("id"), "email": agent.get("email")}, agent_profiles=1)
+        return jsonify({"ok": True, "agent": agent, "profile": agent, "me": agent})
+
+    @app.get("/api/agent/competition_board_v1")
+    def agent_competition_board_v1():
+        me = _current_agent()
+        if not me:
+            return jsonify({"ok": False, "error": "Agent profile not found"}), 404
+        agents = _all_agents()
+        drivers = _drivers()
+        clients = _clients()
+        rows = []
+        for a in agents:
+            aid = str(a.get("id") or "")
+            values = _identity_values(a)
+            d_count = len([x for x in drivers if _matches_identity(x, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_email"))])
+            c_count = len([x for x in clients if _matches_identity(x, values, ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_email"))])
+            rows.append({
+                "agent_id": aid,
+                "agent_name": a.get("full_name") or a.get("username") or a.get("email") or "Agent",
+                "drivers": d_count,
+                "clients": c_count,
+                "score": d_count * 3 + c_count * 2,
+            })
+        rows.sort(key=lambda x: x["score"], reverse=True)
+        for idx, row in enumerate(rows, start=1):
+            row["rank"] = idx
+        _debug("agent_competition_board_v1", {"agent_id": me.get("id")}, agent_profiles=len(agents), drivers=len(drivers), clients=len(clients), rows=len(rows))
+        return jsonify({"ok": True, "rows": rows[:50]})
+
+    @app.get("/api/agent/messages")
+    def agent_messages():
+        agent = _current_agent()
+        if not agent:
+            return jsonify({"ok": False, "error": "Agent profile not found"}), 404
+        fields = ("agent_id", "agent_auth_id", "user_id", "auth_id", "agent_email", "email")
+        rows = _agent_rows("agent_messages", agent, fields)
+        notices = _agent_rows("agent_notifications", agent, fields)
+        for n in notices:
+            n.setdefault("subject", n.get("title") or "Notification")
+            n.setdefault("message", n.get("body") or n.get("message") or "")
+            n.setdefault("source", "agent_notifications")
+        rows = (rows + notices)[:200]
+        _debug("agent_messages", {"agent_id": agent.get("id")}, agent_messages=len(rows), agent_notifications=len(notices))
+        return jsonify({"ok": True, "rows": rows})
+
+    @app.get("/api/agent/messages/summary")
+    def agent_messages_summary():
+        resp = agent_messages()
+        if isinstance(resp, tuple):
+            payload = resp[0].get_json(silent=True) if hasattr(resp[0], "get_json") else {}
+        else:
+            payload = resp.get_json(silent=True) if hasattr(resp, "get_json") else {}
+        rows = (payload or {}).get("rows", [])
+        unread = len([r for r in rows if str(r.get("status") or "").lower() not in {"read", "closed"}])
+        _debug("agent_messages_summary", total=len(rows), unread=unread)
+        return jsonify({"ok": True, "unread": unread, "total": len(rows)})
+
+    @app.post("/api/agent/messages/<message_id>/read")
+    def agent_message_read(message_id):
+        _safe_update("agent_messages", {"id": message_id}, {"status": "read", "read_at": _now_iso()})
+        return jsonify({"ok": True})
+
+    @app.post("/api/agent/messages/send")
+    def agent_message_send():
+        agent = _current_agent()
+        if not agent:
+            return jsonify({"ok": False, "error": "Agent profile not found"}), 404
+        data = request.get_json(silent=True) or {}
+        payload = {
+            "agent_id": str(agent.get("id")),
+            "agent_email": agent.get("email"),
+            "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email"),
+            "subject": _clean(data.get("subject")) or "Agent support message",
+            "message": _clean(data.get("message") or data.get("body")),
+            "status": "sent",
+            "created_at": _now_iso(),
+        }
+        if not payload["message"]:
+            return jsonify({"ok": False, "error": "message required"}), 400
+        res = _safe_insert("agent_messages", payload)
+        if isinstance(res, Exception):
+            return jsonify({"ok": True, "warning": str(res)})
+        return jsonify({"ok": True})
+
+    @app.get("/api/admin/overview")
+    def admin_overview():
+        agents = _all_agents()
+        drivers = _drivers()
+        clients = _clients()
+        ledger = _safe_select("agent_wallet_ledger", {}, "*", 10000, "created_at", True)
+        rules = _payment_amounts()
+        recent = []
+        for d in drivers[:20]:
+            recent.append({"type": "Driver", "name": d.get("full_name"), "phone": d.get("phone") or d.get("phone_number"), "town": d.get("town"), "agent": d.get("recruiter_name"), "created_at": d.get("created_at")})
+        for c in clients[:20]:
+            recent.append({"type": "Client", "name": c.get("full_name"), "phone": c.get("phone") or c.get("phone_number"), "town": c.get("town"), "agent": c.get("recruiter_name"), "created_at": c.get("created_at")})
+        recent.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+
+        def by_place(rows, key):
+            out = {}
+            for row in rows:
+                place = _clean(row.get(key) or row.get("operation_region")) or "Unknown"
+                item = out.setdefault(place, {"name": place, "drivers": 0, "clients": 0, "total": 0})
+                if row.get("_type") == "driver":
+                    item["drivers"] += 1
+                else:
+                    item["clients"] += 1
+                item["total"] += 1
+            return sorted(out.values(), key=lambda x: x["total"], reverse=True)[:12]
+
+        typed_rows = [dict(d, _type="driver") for d in drivers] + [dict(c, _type="client") for c in clients]
+        region_breakdown = by_place(typed_rows, "region")
+        town_breakdown = by_place(typed_rows, "town")
+        approved_drivers = [d for d in drivers if _approved(d)]
+        approved_clients = [c for c in clients if _approved(c)]
+        weekly_drivers = [d for d in drivers if _this_week(d)]
+        weekly_clients = [c for c in clients if _this_week(c)]
+        approved_weekly_drivers = [d for d in weekly_drivers if _approved(d)]
+        approved_weekly_clients = [c for c in weekly_clients if _approved(c)]
+        credits = sum(_safe_float(x.get("amount")) for x in ledger if str(x.get("entry_type") or x.get("txn_type") or "").lower() in {"credit", "bonus", "earning"})
+        debits = sum(_safe_float(x.get("amount")) for x in ledger if str(x.get("entry_type") or x.get("txn_type") or "").lower() in {"debit", "payout", "withdrawal"})
+        estimated_liability = max(0.0, credits - debits)
+        if not estimated_liability and (rules["driver_reg"] or rules["client_reg"]):
+            estimated_liability = (len(approved_drivers) * rules["driver_reg"]) + (len(approved_clients) * rules["client_reg"])
+
+        weekly_top_agents = []
+        for agent in agents:
+            values = _identity_values(agent)
+            fields = ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")
+            d_rows = [row for row in weekly_drivers if _matches_identity(row, values, fields)]
+            c_rows = [row for row in weekly_clients if _matches_identity(row, values, fields)]
+            total = len(d_rows) + len(c_rows)
+            if not total:
+                continue
+            weekly_top_agents.append({
+                "agent_id": agent.get("id"),
+                "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                "email": agent.get("email"),
+                "drivers": len(d_rows),
+                "clients": len(c_rows),
+                "approved_drivers": len([x for x in d_rows if _approved(x)]),
+                "approved_clients": len([x for x in c_rows if _approved(x)]),
+                "total": total,
+                "estimated_pay": round(
+                    len([x for x in d_rows if _approved(x)]) * rules["driver_reg"]
+                    + len([x for x in c_rows if _approved(x)]) * rules["client_reg"],
+                    2,
+                ),
+            })
+        weekly_top_agents.sort(key=lambda x: (-x["total"], x["agent_name"].lower()))
+
+        duplicate_phones = {}
+        for row in drivers + clients:
+            phone = _clean(row.get("phone") or row.get("phone_number"))
+            if phone:
+                duplicate_phones[phone] = duplicate_phones.get(phone, 0) + 1
+        duplicate_count = len([p for p, count in duplicate_phones.items() if count > 1])
+
+        identity_fields = ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")
+        activity_by_agent = {}
+        agent_quality = []
+        for agent in agents:
+            values = _identity_values(agent)
+            agent_drivers = [r for r in drivers if _matches_identity(r, values, identity_fields)]
+            agent_clients = [r for r in clients if _matches_identity(r, values, identity_fields)]
+            activity_by_agent[_clean(agent.get("id"))] = len(agent_drivers) + len(agent_clients)
+            agent_quality.append({
+                "agent_id": agent.get("id"),
+                "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+                "score": agent_quality_score(
+                    agent,
+                    agent_drivers,
+                    agent_clients,
+                    [],
+                ),
+                "profile_completion": profile_completion(agent),
+                "missing_profile_fields": profile_missing(agent),
+            })
+        agent_quality.sort(key=lambda x: x["score"], reverse=True)
+        alerts = []
+        incomplete = [a for a in agents if profile_missing(a)]
+        if incomplete:
+            alerts.append({"level": "warning", "message": f"{len(incomplete)} agents have incomplete profiles"})
+        if duplicate_count:
+            alerts.append({"level": "danger", "message": f"{duplicate_count} duplicate phone patterns need review"})
+        if not rules["driver_reg"] and not rules["client_reg"]:
+            alerts.append({"level": "warning", "message": "Finance payment rules are missing"})
+        low_activity = len([a for a in agents if not activity_by_agent.get(_clean(a.get("id")))])
+        if low_activity:
+            alerts.append({"level": "info", "message": f"{low_activity} agents have no recorded registrations"})
+
+        data = {
+            "agents_total": len(agents),
+            "agents_active": len([a for a in agents if _approved(a)]),
+            "agents_pending": len([a for a in agents if _pending(a)]),
+            "agents_blocked": len([a for a in agents if str(a.get("status") or "").upper() == "BLOCKED"]),
+            "drivers_total": len(drivers),
+            "drivers_registered": len(drivers),
+            "clients_total": len(clients),
+            "clients_registered": len(clients),
+            "weekly_drivers": len(weekly_drivers),
+            "weekly_clients": len(weekly_clients),
+            "weekly_registrations": len(weekly_drivers) + len(weekly_clients),
+            "month_registrations": len([r for r in drivers + clients if _this_month(r)]),
+            "weekly_top_agents": weekly_top_agents[:10],
+            "weekly_finance": {
+                "approved_drivers": len(approved_weekly_drivers),
+                "approved_clients": len(approved_weekly_clients),
+                "driver_rate": rules["driver_reg"],
+                "client_rate": rules["client_reg"],
+                "base_due": round((len(approved_weekly_drivers) * rules["driver_reg"]) + (len(approved_weekly_clients) * rules["client_reg"]), 2),
+            },
+            "team_growth": len([a for a in agents if _clean(a.get("team_leader_id") or a.get("referred_by") or a.get("referred_by_code"))]),
+            "estimated_liabilities": round(estimated_liability, 2),
+            "total_paid": debits,
+            "ledger_credits": credits,
+            "region_breakdown": region_breakdown,
+            "town_breakdown": town_breakdown,
+            "agent_quality": agent_quality[:12],
+            "smart_alerts": alerts,
+            "recent_activity": recent[:25],
+        }
+        _debug("admin_overview", agent_profiles=len(agents), drivers=len(drivers), clients=len(clients), agent_wallet_ledger=len(ledger))
+        return jsonify({"ok": True, "data": data})
+
+    @app.get("/api/admin/drivers")
+    def admin_drivers():
+        rows = _with_recruiter_details(_drivers())
+        _debug("admin_drivers", drivers=len(rows))
+        return jsonify({"ok": True, "data": rows, "rows": rows})
+
+    @app.get("/api/admin/clients")
+    def admin_clients():
+        rows = _with_recruiter_details(_clients())
+        _debug("admin_clients", clients=len(rows))
+        return jsonify({"ok": True, "data": rows, "rows": rows})
+
+    @app.get("/api/admin/finance")
+    def admin_finance():
+        ledger = _safe_select("agent_wallet_ledger", {}, "*", 5000, "created_at", True)
+        wallets = _safe_select("agent_wallets", {}, "*", 5000, "updated_at", True)
+        withdraws = _safe_select("agent_withdraw_requests", {}, "*", 5000, "created_at", True)
+        rows = ledger + wallets + withdraws
+        _debug("admin_finance", agent_wallet_ledger=len(ledger), agent_wallets=len(wallets), agent_withdraw_requests=len(withdraws), rows=len(rows))
+        return jsonify({"ok": True, "data": rows, "rows": rows})
+
+    @app.route("/api/admin/payment_rules", methods=["GET", "POST"])
+    def admin_payment_rules_compat():
+        if request.method == "GET":
+            rows = _safe_select("payment_rules", {}, "*", 500, "updated_at", True)
+            return jsonify({"ok": True, "data": rows, "rows": rows})
+        data = request.get_json(silent=True) or {}
+        payload = dict(data)
+        payload["updated_at"] = _now_iso()
+        row_id = _clean(payload.pop("id", ""))
+        payload_attempts = [payload]
+        slim = {
+            "driver_reg": payload.get("driver_reg") or payload.get("driver_register_amount") or 0,
+            "client_reg": payload.get("client_reg") or payload.get("client_register_amount") or 0,
+            "daily_5_drivers_bonus": payload.get("daily_5_drivers_bonus") or 0,
+            "daily_5_clients_bonus": payload.get("daily_5_clients_bonus") or 0,
+            "weekly_30_activations_bonus": payload.get("weekly_30_activations_bonus") or 0,
+            "first_trip_bonus": payload.get("first_trip_bonus") or 0,
+            "status": payload.get("status") or "Active",
+            "updated_at": payload["updated_at"],
+        }
+        payload_attempts.append(slim)
+        legacy = {
+            "driver_reg": slim["driver_reg"],
+            "client_reg": slim["client_reg"],
+            "status": slim["status"],
+            "updated_at": slim["updated_at"],
+        }
+        payload_attempts.append(legacy)
+        res = None
+        last_error = None
+        for body in payload_attempts:
+            res = _safe_update("payment_rules", {"id": row_id}, body) if row_id else _safe_insert("payment_rules", body)
+            if not isinstance(res, Exception):
+                break
+            last_error = res
+        if isinstance(res, Exception):
+            return jsonify({"ok": True, "messages": [], "unread": 0})
+        rows = _agent_registration_rows(agent)
+        drivers = []
+        clients = []
+        for row in rows:
+            shaped = dict(row)
+            shaped.setdefault("full_name", row.get("name"))
+            if row.get("type") == "Driver":
+                drivers.append(shaped)
+            elif row.get("type") == "Client":
+                clients.append(shaped)
+
+        values = _identity_values(agent)
+        ledger = []
+        seen = set()
+        for field in ("agent_id", "user_id", "agent_email", "email"):
+            for value in values:
+                for row in _safe_select("agent_wallet_ledger", {field: value}, "*", 200, "created_at", True):
+                    row_id = str(row.get("id") or f"{field}:{value}:{row.get('created_at')}:{row.get('amount')}")
+                    if row_id not in seen:
+                        ledger.append(row)
+                        seen.add(row_id)
+        wallet_balance = 0.0
+        for row in ledger:
+            amount = _safe_float(row.get("amount"))
+            kind = str(row.get("entry_type") or row.get("txn_type") or row.get("type") or "").lower()
+            if kind in {"debit", "payout", "withdrawal"}:
+                wallet_balance -= amount
+            else:
+                wallet_balance += amount
+
+        return jsonify({
+            "ok": True,
+            "success": True,
+            "agent": agent,
+            "rows": rows,
+            "drivers": drivers,
+            "clients": clients,
+            "wallet_rows": ledger[:100],
+            "wallet_balance": wallet_balance,
+        })
+
+    @app.post("/api/admin/agent_reset_pin/<agent_id>")
+    def admin_agent_reset_pin(agent_id):
+        agent = _agent_by_id(agent_id) or {}
+        data = request.get_json(silent=True) or {}
+        pin = _clean(data.get("new_pin")) or str(uuid.uuid4().int)[0:6]
+        _safe_update("agent_profiles", {"id": agent_id}, {"pin": pin})
+        return jsonify({
+            "ok": True,
+            "success": True,
+            "pin": pin,
+            "temporary_pin": pin,
+            "agent_name": agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent",
+            "agent_email": agent.get("email") or "",
+        })
+
+    @app.post("/api/admin/agent_set_status/<agent_id>")
+    def admin_agent_set_status(agent_id):
+        data = request.get_json(silent=True) or {}
+        status = _clean(data.get("status")) or "ACTIVE"
+        _safe_update("agent_profiles", {"id": agent_id}, {"status": status})
+        _safe_update("agents", {"id": agent_id}, {"status": status})
+        return jsonify({"ok": True, "success": True})
+
+    @app.post("/api/admin/approve_agent/<agent_id>")
+    def admin_approve_agent(agent_id):
+        agent = _agent_by_id(agent_id)
+        if not agent:
+            return jsonify({"ok": True, "messages": [], "unread": 0})
+
+        payload = {
+            "status": "ACTIVE",
+            "must_change_password": False,
+        }
+        _safe_update("agent_profiles", {"id": agent_id}, payload)
+        _safe_update("agents", {"id": agent_id}, {"status": "ACTIVE"})
+        return jsonify({"ok": True, "message": "Agent approved", "agent_id": agent_id})
+
+    @app.post("/api/admin/reset_agent_account/<agent_id>")
+    def admin_reset_agent_account(agent_id):
+        agent = _agent_by_id(agent_id)
+        if not agent:
+            return jsonify({"ok": True, "messages": [], "unread": 0})
+
+        email = _clean(agent.get("email")).lower()
+        if not email:
+            return jsonify({"ok": False, "error": "Agent email missing"}), 400
+
+        temp_password = _temp_password_for_agent(agent)
+        uid = _link_or_create_auth_user(
+            email=email,
+            password=temp_password,
+            full_name=agent.get("full_name") or "",
+            username=agent.get("username") or "",
+        )
+
+        if not uid:
+            return jsonify({"ok": False, "error": "Could not create or update auth user"}), 500
+
+        payload = {
+            "auth_id": uid,
+            "user_id": uid,
+            "status": "ACTIVE",
+            "must_change_password": True,
+            "temp_password": temp_password,
+            "last_reset_at": _now_iso(),
+            "reset_by_admin": session.get("admin_email") or session.get("email") or "admin",
+        }
+        _safe_update("agent_profiles", {"id": agent_id}, payload)
+        _safe_update("agents", {"id": agent_id}, {"auth_id": uid, "status": "ACTIVE"})
+
+        return jsonify({
+            "ok": True,
+            "message": "Agent account reset successfully",
+            "agent_id": agent_id,
+            "email": email,
+            "temp_password": temp_password,
+            "must_change_password": True,
+        })
+
+    @app.get("/api/admin/agent_account_help/<agent_id>")
+    def admin_agent_account_help(agent_id):
+        agent = _agent_by_id(agent_id)
+        if not agent:
+            return jsonify({"ok": True, "messages": [], "unread": 0})
+
+        mode, date_from, date_to = _period_from_request()
+        rows = _agent_registration_rows(agent, date_from, date_to)
+        days = {d: {"drivers": 0, "clients": 0} for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]}
+        for row in rows:
+            try:
+                day_name = datetime.fromisoformat(str(row.get("created_at")).replace("Z", "+00:00")).strftime("%a")
+            except Exception:
+                continue
+            if day_name in days:
+                key = "drivers" if row.get("type") == "Driver" else "clients"
+                days[day_name][key] += 1
+
+        auth_id = agent.get("auth_id") or agent.get("user_id")
+        safe_agent = dict(agent)
+        safe_agent["auth_linked"] = bool(auth_id)
+        safe_agent["must_change_password"] = bool(agent.get("must_change_password"))
+        safe_agent["profile_picture_url"] = agent.get("profile_picture_url") or agent.get("profile_pic_path")
+        safe_agent["residential_address"] = agent.get("residential_address") or agent.get("address")
+
+        return jsonify({
+            "ok": True,
+            "agent": safe_agent,
+            "summary": {
+                "mode": mode,
+                "date_from": date_from,
+                "date_to": date_to,
+                "drivers_total": len([r for r in rows if r.get("type") == "Driver"]),
+                "clients_total": len([r for r in rows if r.get("type") == "Client"]),
+                "rows_total": len(rows),
+                "daily": days,
+                "team": _team_rows_for_agent(agent),
+                "payment_rules": _payment_amounts(),
+            },
+        })
+
+    @app.get("/api/public/jobs")
+    def public_jobs():
+        rows = _safe_select("remote_jobs", {}, "*", 20, "created_at", True)
+        out = []
+        for row in rows:
+            status = _clean(row.get("status") or "ACTIVE").upper()
+            if status in {"CLOSED", "ARCHIVED", "INACTIVE"}:
+                continue
+            out.append(row)
+        return jsonify({"ok": True, "rows": out[:10]})
+
+    @app.route("/api/admin/jobs", methods=["GET", "POST"])
+    def admin_jobs():
+        if request.method == "GET":
+            rows = _safe_select("remote_jobs", {}, "*", 200, "created_at", True)
+            return jsonify({"ok": True, "rows": rows})
+
+        data = request.get_json(silent=True) or {}
+        title = _clean(data.get("title"))
+        description = _clean(data.get("description") or data.get("details"))
+        if not title or not description:
+            return jsonify({"ok": False, "error": "title and description required"}), 400
+        payload = {
+            "title": title,
+            "description": description,
+            "town": _clean(data.get("town")),
+            "region": _clean(data.get("region")),
+            "target_count": int(data.get("target_count") or 0),
+            "status": _clean(data.get("status")) or "ACTIVE",
+            "created_by": session.get("admin_email") or session.get("email") or "admin",
+            "created_at": _now_iso(),
+        }
+        res = _safe_insert("remote_jobs", payload)
+        if isinstance(res, Exception):
+            return jsonify({"ok": False, "error": str(res), "hint": "Run sql/yene_upgrade.sql in Supabase."}), 500
+        return jsonify({"ok": True, "row": (res.data or [payload])[0] if hasattr(res, "data") else payload})
+
+    @app.get("/api/agent/jobs")
+    def agent_jobs():
+        rows = _safe_select("remote_jobs", {}, "*", 50, "created_at", True)
+        out = []
+        for row in rows:
+            status = _clean(row.get("status") or "ACTIVE").upper()
+            if status in {"CLOSED", "ARCHIVED", "INACTIVE"}:
+                continue
+            out.append(row)
+        return jsonify({"ok": True, "rows": out[:20]})
+
+    @app.get("/api/agent/group_messages")
+    def agent_group_messages():
+        rows = _safe_select("agent_group_messages", {}, "*", 100, "created_at", True)
+        broadcasts = _safe_select("broadcasts", {}, "*", 50, "created_at", True)
+        out = []
+        for row in rows:
+            out.append(row)
+        for row in broadcasts:
+            out.append({
+                "id": row.get("id"),
+                "author_name": "YENE Admin",
+                "message": row.get("message"),
+                "title": row.get("title") or "Admin notice",
+                "created_at": row.get("created_at"),
+                "source": "broadcasts",
+            })
+        out.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+        return jsonify({"ok": True, "rows": out[:100]})
+
+    @app.route("/agent/change-password", methods=["GET", "POST"])
+    def agent_change_password():
+        email = _clean(session.get("agent_email") or session.get("email")).lower()
+        if not email:
+            return redirect("/login")
+
+        agent = _agent_by_email(email)
+        if not agent:
+            session.clear()
+            flash("Agent profile not found")
+            return redirect("/login")
+
+        if request.method == "GET":
+            return render_template("agent_change_password.html", agent=agent)
+
+        current_password = request.form.get("current_password") or ""
+        new_password = request.form.get("new_password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
+
+        if not current_password or not new_password or not confirm_password:
+            flash("All password fields are required")
+            return redirect("/agent/change-password")
+
+        if len(new_password) < 6:
+            flash("New password must be at least 6 characters")
+            return redirect("/agent/change-password")
+
+        if new_password != confirm_password:
+            flash("New password and confirm password do not match")
+            return redirect("/agent/change-password")
+
+        try:
+            _sign_in_supabase(email, current_password)
+        except Exception:
+            flash("Current password is incorrect")
+            return redirect("/agent/change-password")
+
+        uid = agent.get("auth_id") or agent.get("user_id")
+        if not uid:
+            flash("Account auth link missing. Contact admin.")
+            return redirect("/agent/change-password")
+
+        try:
+            sb_admin.auth.admin.update_user_by_id(uid, {"password": new_password})
+        except Exception as e:
+            app.logger.warning("agent_change_password_failed email=%s error=%s", email, e)
+            flash("Could not update password")
+            return redirect("/agent/change-password")
+
+        _safe_update("agent_profiles", {"id": agent.get("id")}, {
+            "must_change_password": False,
+            "temp_password": None,
+        })
+
+        flash("Password changed successfully")
+        return redirect("/agent/dashboard")
+
+    @app.post("/api/admin/delete_agent/<agent_id>")
+    def admin_delete_agent_alias(agent_id):
+        _safe_delete("agent_profiles", {"id": agent_id})
+        _safe_delete("agents", {"id": agent_id})
+        return jsonify({"ok": True, "success": True})
+
+    def _admin_weekly_report_data():
+        today = datetime.utcnow().date()
+        default_start = today - timedelta(days=today.weekday())
+        json_data = request.get_json(silent=True) or {}
+        start = _parse_date(_clean(request.args.get("week_start") or json_data.get("week_start")), default_start)
+        end = _parse_date(_clean(request.args.get("week_end") or json_data.get("week_end")), start + timedelta(days=6))
+        if end < start:
+            end = start + timedelta(days=6)
+
+        incoming = _payment_rules_latest() or {}
+
+        def pick_value(*keys, fallback=0):
+            for key in keys:
+                for source in (request.args, json_data, incoming):
+                    v = source.get(key) if hasattr(source, "get") else None
+                    if v not in (None, ""):
+                        try:
+                            return float(v)
+                        except Exception:
+                            pass
+            return fallback
+
+        rules = {
+            "source": incoming.get("_source") or "request_or_db",
+            "driver_reg": pick_value("driver_reg", "driver_amount", "driver_register_amount", fallback=0),
+            "client_reg": pick_value("client_reg", "client_amount", "client_register_amount", fallback=0),
+            "daily_5_drivers_bonus": pick_value("daily_5_drivers_bonus", "driver_daily_bonus", fallback=0),
+            "daily_5_clients_bonus": pick_value("daily_5_clients_bonus", "client_daily_bonus", fallback=0),
+            "daily_driver_threshold": int(pick_value("daily_driver_threshold", "driver_daily_threshold", fallback=5) or 5),
+            "daily_client_threshold": int(pick_value("daily_client_threshold", "client_daily_threshold", fallback=5) or 5),
+            "weekly_activation_threshold": int(pick_value("weekly_activation_threshold", "weekly_threshold", fallback=30) or 30),
+            "weekly_30_activations_bonus": pick_value("weekly_30_activations_bonus", "weekly_activation_bonus", fallback=0),
+            "first_trip_bonus": pick_value("first_trip_bonus", fallback=0),
+            "status": _clean(request.args.get("status") or json_data.get("status") or incoming.get("status") or "Active"),
+        }
+        rules["is_active"] = rules["status"].lower() not in {"inactive", "disabled", "off", "false"}
+
+        selected_agent_id = _clean(request.args.get("agent_id") or json_data.get("agent_id"))
+        raw_agent_ids = request.args.get("agent_ids") or json_data.get("agent_ids") or ""
+        if isinstance(raw_agent_ids, list):
+            selected_agent_ids = [_clean(x) for x in raw_agent_ids if _clean(x)]
+        else:
+            selected_agent_ids = [_clean(x) for x in str(raw_agent_ids).split(",") if _clean(x)]
+        if selected_agent_id:
+            selected_agent_ids = [selected_agent_id]
+        agents = [a for a in (_agent_by_id(aid) for aid in selected_agent_ids) if a] if selected_agent_ids else _all_agents()
+
+        def in_range(row):
+            day = _row_date(row)
+            return bool(day and start <= day <= end)
+
+        weekly_drivers = [r for r in _drivers() if in_range(r)]
+        weekly_clients = [r for r in _clients() if in_range(r)]
+        identity_fields = ("recruiter_agent_id", "agent_id", "agent_auth_id", "recruiter_auth_id", "recruiter_email")
+        day_labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        paid_refs = {
+            _clean(row.get("reference"))
+            for row in _safe_select("agent_wallet_ledger", {}, "reference", 20000)
+            if str(row.get("reference") or "").startswith(("weekly-payout-driver-", "weekly-payout-client-"))
+        }
+
+        def empty_daily():
+            out = {}
+            for offset, label in enumerate(day_labels):
+                key = (start + timedelta(days=offset)).isoformat()
+                out[key] = {
+                    "date": key,
+                    "label": label,
+                    "drivers": 0,
+                    "clients": 0,
+                    "approved_drivers": 0,
+                    "approved_clients": 0,
+                    "pending": 0,
+                    "bonus": 0.0,
+                    "bonus_lines": [],
+                    "amount": 0.0,
+                    "rows": [],
+                }
+            return out
+
+        def row_payment(row):
+            return rules["driver_reg"] if row.get("type") == "Driver" else rules["client_reg"]
+
+        def is_payable(row):
+            return rules["is_active"] and _approved(row.get("status")) and not row.get("already_paid")
+
+        def agent_name(agent):
+            return agent.get("full_name") or agent.get("username") or agent.get("email") or "Agent"
+
+        def shaped_driver(row, agent):
+            return {
+                "id": row.get("id"),
+                "type": "Driver",
+                "name": row.get("full_name") or row.get("name") or "",
+                "phone": row.get("phone") or row.get("phone_number") or "",
+                "town": row.get("town") or row.get("region") or "",
+                "code": row.get("external_code") or row.get("license_number") or row.get("driver_code") or "",
+                "created_at": row.get("created_at"),
+                "status": row.get("status"),
+                "trips_completed": row.get("trips_completed") or 0,
+                "verified_trips": row.get("verified_trips") or 0,
+                "registered_by": agent_name(agent),
+            }
+
+        def shaped_client(row, agent):
+            return {
+                "id": row.get("id"),
+                "type": "Client",
+                "name": row.get("full_name") or row.get("name") or "",
+                "phone": row.get("phone") or row.get("phone_number") or "",
+                "town": row.get("town") or row.get("region") or "",
+                "code": row.get("external_code") or row.get("yene_code") or row.get("client_code") or "",
+                "created_at": row.get("created_at"),
+                "status": row.get("status"),
+                "registered_by": agent_name(agent),
+            }
+
+        report_rows = []
+        for agent in agents:
+            values = _identity_values(agent)
+            rows = []
+            rows.extend(shaped_driver(row, agent) for row in weekly_drivers if _matches_identity(row, values, identity_fields))
+            rows.extend(shaped_client(row, agent) for row in weekly_clients if _matches_identity(row, values, identity_fields))
+            rows.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+            if not rows:
+                continue
+
+            daily = empty_daily()
+            base_total = 0.0
+            pending_value = 0.0
+            for row in rows:
+                key = str(row.get("created_at") or "")[:10]
+                bucket = daily.setdefault(key, {
+                    "date": key,
+                    "label": key,
+                    "drivers": 0,
+                    "clients": 0,
+                    "approved_drivers": 0,
+                    "approved_clients": 0,
+                    "pending": 0,
+                    "bonus": 0.0,
+                    "bonus_lines": [],
+                    "amount": 0.0,
+                    "rows": [],
+                })
+                amount = row_payment(row)
+                payout_reference = f"weekly-payout-{row.get('type', '').lower()}-{row.get('id')}"
+                row["payout_reference"] = payout_reference
+                row["already_paid"] = payout_reference in paid_refs
+                row["payment_rate"] = amount
+                row["payment_due"] = amount if is_payable(row) else 0.0
+                if row["already_paid"]:
+                    row["payable_status"] = "Already paid"
+                elif is_payable(row):
+                    row["payable_status"] = "Payable"
+                else:
+                    row["payable_status"] = "Pending approval"
+                bucket["rows"].append(row)
+                if row.get("type") == "Driver":
+                    bucket["drivers"] += 1
+                    if is_payable(row):
+                        bucket["approved_drivers"] += 1
+                else:
+                    bucket["clients"] += 1
+                    if is_payable(row):
+                        bucket["approved_clients"] += 1
+                if is_payable(row):
+                    bucket["amount"] += amount
+                    base_total += amount
+                elif not row["already_paid"]:
+                    pending_value += amount
+                    bucket["pending"] += 1
+
+            bonus_total = 0.0
+            bonus_lines = []
+            for day_key, values in sorted(daily.items()):
+                if values["approved_drivers"] >= rules["daily_driver_threshold"] and rules["daily_5_drivers_bonus"] and rules["is_active"]:
+                    values["bonus"] += rules["daily_5_drivers_bonus"]
+                    bonus_total += rules["daily_5_drivers_bonus"]
+                    line = f"{values['label']} {day_key}: driver daily threshold {values['approved_drivers']}/{rules['daily_driver_threshold']}"
+                    values["bonus_lines"].append(line)
+                    bonus_lines.append(line)
+                if values["approved_clients"] >= rules["daily_client_threshold"] and rules["daily_5_clients_bonus"] and rules["is_active"]:
+                    values["bonus"] += rules["daily_5_clients_bonus"]
+                    bonus_total += rules["daily_5_clients_bonus"]
+                    line = f"{values['label']} {day_key}: client daily threshold {values['approved_clients']}/{rules['daily_client_threshold']}"
+                    values["bonus_lines"].append(line)
+                    bonus_lines.append(line)
+
+            driver_count = len([r for r in rows if r["type"] == "Driver"])
+            client_count = len([r for r in rows if r["type"] == "Client"])
+            approved_driver_count = len([r for r in rows if r["type"] == "Driver" and is_payable(r)])
+            approved_client_count = len([r for r in rows if r["type"] == "Client" and is_payable(r)])
+            first_trip_count = len([
+                r for r in rows
+                if r["type"] == "Driver"
+                and is_payable(r)
+                and (_safe_float(r.get("verified_trips")) > 0 or _safe_float(r.get("trips_completed")) > 0)
+            ])
+            if first_trip_count and rules["first_trip_bonus"] and rules["is_active"]:
+                amount = first_trip_count * rules["first_trip_bonus"]
+                bonus_total += amount
+                bonus_lines.append(f"First trip bonus: {first_trip_count} drivers x {_fmt_money(rules['first_trip_bonus'])}")
+            activation_count = approved_driver_count + approved_client_count
+            if activation_count >= rules["weekly_activation_threshold"] and rules["weekly_30_activations_bonus"] and rules["is_active"]:
+                bonus_total += rules["weekly_30_activations_bonus"]
+                bonus_lines.append(f"Weekly activation threshold: {activation_count}/{rules['weekly_activation_threshold']}")
+
+            report_rows.append({
+                "agent": agent,
+                "agent_name": agent_name(agent),
+                "rows": rows,
+                "daily": daily,
+                "driver_count": driver_count,
+                "client_count": client_count,
+                "approved_driver_count": approved_driver_count,
+                "approved_client_count": approved_client_count,
+                "pending_count": len([r for r in rows if (not _approved(r.get("status"))) and not r.get("already_paid")]),
+                "already_paid_count": len([r for r in rows if r.get("already_paid")]),
+                "base_total": round(base_total, 2),
+                "bonus_total": round(bonus_total, 2),
+                "bonus_lines": bonus_lines,
+                "agent_total": round(base_total + bonus_total, 2),
+                "pending_value": round(pending_value, 2),
+                "total_registrations": driver_count + client_count,
+            })
+
+        report_rows.sort(key=lambda item: (-item["total_registrations"], item["agent_name"].lower()))
+        totals = {
+            "agents": len(report_rows),
+            "drivers": sum(x["driver_count"] for x in report_rows),
+            "clients": sum(x["client_count"] for x in report_rows),
+            "approved_drivers": sum(x["approved_driver_count"] for x in report_rows),
+            "approved_clients": sum(x["approved_client_count"] for x in report_rows),
+            "pending": sum(x["pending_count"] for x in report_rows),
+            "already_paid": sum(x["already_paid_count"] for x in report_rows),
+            "base": round(sum(x["base_total"] for x in report_rows), 2),
+            "bonus": round(sum(x["bonus_total"] for x in report_rows), 2),
+            "payout": round(sum(x["agent_total"] for x in report_rows), 2),
+            "pending_value": round(sum(x["pending_value"] for x in report_rows), 2),
+        }
+        selected_label = "ALL AGENTS"
+        if len(selected_agent_ids) == 1 and report_rows:
+            selected_label = report_rows[0]["agent_name"]
+        elif selected_agent_ids:
+            selected_label = f"{len(selected_agent_ids)} selected agents"
+        return {
+            "start": start,
+            "end": end,
+            "rules": rules,
+            "selected_agent_ids": selected_agent_ids,
+            "selected_label": selected_label,
+            "report_rows": report_rows,
+            "totals": totals,
+            "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        }
+
+    @app.get("/api/admin/weekly_agent_report_preview")
+    def admin_weekly_agent_report_preview():
+        report = _admin_weekly_report_data()
+        rows = []
+        for item in report["report_rows"]:
+            agent = item["agent"]
+            rows.append({
+                "agent_id": agent.get("id"),
+                "agent_name": item["agent_name"],
+                "email": agent.get("email"),
+                "phone": agent.get("phone") or agent.get("phone_number"),
+                "referral_code": agent.get("referral_code") or agent.get("referred_by_code"),
+                "drivers": item["driver_count"],
+                "clients": item["client_count"],
+                "approved_drivers": item["approved_driver_count"],
+                "approved_clients": item["approved_client_count"],
+                "pending": item["pending_count"],
+                "already_paid": item["already_paid_count"],
+                "base_total": item["base_total"],
+                "bonus_total": item["bonus_total"],
+                "agent_total": item["agent_total"],
+            })
+        return jsonify({
+            "ok": True,
+            "week_start": report["start"].isoformat(),
+            "week_end": report["end"].isoformat(),
+            "selected": report["selected_label"],
+            "rules": report["rules"],
+            "totals": report["totals"],
+            "rows": rows,
+        })
+
+    @app.post("/api/admin/weekly_agent_report_finalize")
+    def admin_weekly_agent_report_finalize():
+        report = _admin_weekly_report_data()
+        start = report["start"].isoformat()
+        end = report["end"].isoformat()
+        processed_agents = []
+        processed_rows = 0
+        total_amount = 0.0
+        errors = []
+
+        for item in report["report_rows"]:
+            agent = item["agent"]
+            payable_rows = [row for row in item["rows"] if _safe_float(row.get("payment_due")) > 0 and not row.get("already_paid")]
+            amount = round(sum(_safe_float(row.get("payment_due")) for row in payable_rows) + _safe_float(item.get("bonus_total")), 2)
+            if not payable_rows and amount <= 0:
+                continue
+
+            item_refs_ok = True
+            for row in payable_rows:
+                payload = {
+                    "agent_id": str(agent.get("id") or ""),
+                    "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                    "agent_email": agent.get("email") or row.get("recruiter_email") or "",
+                    "agent_name": item["agent_name"],
+                    "entry_type": "payout_item",
+                    "amount": 0,
+                    "reference": row.get("payout_reference"),
+                    "note": f"{row.get('type')} registration included in weekly payout {start} to {end}",
+                    "status": "processed",
+                    "created_at": _now_iso(),
+                }
+                res = _safe_insert("agent_wallet_ledger", payload)
+                if isinstance(res, Exception):
+                    item_refs_ok = False
+                    errors.append({"reference": row.get("payout_reference"), "error": str(res)})
+            if not item_refs_ok:
+                continue
+
+            payout_ref = f"weekly-payout-agent-{agent.get('id')}-{start}-to-{end}"
+            if not _safe_select("agent_wallet_ledger", {"reference": payout_ref}, "id", 1):
+                res = _safe_insert("agent_wallet_ledger", {
+                    "agent_id": str(agent.get("id") or ""),
+                    "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                    "agent_email": agent.get("email") or "",
+                    "agent_name": item["agent_name"],
+                    "entry_type": "debit",
+                    "amount": amount,
+                    "reference": payout_ref,
+                    "note": f"Weekly payout processed for {start} to {end}",
+                    "status": "processed",
+                    "created_at": _now_iso(),
+                })
+                if isinstance(res, Exception):
+                    errors.append({"reference": payout_ref, "error": str(res)})
+                    continue
+
+            _safe_insert("agent_messages", {
+                "agent_id": str(agent.get("id") or ""),
+                "agent_auth_id": str(agent.get("auth_id") or agent.get("user_id") or ""),
+                "agent_email": agent.get("email") or "",
+                "agent_name": item["agent_name"],
+                "subject": "Weekly payout processed",
+                "message": f"Your weekly payout for {start} to {end} was processed. Amount included: {_fmt_money(amount)}.",
+                "status": "unread",
+                "created_at": _now_iso(),
+            })
+            processed_agents.append({
+                "agent_id": agent.get("id"),
+                "agent_name": item["agent_name"],
+                "amount": amount,
+                "rows": len(payable_rows),
+            })
+            processed_rows += len(payable_rows)
+            total_amount += amount
+
+        return jsonify({
+            "ok": not errors,
+            "processed_agents": processed_agents,
+            "processed_rows": processed_rows,
+            "total_amount": round(total_amount, 2),
+            "week_start": start,
+            "week_end": end,
+            "errors": errors[:20],
+        }), (207 if errors else 200)
+
+    @app.get("/api/admin/weekly_agent_report_pdf")
+    def admin_weekly_agent_report_pdf():
+        report = _admin_weekly_report_data()
+        start = report["start"]
+        end = report["end"]
+        rules = report["rules"]
+        report_rows = report["report_rows"]
+        totals = report["totals"]
+        buf = BytesIO()
+        c = canvas.Canvas(buf, pagesize=A4)
+        w, h = A4
+        left = 38
+        right = w - 38
+        primary = colors.HexColor("#0f766e")
+        dark = colors.HexColor("#142231")
+        muted = colors.HexColor("#64748b")
+        soft = colors.HexColor("#eef6fd")
+        line = colors.HexColor("#d9e2ec")
+
+        def text_fit(value, chars):
+            value = str(value or "-")
+            return value if len(value) <= chars else value[: max(0, chars - 1)] + "..."
+
+        def draw_text(x, y, value, size=8, bold=False, color=dark):
+            c.setFillColor(color)
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+            c.drawString(x, y, str(value or "-"))
+            c.setFillColor(dark)
+
+        def draw_money(x, y, value, size=8, bold=False):
+            c.setFillColor(dark)
+            c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+            c.drawRightString(x, y, _fmt_money(value))
+
+        def new_page():
+            c.showPage()
+            draw_header()
+            return h - 108
+
+        def ensure_space(y, needed=60):
+            if y < needed:
+                return new_page()
+            return y
+
+        def draw_header():
+            c.setFillColor(primary)
+            c.rect(0, h - 92, w, 92, fill=1, stroke=0)
+            c.setFillColor(colors.white)
+            c.setFont("Helvetica-Bold", 18)
+            c.drawString(left, h - 38, "YENE Weekly Agent Payment Report")
+            c.setFont("Helvetica", 9)
+            c.drawString(left, h - 56, f"Report week: {start.isoformat()} to {end.isoformat()} | Agent filter: {report['selected_label']}")
+            c.drawString(left, h - 72, f"Generated: {report['generated_at']} | Rule status: {rules['status']} | Source {rules['source']}")
+            c.setFillColor(dark)
+
+        def draw_table_header(y):
+            c.setFillColor(soft)
+            c.rect(left, y - 4, right - left, 18, fill=1, stroke=0)
+            c.setStrokeColor(colors.HexColor('#D1D5DB'))
+            c.line(left, y - 4, right, y - 4)
+            draw_text(left + 8, y, "Date", 7, True)
+            draw_text(left + 66, y, "Type", 7, True)
+            draw_text(left + 114, y, "Registered person / by", 7, True)
+            draw_text(left + 270, y, "Phone", 7, True)
+            draw_text(left + 360, y, "Town", 7, True)
+            draw_text(left + 435, y, "Status", 7, True)
+            c.setFont("Helvetica-Bold", 7)
+            c.drawRightString(right - 8, y, "Due")
+            return y - 16
+
+        draw_header()
+        y = h - 108
+        c.setFillColor(soft)
+        c.roundRect(left, y - 48, right - left, 56, 6, fill=1, stroke=0)
+        draw_text(left + 12, y - 4, f"Agents: {totals['agents']} | Drivers: {totals['drivers']} | Clients: {totals['clients']} | Pending rows: {totals['pending']} | Already paid: {totals.get('already_paid', 0)}", 10, True)
+        draw_text(left + 12, y - 20, f"Rates: Driver {_fmt_money(rules['driver_reg'])} | Client {_fmt_money(rules['client_reg'])} | Driver daily bonus {_fmt_money(rules['daily_5_drivers_bonus'])} at {rules['daily_driver_threshold']} | Client daily bonus {_fmt_money(rules['daily_5_clients_bonus'])} at {rules['daily_client_threshold']}", 8)
+        draw_text(left + 12, y - 36, f"Base: {_fmt_money(totals['base'])} | Bonuses: {_fmt_money(totals['bonus'])} | Pending value not due: {_fmt_money(totals['pending_value'])} | Grand payout: {_fmt_money(totals['payout'])}", 8, True, primary)
+        y -= 72
+
+        if not report_rows:
+            draw_text(left, y, "No weekly registration activity found for this period.", 10)
+        for item in report_rows:
+            y = ensure_space(y, 150)
+            agent = item["agent"]
+            c.setFillColor(colors.white)
+            c.roundRect(left, y - 58, right - left, 66, 6, fill=1, stroke=1)
+            c.setStrokeColor(colors.HexColor('#D1D5DB'))
+            draw_text(left + 12, y - 8, text_fit(item["agent_name"], 76), 12, True, primary)
+            draw_text(left + 12, y - 24, f"Email: {agent.get('email') or '-'}", 8)
+            draw_text(left + 12, y - 38, f"Phone: {agent.get('phone') or agent.get('phone_number') or '-'} | Referral: {agent.get('referral_code') or '-'}", 8)
+            draw_text(left + 12, y - 52, f"Town/Region: {agent.get('town') or '-'} / {agent.get('region') or agent.get('operation_region') or '-'}", 8)
+            draw_text(left + 300, y - 24, f"Drivers: {item['driver_count']} ({item['approved_driver_count']} payable) | Clients: {item['client_count']} ({item['approved_client_count']} payable)", 8, True)
+            draw_text(left + 300, y - 38, f"Rates: driver {_fmt_money(rules['driver_reg'])} | client {_fmt_money(rules['client_reg'])}", 8)
+            draw_text(left + 300, y - 52, f"Total due: {_fmt_money(item['agent_total'])}", 10, True, primary)
+            y -= 80
+
+            y = ensure_space(y, 82)
+            draw_text(left + 8, y, "Monday to Sunday counts", 8, True)
+            y -= 13
+            for day, values in sorted(item["daily"].items()):
+                y = ensure_space(y, 50)
+                draw_text(
+                    left + 18,
+                    y,
+                    f"{values.get('label') or day} {day}: drivers {values['drivers']} | clients {values['clients']} | payable {values['approved_drivers'] + values['approved_clients']} | pending {values['pending']} | base {_fmt_money(values['amount'])} | bonus {_fmt_money(values['bonus'])}",
+                    7,
+                )
+                y -= 11
+                for row in values.get("rows", [])[:18]:
+                    y = ensure_space(y, 45)
+                    draw_text(left + 28, y, f"- {row.get('type')}: {text_fit(row.get('name'), 22)} | {text_fit(row.get('phone'), 16)} | {text_fit(row.get('town'), 16)} | {text_fit(row.get('payable_status'), 14)} | {str(row.get('created_at') or '')[:16]}", 6)
+                    y -= 9
+            y -= 5
+
+            y = draw_table_header(y)
+            for row in item["rows"]:
+                y = ensure_space(y, 54)
+                draw_text(left + 8, y, str(row.get("created_at") or "")[:19].replace("T", " "), 7)
+                draw_text(left + 66, y, text_fit(row.get("type"), 9), 7)
+                draw_text(left + 114, y, text_fit(f"{row.get('name') or '-'} / {row.get('registered_by') or '-'}", 30), 7)
+                draw_text(left + 270, y, text_fit(row.get("phone"), 17), 7)
+                draw_text(left + 360, y, text_fit(row.get("town"), 13), 7)
+                draw_text(left + 435, y, text_fit(row.get("status") or "-", 13), 7)
+                draw_money(right - 8, y, row.get("payment_due"), 7)
+                c.setStrokeColor(colors.HexColor("#edf2f7"))
+                c.line(left, y - 4, right, y - 4)
+                y -= 12
+
+            y -= 6
+            y = ensure_space(y, 70)
+            draw_text(left + 8, y, f"Base pay: {_fmt_money(item['base_total'])} | Bonuses: {_fmt_money(item['bonus_total'])} | Pending value not due: {_fmt_money(item['pending_value'])}", 8, True)
+            y -= 14
+            if item["bonus_lines"]:
+                y = ensure_space(y, 50)
+                draw_text(left + 8, y, "Bonus lines", 8, True)
+                y -= 12
+            for line in item["bonus_lines"]:
+                y = ensure_space(y, 50)
+                draw_text(left + 18, y, text_fit(line, 105), 7)
+                y -= 11
+            y -= 16
+            if y < 90:
+                y = new_page()
+
+        c.save()
+        buf.seek(0)
+        report_name = (
+            f"yene_weekly_report_{start.isoformat()}_to_{end.isoformat()}.pdf"
+            if not report["selected_agent_ids"]
+            else f"yene_agent_report_{start.isoformat()}_to_{end.isoformat()}.pdf"
+        )
+        return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=report_name)
+
+    @app.get("/api/admin/agent_center_pdf/<agent_id>")
+    def admin_agent_center_pdf(agent_id):
+        agent = _agent_by_id(agent_id) or {}
+        mode, date_from, date_to = _period_from_request()
+        rows = _agent_registration_rows(agent_id, date_from, date_to)
+        buf = BytesIO()
+        c = canvas.Canvas(buf, pagesize=A4)
+        w, h = A4
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, h - 50, "YENE Agent Center Report")
+        c.setFont("Helvetica", 10)
+        c.drawString(50, h - 70, f"Agent: {agent.get('full_name') or agent.get('email') or agent_id}")
+        c.drawString(50, h - 85, f"Mode: {mode}  Range: {date_from or 'all'} to {date_to or 'all'}")
+        y = h - 115
+        for row in rows[:80]:
+            c.drawString(50, y, f"{row.get('created_at') or ''} {row.get('type')}: {row.get('name') or ''} {row.get('phone') or ''}"[:115])
+            y -= 14
+            if y < 60:
+                c.showPage()
+                y = h - 50
+        c.save()
+        buf.seek(0)
+        return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=f"yene_agent_{agent_id}_report.pdf")

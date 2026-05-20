@@ -1,0 +1,856 @@
+﻿import csv
+import datetime
+import io
+import json
+
+# -----------------------------
+# Supabase token auth (Agent API)
+# -----------------------------
+import os
+import time
+import tempfile
+from datetime import datetime, timedelta
+from functools import wraps
+from io import StringIO
+
+import requests
+from dotenv import load_dotenv
+from flask import (
+    Flask,
+    Response,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from flask_cors import CORS
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from supabase import create_client
+
+from admin_agents_live_routes import register_admin_agents_live_routes
+from admin_agents_master_routes import register_admin_agents_master_routes
+from admin_agents_reject_fix_routes import register_admin_agents_reject_fix_routes
+from admin_approval_working_routes import register_admin_approval_working_routes
+from admin_broadcast_fix_routes import register_admin_broadcast_fix_routes
+from admin_compat_routes import register_admin_compat_routes
+from admin_error_fixes_routes import register_admin_error_fixes_routes
+from admin_extended_routes import register_admin_extended_routes
+from admin_final_routes import register_admin_final_routes
+from admin_presence_town_routes import register_admin_presence_town_routes
+from admin_workflow_routes import register_admin_workflow_routes
+from agent_academy_v1 import register_agent_academy_v1_routes
+from agent_dashboard_v4 import register_agent_dashboard_v4_routes
+from agent_team_features import register_agent_team_routes
+from agent_wallet_v1 import register_agent_wallet_v1_routes
+from yene_compat_routes import register_yene_compat_routes
+
+
+def _sb_get_user_id_from_token(access_token: str):
+    """Validate Supabase access token and return user_id (uuid string) or None."""
+    url = os.getenv("SUPABASE_URL", "").strip() + "/auth/v1/user"
+    apikey = os.getenv("SUPABASE_ANON_KEY", "").strip()
+    if not url.strip() or not apikey.strip():
+        return None
+
+    try:
+        r = requests.get(
+            url,
+            headers={
+                "apikey": apikey,
+                "Authorization": f"Bearer {access_token}",
+            },
+            timeout=5,
+        )
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        return data.get("id")
+    except Exception:
+        return None
+
+
+
+
+
+
+def require_login(required_role=None):
+    """Early temporary session-based login guard for legacy modules."""
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            role = (session.get("role") or "").upper()
+            if not role:
+                return redirect(url_for("login"))
+            if required_role and role != str(required_role).upper():
+                if role == "ADMIN":
+                    return redirect(url_for("admin_dashboard"))
+                return redirect(url_for("login"))
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def require_agent_token(fn):
+    """Protect /api/agent/* using Supabase auth token instead of Flask session."""
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        # PUBLIC_DASHBOARD_BYPASS (do not remove)
+        if request.path in ["/agent/dashboard", "/dashboard/admin"]:
+            return fn(*args, **kwargs)
+
+        auth = request.headers.get("Authorization", "")
+        if not auth.lower().startswith("bearer "):
+            return (
+                jsonify({"ok": False, "error": "Missing Authorization Bearer token"}),
+                401,
+            )
+        token = auth.split(" ", 1)[1].strip()
+        uid = _sb_get_user_id_from_token(token)
+        if not uid:
+            return jsonify({"ok": False, "error": "Invalid/expired token"}), 401
+
+        # Attach for handlers to use
+        request.sb_uid = uid
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+
+# --- 1. THE FOUNDATION & TOOLS ---
+app = Flask(__name__)
+
+# ---------------------------
+# PUBLIC DASHBOARD PAGES
+# Supabase session is handled in browser.
+# Data access must be via /api/* with Bearer token.
+# ---------------------------
+
+
+
+def _agent_session_email():
+    return session.get("agent_email")
+
+def _set_agent_session(email):
+    session.clear()
+    session["email"] = email
+    session["agent_email"] = email
+    session["role"] = "AGENT"
+
+def _set_admin_session(email):
+    session.clear()
+    session["email"] = email
+    session["admin_email"] = email
+    session["role"] = "ADMIN"
+    session["is_admin"] = True
+
+def _require_admin():
+    return bool(session.get("admin_email")) and session.get("role") == "ADMIN"
+
+def _current_dashboard_for_session():
+    role = (session.get("role") or "").upper()
+    if role == "ADMIN" and session.get("admin_email"):
+        return "/dashboard/admin"
+    if role == "AGENT" and session.get("agent_email"):
+        return "/agent/dashboard"
+    return None
+
+def _clean_status(value):
+    return str(value or "").strip().upper()
+
+BLOCKED_PROFILE_STATUSES = {"BLOCKED", "REJECTED", "SUSPENDED", "DISABLED", "BANNED"}
+APPROVED_PROFILE_STATUSES = {"ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED"}
+WORKING_AGENT_STATUSES = APPROVED_PROFILE_STATUSES | {"PENDING", "PENDING_APPROVAL", "UNDER_REVIEW", "ONBOARDING"}
+
+def _is_active_profile(profile):
+    """Allow agents in onboarding to work, while blocking rejected/suspended accounts."""
+    if not profile:
+        return False
+    status = _clean_status(profile.get("status"))
+    if status in BLOCKED_PROFILE_STATUSES:
+        return False
+    return not status or status in WORKING_AGENT_STATUSES
+
+def _is_approved_profile(profile):
+    if not profile:
+        return False
+    status = _clean_status(profile.get("status"))
+    if status in BLOCKED_PROFILE_STATUSES:
+        return False
+    return not status or status in APPROVED_PROFILE_STATUSES
+
+def _role_is_admin(profile):
+    return str(profile.get("role") or "").strip().upper() == "ADMIN"
+
+def _lookup_profile(table_name, email):
+    email = (email or "").strip().lower()
+    if not email:
+        return None
+
+    cache_key = f"_profile_cache_{table_name}_{email}"
+    cached = session.get(cache_key)
+
+    def _query():
+        return (
+            sb_admin.table(table_name)
+            .select("*")
+            .eq("email", email)
+            .limit(1)
+        )
+
+    last_exc = None
+    for attempt in range(4):
+        try:
+            rows = _query().execute().data or []
+            if rows:
+                row = rows[0]
+                session[cache_key] = {
+                    "id": row.get("id"),
+                    "auth_id": row.get("auth_id"),
+                    "user_id": row.get("user_id"),
+                    "email": row.get("email"),
+                    "full_name": row.get("full_name"),
+                    "username": row.get("username"),
+                    "role": row.get("role"),
+                    "status": row.get("status"),
+                }
+                return row
+            return cached if isinstance(cached, dict) else None
+        except Exception as exc:
+            last_exc = exc
+            app.logger.warning(
+                "profile_lookup_failed table=%s email=%s attempt=%s error=%s",
+                table_name, email, attempt + 1, exc
+            )
+            time.sleep(0.2 * (attempt + 1))
+    return cached if isinstance(cached, dict) else None
+
+def _sign_in_supabase(email, password):
+    return supabase.auth.sign_in_with_password({
+        "email": email,
+        "password": password,
+    })
+
+def _safe_log_system_event(event_type, details, user_id=None):
+    try:
+        fn = globals().get("log_system_event")
+        if callable(fn):
+            return fn(event_type, details, user_id=user_id)
+    except Exception:
+        pass
+    return None
+
+
+@app.route("/dashboard/admin")
+def admin_dashboard():
+    if not _require_admin():
+        if (session.get("role") or "").upper() == "AGENT" and session.get("agent_email"):
+            return redirect("/agent/dashboard")
+        return redirect("/admin/login")
+    return render_template("admin_dashboard.html")
+
+
+@app.route("/dashboard")
+def dashboard_router():
+    dashboard = _current_dashboard_for_session()
+    if dashboard:
+        return redirect(dashboard)
+    return redirect("/login")
+
+
+@app.route("/admin/dashboard")
+def admin_dashboard_alias():
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/agent")
+def agent_root_alias():
+    return redirect(url_for("agent_dashboard"))
+
+
+@app.route("/agent/dashboard")
+def agent_dashboard():
+    if (session.get("role") or "").upper() != "AGENT" or not session.get("agent_email"):
+        if _require_admin():
+            return redirect("/dashboard/admin")
+        return redirect("/login")
+
+    try:
+        email = (session.get("agent_email") or session.get("email") or "").strip().lower()
+        profile = _lookup_profile("agent_profiles", email) if email else None
+        if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
+            session.clear()
+            flash("Your agent account is not available for working access")
+            return redirect("/login")
+        if profile.get("must_change_password"):
+            return redirect("/agent/change-password")
+    except Exception:
+        pass
+
+    return render_template("agent_dashboard.html")
+
+
+@app.route("/dashboard/agent")
+def agent_dashboard_alias():
+    return redirect(url_for("agent_dashboard"))
+
+
+# ---------------------------
+# PUBLIC DASHBOARD PAGES
+# Supabase session is handled in browser.
+# Data access must be via /api/* with Bearer token.
+# ---------------------------
+
+
+# --- Inject Supabase env into all templates (agent login needs this) ---
+
+
+@app.context_processor
+def inject_supabase_env():
+    return {
+        "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
+        "SUPABASE_ANON_KEY": os.getenv("SUPABASE_ANON_KEY", ""),
+    }
+
+
+# --- end inject ---
+
+
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "change-me")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+CORS(app)
+
+
+@app.before_request
+def protect_role_scoped_api_routes():
+    if request.path.startswith("/api/admin/") and not _require_admin():
+        return jsonify({"ok": False, "error": "Admin login required"}), 401
+
+    if request.path.startswith("/api/agent/"):
+        role = (session.get("role") or "").upper()
+        email = (session.get("agent_email") or session.get("email") or "").strip().lower()
+        if role != "AGENT" or not email:
+            return jsonify({"ok": False, "error": "Agent login required"}), 401
+        profile = _lookup_profile("agent_profiles", email)
+        if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
+            return jsonify({"ok": False, "error": "Agent account is blocked or unavailable"}), 403
+
+
+@app.after_request
+def normalize_api_json_response(response):
+    if not request.path.startswith("/api/") or not response.is_json:
+        return response
+    data = response.get_json(silent=True)
+    if not isinstance(data, dict) or "ok" not in data or "success" in data:
+        return response
+    data["success"] = bool(data.get("ok"))
+    normalized = app.response_class(
+        json.dumps(data, default=str),
+        status=response.status_code,
+        mimetype=response.mimetype,
+    )
+    for key, value in response.headers.items():
+        if key.lower() not in {"content-length", "content-type"}:
+            normalized.headers[key] = value
+    return normalized
+
+URL = os.getenv("SUPABASE_URL", "").strip()
+ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "").strip()
+SERVICE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    or os.getenv("SUPABASE_SERVICE_KEY", "").strip()
+)
+
+if not URL or not ANON_KEY:
+    raise RuntimeError("SUPABASE_URL and SUPABASE_ANON_KEY must be configured in environment")
+
+app.logger.info(
+    "Supabase config loaded: url_present=%s anon_present=%s service_role_present=%s",
+    bool(URL),
+    bool(ANON_KEY),
+    bool(SERVICE_KEY),
+)
+
+supabase = create_client(URL, ANON_KEY)
+sb_admin = create_client(URL, SERVICE_KEY) if SERVICE_KEY else supabase
+
+# --- HELPER FUNCTIONS ---
+
+
+
+register_agent_team_routes(app, sb_admin)
+register_agent_dashboard_v4_routes(app, sb_admin, require_login, _safe_log_system_event)
+register_agent_wallet_v1_routes(app, sb_admin, require_login)
+register_agent_academy_v1_routes(app, sb_admin, require_login)
+register_admin_compat_routes(app, sb_admin)
+register_admin_presence_town_routes(app, sb_admin)
+register_admin_extended_routes(app, sb_admin)
+register_admin_final_routes(app, sb_admin)
+register_admin_workflow_routes(app, sb_admin)
+register_admin_agents_reject_fix_routes(app, sb_admin)
+register_admin_agents_master_routes(app, sb_admin)
+register_admin_agents_live_routes(app, sb_admin)
+register_admin_approval_working_routes(app, sb_admin)
+register_admin_error_fixes_routes(app, sb_admin)
+register_admin_broadcast_fix_routes(app, sb_admin)
+register_yene_compat_routes(app, sb_admin)
+
+
+def homepage_stats(sb_admin):
+    def _safe_select(
+        table, filters=None, cols="*", limit=None, order_col=None, desc=False
+    ):
+        filters = filters or {}
+        try:
+            all_rows = []
+            page_size = 1000
+            start = 0
+            remaining = int(limit) if limit else None
+
+            while True:
+                batch_size = page_size if remaining is None else min(page_size, remaining)
+                if batch_size <= 0:
+                    break
+
+                q = sb_admin.table(table).select(cols).range(start, start + batch_size - 1)
+                for k, v in filters.items():
+                    q = q.eq(k, v)
+                if order_col:
+                    q = q.order(order_col, desc=desc)
+
+                res = q.execute()
+                batch = res.data or []
+                all_rows.extend(batch)
+
+                if len(batch) < batch_size:
+                    break
+
+                start += batch_size
+                if remaining is not None:
+                    remaining -= len(batch)
+
+            return all_rows
+        except Exception:
+            return []
+
+    def _clean(v):
+        return str(v or "").strip()
+
+    def _approved(v):
+        return _clean(v).upper() in ("ACTIVE", "APPROVED", "VERIFIED", "ADMIN_APPROVED")
+
+    def _pending(v):
+        return _clean(v).upper() in ("PENDING", "PENDING_APPROVAL", "UNDER_REVIEW")
+
+    today = datetime.utcnow().date()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    def _row_date(row):
+        raw = _clean(row.get("created_at"))
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+        except Exception:
+            return None
+
+    def _created_this_week(row):
+        created = _row_date(row)
+        return bool(created and week_start <= created <= week_end)
+
+    def _official_updates():
+        rows = _safe_select("broadcasts", {}, "*", 10, "created_at", True)
+        out = []
+        for r in rows:
+            msg = _clean(r.get("message"))
+            if not msg:
+                continue
+            out.append(
+                {
+                    "date": _clean(r.get("created_at"))[:10],
+                    "title": _clean(r.get("title")) or "Official Update",
+                    "message": msg,
+                }
+            )
+        if out:
+            return out[:5]
+
+        rows = _safe_select("system_logs", {}, "*", 10, "created_at", True)
+        for r in rows:
+            details = _clean(r.get("details"))
+            if not details:
+                continue
+            out.append(
+                {
+                    "date": _clean(r.get("created_at"))[:10],
+                    "title": _clean(r.get("event_type")) or "Official Update",
+                    "message": details,
+                }
+            )
+        if out:
+            return out[:5]
+
+        return []
+
+    def _network_rules():
+        return [
+            {"icon": "✅", "text": "Only approved agents can earn commissions."},
+            {
+                "icon": "📵",
+                "text": "Duplicate phone registrations are blocked for network integrity.",
+            },
+            {
+                "icon": "🧾",
+                "text": "Verified trip tracking supports clear reward calculations.",
+            },
+            {
+                "icon": "💳",
+                "text": "Transparent ledger and admin review support fair payouts.",
+            },
+        ]
+
+    def _payment_value(row, *keys):
+        for key in keys:
+            val = row.get(key)
+            if val not in (None, ""):
+                return val
+        return 0
+
+    def _regional_rates():
+        rows = _safe_select("payment_rules", {}, "*", 200, "updated_at", True)
+        out = []
+        for r in rows:
+            region = _clean(r.get("region"))
+            town = _clean(r.get("town"))
+            driver = _payment_value(r, "driver_reg", "driver_register_amount", "driver_amount")
+            client = _payment_value(r, "client_reg", "client_register_amount", "client_amount")
+            status = _clean(r.get("status")) or "Active"
+            if region or town:
+                out.append(
+                    {
+                        "region": region or "Namibia",
+                        "town": town or "General",
+                        "driver": driver if driver is not None else 0,
+                        "client": client if client is not None else 0,
+                        "status": status,
+                    }
+                )
+
+        if out:
+            seen = set()
+            unique = []
+            for r in out:
+                key = (
+                    r["region"].lower(),
+                    r["town"].lower(),
+                    str(r["driver"]),
+                    str(r["client"]),
+                    r["status"].lower(),
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                unique.append(r)
+            return unique[:12]
+
+        return []
+
+    def _weekly_payment_info():
+        rows = _safe_select("weekly_payment_settings", {}, "*", 50, "updated_at", True)
+        source = "weekly_payment_settings"
+        if not rows:
+            rows = _safe_select("payment_rules", {}, "*", 100, "updated_at", True)
+            source = "payment_rules"
+        out = []
+        for r in rows:
+            out.append({
+                "source": source,
+                "region": _clean(r.get("region") or r.get("operation_region")) or "Namibia",
+                "town": _clean(r.get("town")) or "All towns",
+                "driver_pay": _payment_value(r, "driver_reg", "driver_register_amount", "driver_amount"),
+                "client_pay": _payment_value(r, "client_reg", "client_register_amount", "client_amount"),
+                "driver_daily_bonus": _payment_value(r, "daily_5_drivers_bonus", "driver_daily_bonus", "daily_driver_bonus"),
+                "client_daily_bonus": _payment_value(r, "daily_5_clients_bonus", "client_daily_bonus", "daily_client_bonus"),
+                "activation_bonus": _payment_value(r, "weekly_30_activations_bonus", "activation_bonus", "weekly_activation_bonus"),
+                "first_trip_bonus": _payment_value(r, "first_trip_bonus"),
+                "status": _clean(r.get("status")) or "Active",
+            })
+        return out[:8]
+
+    agents = _safe_select("agent_profiles", {}, "*", 10000)
+    if not agents:
+        agents = _safe_select("agents", {}, "*", 10000)
+    drivers = _safe_select("drivers", {}, "*", 10000, "created_at", True)
+    clients = _safe_select("clients", {}, "*", 10000, "created_at", True)
+    jobs = _safe_select("remote_jobs", {}, "*", 8, "created_at", True)
+    recent = []
+    for d in drivers[:10]:
+        recent.append({
+            "type": "Driver",
+            "name": _clean(d.get("full_name") or d.get("name")),
+            "phone": _clean(d.get("phone") or d.get("phone_number")),
+            "town": _clean(d.get("town")),
+            "created_at": _clean(d.get("created_at")),
+        })
+    for c in clients[:10]:
+        recent.append({
+            "type": "Client",
+            "name": _clean(c.get("full_name") or c.get("name")),
+            "phone": _clean(c.get("phone") or c.get("phone_number")),
+            "town": _clean(c.get("town")),
+            "created_at": _clean(c.get("created_at")),
+        })
+    recent.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+
+    active_agents = [r for r in agents if _approved(r.get("status")) or not _clean(r.get("status"))]
+    pending_agents = [r for r in agents if _pending(r.get("status"))]
+    approved_drivers = [r for r in drivers if _approved(r.get("status"))]
+    approved_clients = [r for r in clients if _approved(r.get("status"))]
+    weekly_drivers = [r for r in drivers if _created_this_week(r)]
+    weekly_clients = [r for r in clients if _created_this_week(r)]
+    weekly_registrations = len(weekly_drivers) + len(weekly_clients)
+
+    leaderboard = []
+    for agent in active_agents:
+        ids = {
+            _clean(agent.get("id")),
+            _clean(agent.get("auth_id")),
+            _clean(agent.get("user_id")),
+            _clean(agent.get("email")).lower(),
+        }
+        ids.discard("")
+        agent_drivers = [
+            r for r in weekly_drivers
+            if _clean(r.get("recruiter_agent_id")) in ids
+            or _clean(r.get("agent_id")) in ids
+            or _clean(r.get("agent_auth_id")) in ids
+            or _clean(r.get("recruiter_email")).lower() in ids
+        ]
+        agent_clients = [
+            r for r in weekly_clients
+            if _clean(r.get("recruiter_agent_id")) in ids
+            or _clean(r.get("agent_id")) in ids
+            or _clean(r.get("agent_auth_id")) in ids
+            or _clean(r.get("recruiter_email")).lower() in ids
+        ]
+        approved_agent_drivers = [r for r in agent_drivers if _approved(r.get("status"))]
+        approved_agent_clients = [r for r in agent_clients if _approved(r.get("status"))]
+        score = len(approved_agent_drivers) * 3 + len(approved_agent_clients) * 2
+        if score:
+            leaderboard.append({
+                "name": _clean(agent.get("full_name") or agent.get("username") or agent.get("email")) or "Agent",
+                "town": _clean(agent.get("town") or agent.get("operation_region") or agent.get("region")) or "Namibia",
+                "drivers": len(approved_agent_drivers),
+                "clients": len(approved_agent_clients),
+                "score": score,
+            })
+    leaderboard.sort(key=lambda item: item["score"], reverse=True)
+
+    job_alerts = []
+    for job in jobs:
+        status = _clean(job.get("status") or "ACTIVE").upper()
+        if status in {"CLOSED", "ARCHIVED", "INACTIVE"}:
+            continue
+        title = _clean(job.get("title"))
+        description = _clean(job.get("description") or job.get("details"))
+        if title or description:
+            job_alerts.append({
+                "id": _clean(job.get("id")),
+                "title": title or "YENE remote task",
+                "town": _clean(job.get("town") or job.get("region")) or "Namibia",
+                "description": description,
+                "status": status.title(),
+                "created_at": _clean(job.get("created_at")),
+            })
+    regions = set()
+    for row in agents + drivers + clients:
+        region = _clean(row.get("region") or row.get("operation_region"))
+        if region:
+            regions.add(region.lower())
+
+    return {
+        "stats": {
+            "regions": len(regions),
+            "agents": len(active_agents),
+            "agents_total": len(agents),
+            "agents_active": len(active_agents),
+            "agents_pending": len(pending_agents),
+            "drivers": len(approved_drivers),
+            "drivers_registered": len(approved_drivers),
+            "drivers_total": len(drivers),
+            "drivers_pending": len([r for r in drivers if _pending(r.get("status"))]),
+            "clients": len(approved_clients),
+            "clients_registered": len(approved_clients),
+            "clients_total": len(clients),
+            "clients_all_time": len(clients),
+            "clients_pending": len([r for r in clients if _pending(r.get("status"))]),
+            "registrations_this_week": weekly_registrations,
+            "weekly_drivers": len(weekly_drivers),
+            "weekly_clients": len(weekly_clients),
+            "week_start": week_start.isoformat(),
+            "week_end": week_end.isoformat(),
+            "leaderboard": leaderboard[:5],
+            "job_alerts": job_alerts[:5],
+            "recent_activity": recent[:12],
+        },
+        "updates": _official_updates(),
+        "rules": _network_rules(),
+        "rates": _regional_rates(),
+        "payment_info": _weekly_payment_info(),
+    }
+
+
+@app.route("/")
+def index():
+    home = homepage_stats(sb_admin)
+    return render_template(
+        "index.html",
+        stats=home["stats"],
+        updates=home["updates"],
+        rules=home["rules"],
+        rates=home["rates"],
+        payment_info=home["payment_info"],
+    )
+
+
+# ---------------------------
+# AUTH + DASHBOARD ROUTES
+# ---------------------------
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        dashboard = _current_dashboard_for_session()
+        wants_form = (request.args.get("force") or request.args.get("login") or "").lower() in {"1", "true", "yes"}
+        if dashboard and not wants_form:
+            return redirect(dashboard)
+        return render_template(
+            "login.html",
+            login_mode="agent",
+            SUPABASE_URL=globals().get("SUPABASE_URL", ""),
+            SUPABASE_ANON_KEY=globals().get("SUPABASE_ANON_KEY", "")
+        )
+
+    email = (request.form.get("email") or "").strip().lower()
+    password = request.form.get("password") or ""
+
+    if not email or not password:
+        flash("Email and password are required")
+        return redirect("/login")
+
+    try:
+        _sign_in_supabase(email, password)
+    except Exception as e:
+        msg = str(e)
+        if "JWT expired" in msg:
+            flash("Session expired. Please login again.")
+        else:
+            flash(f"Login error: {msg}")
+        return redirect("/login")
+
+    profile = _lookup_profile("agent_profiles", email)
+    if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
+        session.clear()
+        flash("No working agent profile found for this account")
+        return redirect("/login")
+
+    _set_agent_session(email)
+    _safe_log_system_event("LOGIN", f"AGENT logged in: {email}", user_id=email)
+    return redirect("/agent/dashboard")
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "GET":
+        # Always show the admin login form here.
+        # Do not redirect an active agent session into agent dashboard.
+        return render_template("login.html", login_mode="admin")
+
+    email = (request.form.get("email") or "").strip().lower()
+    password = request.form.get("password") or ""
+
+    if not email or not password:
+        flash("Email and password are required")
+        return redirect("/admin/login")
+
+    try:
+        _sign_in_supabase(email, password)
+    except Exception as e:
+        app.logger.warning("admin_login_auth_failed email=%s error=%s", email, e)
+        flash("Invalid admin credentials")
+        return redirect("/admin/login")
+
+    profile = _lookup_profile("admin_profiles", email)
+    if not profile or not _is_approved_profile(profile):
+        session.clear()
+        app.logger.warning("admin_login_profile_rejected email=%s profile_found=%s", email, bool(profile))
+        flash("No approved admin profile found for this account")
+        return redirect("/admin/login")
+
+    _set_admin_session(email)
+    _safe_log_system_event("LOGIN", f"ADMIN logged in: {email}", user_id=email)
+    return redirect("/dashboard/admin")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "GET":
+        return render_template("register.html")
+
+    full_name = (request.form.get("full_name") or "").strip()
+    username = (request.form.get("username") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    gender = (request.form.get("gender") or "").strip()
+    password = request.form.get("password") or ""
+
+    if not all([full_name, username, phone, email, gender, password]):
+        flash("All fields are required")
+        return redirect("/register")
+
+    try:
+        # 1. Create Supabase auth user
+        supabase.auth.sign_up({
+            "email": email,
+            "password": password
+        })
+
+        # 2. Create agent profile
+        sb_admin.table("agent_profiles").insert({
+            "username": username,
+            "full_name": full_name,
+            "phone_number": phone,
+            "email": email,
+            "gender": gender,
+            "auth_method": "email",
+            "status": "PENDING_APPROVAL",
+            "role": "AGENT"
+        }).execute()
+
+        session.clear()
+        _set_agent_session(email)
+        flash("Account created successfully.")
+        return redirect("/agent/dashboard")
+
+    except Exception as e:
+        app.logger.exception("register_failed")
+        flash(f"Registration failed: {e}")
+        return redirect("/register")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=False)

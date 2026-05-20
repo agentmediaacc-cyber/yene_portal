@@ -28,11 +28,6 @@
 
     *{box-sizing:border-box}
     html{scroll-behavior:smooth}
-    html,body{
-      min-height:100%;
-      overflow-x:hidden;
-      overflow-y:auto;
-    }
     body{
       margin:0;
       font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
@@ -69,10 +64,6 @@
       padding:18px;
       z-index:50;
       backdrop-filter:blur(18px);
-      display:flex;
-      flex-direction:column;
-      overflow-y:auto;
-      overflow-x:hidden;
     }
 
     .brand{
@@ -98,7 +89,7 @@
     .brand h1{margin:0;font-size:18px;line-height:1.1}
     .brand p{margin:4px 0 0;color:var(--muted);font-size:12px}
 
-    .side-stack{margin-top:18px;display:flex;flex-direction:column;gap:10px;flex:1 1 auto;padding-bottom:20px}
+    .side-stack{margin-top:18px;display:flex;flex-direction:column;gap:10px}
 
     .nav-btn{
       width:100%;
@@ -138,13 +129,12 @@
     }
 
     .side-footer{
+      position:absolute;left:18px;right:18px;bottom:18px;
       padding:14px;border-radius:18px;border:1px solid var(--line);
       background:rgba(255,255,255,.03);color:var(--muted);font-size:13px;
-      margin-top:auto;
-      flex:0 0 auto;
     }
 
-    .main{min-width:0;overflow:visible}
+    .main{min-width:0}
 
     .topbar{
       position:sticky;top:0;z-index:40;
@@ -880,7 +870,7 @@
       .side-stack{padding-bottom:18px}
       .side-footer{display:none}
       .topbar{padding:14px 16px}
-      .page{padding:16px 16px 100px}
+      .page{padding:16px}
       .search-hide{display:none}
       .mini-grid,.form-grid{grid-template-columns:1fr}
     }
@@ -1028,28 +1018,6 @@
       color: #92400e;
       border-color: #f59e0b;
     }
-    .field-help{
-      margin-top:6px;
-      font-size:12px;
-      color:#5d7189;
-      line-height:1.45;
-    }
-    .field-group{
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-    }
-    .field-label{
-      font-size:12px;
-      font-weight:800;
-      letter-spacing:.04em;
-      text-transform:uppercase;
-      color:#dceaff;
-    }
-    .field::placeholder,.textarea::placeholder{
-      color:#7f96af;
-      opacity:1;
-    }
     .btn-loading {
       opacity: .75;
       pointer-events: none;
@@ -1110,7 +1078,7 @@
       </div>
 
       <div class="side-footer">
-        YENE workspace with profile, registrations, wallet, team, jobs, support, and reports.
+        Live YENE workspace with profile, registrations, wallet, team, jobs, support, and reports connected to Supabase.
       </div>
     </aside>
     <div class="menu-backdrop" id="menuBackdrop" aria-hidden="true"></div>
@@ -1119,7 +1087,7 @@
       <div class="topbar">
         <div class="top-left">
           <button class="menu-btn" id="menuBtn" type="button" aria-controls="sidebar" aria-expanded="false">☰</button>
-          <div class="soft-badge search-hide" id="helloBadge">Checking account...</div>
+          <div class="soft-badge search-hide" id="helloBadge">Loading agent...</div>
         </div>
         <div class="top-right">
           <div class="soft-badge" id="weekBadge">Current week</div>
@@ -1170,8 +1138,7 @@
             </div>
             <div class="card-body tight">
               <div class="list" id="jobPreviewList">
-                <div class="muted">No active jobs right now.</div>
-
+                <div class="muted">Loading active jobs...</div>
               </div>
             </div>
           </div>
@@ -1209,7 +1176,7 @@
                 </div>
                 <div class="stat-ico">👤</div>
               </div>
-              <div class="stat-sub">Count from current activity</div>
+              <div class="stat-sub">Live count from current activity feed</div>
             </div>
 
             <div class="card stat">
@@ -1238,11 +1205,11 @@
             <div class="card">
               <div class="card-header">
                 <h3>Recent Registrations</h3>
-                <div class="pill">This Week</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body tight">
                 <div class="list" id="recentActivityList">
-                  <div class="muted">Checking activity...</div>
+                  <div class="muted">Loading activity...</div>
                 </div>
               </div>
             </div>
@@ -1254,20 +1221,18 @@
               </div>
               <div class="card-body tight">
                 <div class="list" id="messageList">
-                  <div class="muted">No messages yet.</div>
-
+                  <div class="muted">Loading messages...</div>
                 </div>
               </div>
             </div>
             <div class="card">
               <div class="card-header">
                 <h3>Smart Alerts</h3>
-                <div class="pill">Open</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body tight">
                 <div class="list" id="agentAlertList">
-                  <div class="muted">No alerts right now.</div>
-
+                  <div class="muted">Loading alerts...</div>
                 </div>
               </div>
             </div>
@@ -1282,43 +1247,20 @@
             <div class="card">
               <div class="card-header">
                 <h3>Register Driver</h3>
-                <div class="pill">Open</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body">
                 <form id="driverForm" class="form-grid">
                   <div id="driverFormFeedback" class="inline-feedback info full" style="display:none;"></div>
-                  <label class="field-group">
-                    <span class="field-label">Driver Full Name</span>
-                    <input class="field" name="full_name" aria-label="Driver full name" placeholder="Enter driver full name" required />
-                  </label>
-                  <label class="field-group">
-                    <span class="field-label">Driver Phone Number</span>
-                    <input class="field" name="phone" aria-label="Driver phone number" placeholder="0812613261 or +264812613261" required />
-                  </label>
-                  <label class="field-group">
-                    <span class="field-label">Town</span>
-                    <input class="field" name="town" aria-label="Town" placeholder="Enter town" required />
-                  </label>
-                  <label class="field-group">
-                    <span class="field-label">Region</span>
-                    <input class="field" name="region" aria-label="Region" placeholder="Enter region" list="namibiaRegions" />
-                  </label>
-                  <label class="field-group">
-                    <span class="field-label">Car Details</span>
-                    <input class="field" name="car_details" aria-label="Car details" placeholder="Toyota Corolla, white, N 12345 W" />
-                  </label>
-                  <label class="field-group">
-                    <span class="field-label">Licence Number</span>
-                    <input class="field" name="license_number" aria-label="Licence number" placeholder="Enter licence number" />
-                  </label>
-                  <div class="field-group">
-                    <span class="field-label">Driver PAR Code</span>
-                    <input class="field js-prefixed-code" data-prefix="PAR" name="external_code" aria-label="Driver PAR code" placeholder="3232 or PAR3232" required />
-                    <div class="field-help">Type the real driver code. If you enter only numbers, YENE formats them as `PAR<number>`.</div>
-                  </div>
+                  <input class="field" name="full_name" placeholder="Driver full name" required />
+                  <input class="field" name="phone" placeholder="Phone number" required />
+                  <input class="field" name="town" placeholder="Town" required />
+                  <input class="field" name="car_details" placeholder="Car details" />
+                  <input class="field" name="license_number" placeholder="PAR / license number" required />
+                  <input class="field" name="external_code" placeholder="Referral / external code (optional)" />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Register Driver</button>
-                    <div class="mini-note">Phone numbers are normalized to Namibia +264 format before saving.</div>
+                    <div class="mini-note">Phone and licence details are checked before saving.</div>
                   </div>
                 </form>
               </div>
@@ -1327,35 +1269,18 @@
             <div class="card">
               <div class="card-header">
                 <h3>Register Client</h3>
-                <div class="pill">Open</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body">
                 <form id="clientForm" class="form-grid">
                   <div id="clientFormFeedback" class="inline-feedback info full" style="display:none;"></div>
-                  <label class="field-group">
-                    <span class="field-label">Client Full Name</span>
-                    <input class="field" name="full_name" aria-label="Client full name" placeholder="Enter client full name" required />
-                  </label>
-                  <label class="field-group">
-                    <span class="field-label">Client Phone Number</span>
-                    <input class="field" name="phone" aria-label="Client phone number" placeholder="0812613261 or +264812613261" required />
-                  </label>
-                  <label class="field-group">
-                    <span class="field-label">Town</span>
-                    <input class="field" name="town" aria-label="Town" placeholder="Enter town" required />
-                  </label>
-                  <label class="field-group">
-                    <span class="field-label">Region</span>
-                    <input class="field" name="region" aria-label="Region" placeholder="Enter region" list="namibiaRegions" />
-                  </label>
-                  <div class="field-group">
-                    <span class="field-label">Client CUS Code</span>
-                    <input class="field js-prefixed-code" data-prefix="CUS" name="external_code" aria-label="Client CUS code" placeholder="3323 or CUS3323" required />
-                    <div class="field-help">Type the real client code. If you enter only numbers, YENE formats them as `CUS<number>`.</div>
-                  </div>
+                  <input class="field" name="full_name" placeholder="Client full name" required />
+                  <input class="field" name="phone" placeholder="Phone number" required />
+                  <input class="field" name="town" placeholder="Town" required />
+                  <input class="field" name="external_code" placeholder="Customer code" required />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Register Client</button>
-                    <div class="mini-note">Phone numbers are normalized to Namibia +264 format before saving.</div>
+                    <div class="mini-note">Phone and customer code are checked before saving.</div>
                   </div>
                 </form>
               </div>
@@ -1380,14 +1305,11 @@
                       <th>Name</th>
                       <th>Phone</th>
                       <th>Town</th>
-                      <th>Region</th>
-                      <th>Code</th>
-                      <th>Status</th>
                       <th>When</th>
                     </tr>
                   </thead>
                   <tbody id="activityTableBody">
-                    <tr><td colspan="8" class="muted">Checking registrations...</td></tr>
+                    <tr><td colspan="5" class="muted">Loading live data...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -1403,8 +1325,7 @@
             </div>
             <div class="card-body">
               <div class="list" id="jobList">
-                <div class="muted">No active jobs right now.</div>
-
+                <div class="muted">Loading active jobs...</div>
               </div>
             </div>
           </div>
@@ -1416,7 +1337,7 @@
             </div>
             <div class="card-body">
               <div class="list" id="groupMessageList">
-                  <div class="muted">Checking group notices...</div>
+                <div class="muted">Loading group notices...</div>
               </div>
             </div>
           </div>
@@ -1460,11 +1381,11 @@
             <div class="card">
               <div class="card-header">
                 <h3>Wallet History</h3>
-                <div class="pill">Wallet</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body tight">
                 <div class="list" id="walletHistoryList">
-                  <div class="muted">Checking wallet history...</div>
+                  <div class="muted">Loading wallet history...</div>
                 </div>
               </div>
             </div>
@@ -1476,14 +1397,14 @@
               </div>
               <div class="card-body">
                 <form id="withdrawForm" class="form-grid">
-                  <input class="field" name="amount" type="number" min="1" step="0.01" aria-label="Amount N$" required />
-                  <input class="field" name="note" aria-label="Optional note" />
+                  <input class="field" name="amount" type="number" min="1" step="0.01" placeholder="Amount N$" required />
+                  <input class="field" name="note" placeholder="Optional note" />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Request Withdrawal</button>
                   </div>
                 </form>
                 <div class="list" id="withdrawList" style="margin-top:14px">
-                  <div class="muted">Checking requests...</div>
+                  <div class="muted">Loading requests...</div>
                 </div>
               </div>
             </div>
@@ -1530,11 +1451,11 @@
             <div class="card">
               <div class="card-header">
                 <h3>Referral Team Summary</h3>
-                <div class="pill">Team</div>
+                <div class="pill">Live</div>
               </div>
               <div class="card-body">
                 <div class="list" id="teamSummaryList">
-                  <div class="muted">Checking team summary...</div>
+                  <div class="muted">Loading team summary...</div>
                 </div>
               </div>
             </div>
@@ -1577,7 +1498,7 @@
                 <div>
                   <div class="label">Recruitment Leaderboard</div>
                   <h3 style="margin:6px 0 6px;">Performance, rivalry, and competition</h3>
-                  <div class="leader-subnote">Rankings from your saved registrations. Switch between week, month, and all-time views.</div>
+                  <div class="leader-subnote">Live rankings from your real agent leaderboard route. Switch between week, month, and all-time views.</div>
                 </div>
                 <div class="toolbar">
                   <button class="btn btn-soft leader-btn active" data-period="week">This Week</button>
@@ -1597,7 +1518,7 @@
                 </div>
                 <div class="stat-ico">👤</div>
               </div>
-              <div class="stat-sub" id="rankClientsWeekSub">Checking current week leaderboard...</div>
+              <div class="stat-sub" id="rankClientsWeekSub">Loading current week leaderboard...</div>
             </div>
 
             <div class="card stat">
@@ -1608,7 +1529,7 @@
                 </div>
                 <div class="stat-ico">🚗</div>
               </div>
-              <div class="stat-sub" id="rankDriversWeekSub">Checking current week leaderboard...</div>
+              <div class="stat-sub" id="rankDriversWeekSub">Loading current week leaderboard...</div>
             </div>
 
             <div class="card stat spark">
@@ -1781,7 +1702,7 @@
                 </div>
 
                 <div class="support-thread" id="fullMessageList">
-                  <div class="muted">Checking inbox...</div>
+                  <div class="muted">Loading inbox...</div>
                 </div>
               </div>
             </div>
@@ -1808,8 +1729,8 @@
                     <option value="URGENT">Urgent</option>
                   </select>
 
-                  <input class="field full" id="supportSubject" name="subject" aria-label="Subject" required />
-                  <textarea class="textarea full" id="supportMessage" name="message" aria-label="Describe the issue or reply..." required></textarea>
+                  <input class="field full" id="supportSubject" name="subject" placeholder="Subject" required />
+                  <textarea class="textarea full" id="supportMessage" name="message" placeholder="Describe the issue or reply..." required></textarea>
                   <input type="hidden" id="supportReplyToId" value="" />
 
                   <div class="full reply-actions">
@@ -1933,7 +1854,7 @@
                   <img class="profile-photo" id="profilePhoto" alt="Agent profile photo">
                   <div class="stack">
                     <div class="title" id="profileNameLabel">Agent profile</div>
-                    <div class="sub" id="profileCompletionText">Checking profile requirements...</div>
+                    <div class="sub" id="profileCompletionText">Loading profile requirements...</div>
                     <div class="completion-bar"><div class="completion-fill" id="profileCompletionFill"></div></div>
                   </div>
                 </div>
@@ -1950,10 +1871,10 @@
                   <div class="mini-note" id="cameraStatus">Use camera or upload from gallery. Saved photos are stored in Supabase Storage.</div>
                 </div>
                 <form id="settingsForm" class="form-grid">
-                  <input class="field" name="full_name" id="setName" aria-label="Full name" />
-                  <input class="field" name="username" id="setUsername" aria-label="Username" />
-                  <input class="field" name="email" id="setEmail" aria-label="Email" readonly />
-                  <input class="field" name="phone" id="setPhone" aria-label="Phone" />
+                  <input class="field" name="full_name" id="setName" placeholder="Full name" />
+                  <input class="field" name="username" id="setUsername" placeholder="Username" />
+                  <input class="field" name="email" id="setEmail" placeholder="Email" readonly />
+                  <input class="field" name="phone" id="setPhone" placeholder="Phone" />
                   <select class="select" name="gender" id="setGender">
                     <option value="">Gender</option>
                     <option value="Female">Female</option>
@@ -1961,23 +1882,16 @@
                     <option value="Other">Other</option>
                     <option value="Prefer not to say">Prefer not to say</option>
                   </select>
-                  <input class="field" name="date_of_birth" id="setBirth" type="date" aria-label="Date of birth" />
-                  <input class="field" name="town" id="setTown" aria-label="Town" />
-                  <input class="field" name="region" id="setRegion" aria-label="Region" list="namibiaRegions" />
-                  <div class="mini-note full" id="regionLockNote" style="display:none">Region locked by admin</div>
-                  <datalist id="namibiaRegions">
-                    {% for region in NAMIBIA_REGIONS %}
-                      <option value="{{ region }}"></option>
-                    {% endfor %}
-                  </datalist>
-
-                  <input class="field" name="national_id" id="setNationalId" aria-label="National ID / ID number" />
-                  <input class="field" name="next_of_kin_name" id="setKinName" aria-label="Next of kin name" />
-                  <input class="field" name="next_of_kin_phone" id="setKinPhone" aria-label="Next of kin phone" />
-                  <input class="field full" name="residential_address" id="setAddress" aria-label="Residential address" />
-                  <textarea class="textarea full" name="bio" id="setBio" aria-label="Bio / about"></textarea>
-                  <input class="field full" name="profile_picture_url" id="setProfilePicture" aria-label="Profile picture (optional) URL" />
-                  <input class="field full" id="setReferral" aria-label="Referral code" readonly />
+                  <input class="field" name="date_of_birth" id="setBirth" type="date" placeholder="Date of birth" />
+                  <input class="field" name="town" id="setTown" placeholder="Town" />
+                  <input class="field" name="region" id="setRegion" placeholder="Region" />
+                  <input class="field" name="national_id" id="setNationalId" placeholder="National ID / ID number" />
+                  <input class="field" name="next_of_kin_name" id="setKinName" placeholder="Next of kin name" />
+                  <input class="field" name="next_of_kin_phone" id="setKinPhone" placeholder="Next of kin phone" />
+                  <input class="field full" name="residential_address" id="setAddress" placeholder="Residential address" />
+                  <textarea class="textarea full" name="bio" id="setBio" placeholder="Bio / about"></textarea>
+                  <input class="field full" name="profile_picture_url" id="setProfilePicture" placeholder="Profile picture (optional) URL" />
+                  <input class="field full" id="setReferral" placeholder="Referral code" readonly />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Save My Account</button>
                     <button class="btn btn-soft" type="button" id="copyCodeBtn">Copy Referral Code</button>
@@ -2032,22 +1946,6 @@
 
     const menuState = { open: false };
     const $ = (id) => document.getElementById(id);
-    const setText = (id, value) => {
-      const el = $(id);
-      if (el) el.textContent = value == null ? "" : String(value);
-    };
-    const setHTML = (id, value) => {
-      const el = $(id);
-      if (el) el.innerHTML = value == null ? "" : String(value);
-    };
-    const setValue = (id, value) => {
-      const el = $(id);
-      if (el) el.value = value == null ? "" : String(value);
-    };
-    const setSrc = (id, value) => {
-      const el = $(id);
-      if (el) el.src = value == null ? "" : String(value);
-    };
 
     function esc(v){
       return String(v ?? "")
@@ -2082,12 +1980,15 @@
         loadMessages(),
         loadLeaderboard("week")
       ]);
-      try{ updateHero(); }catch(e){ console.error('updateHero after save failed', e); }
-      try{ renderActivity(); }catch(e){ console.error('renderActivity after save failed', e); }
-      try{ renderWallet(); }catch(e){ console.error('renderWallet after save failed', e); }
-      try{ renderMessages(); }catch(e){ console.error('renderMessages after save failed', e); }
-      try{ renderLeaderboard(); }catch(e){ console.error('renderLeaderboard after save failed', e); }
-      return "Saved and sent to admin approval.";
+      updateHero();
+      renderActivity();
+      renderWallet();
+      renderMessages();
+      renderLeaderboard();
+      const summary = state.summary || {};
+      const drivers = Number(summary.drivers_this_week || summary.week_drivers || summary.drivers_week || 0);
+      const clients = Number(summary.clients_this_week || summary.week_clients || summary.clients_week || 0);
+      return `${kind} saved and waiting for admin approval. Current week: ${drivers} drivers, ${clients} clients.`;
     }
 
 
@@ -2099,7 +2000,7 @@
       el.style.display = "block";
     }
 
-    function setButtonLoading(btn, isLoading, loadingText = "YENE is checking and sending to admin approval...") {
+    function setButtonLoading(btn, isLoading, loadingText = "Saving...") {
       if (!btn) return;
       if (!btn.dataset.originalText) {
         btn.dataset.originalText = btn.innerHTML;
@@ -2233,52 +2134,45 @@
       const me = state.me || {};
       const summary = state.summary || {};
       const wallet = state.walletSummary || {};
-      const name = me.full_name || me.name || me.username || me.email || "Agent";
+      const name = me.full_name || me.name || me.username || "Agent";
 
-      setText("heroTitle", "Welcome, " + name);
-      setText("helloBadge", name);
-      setText("heroTown", safe(me.town || me.region || "Update profile"));
-      setText("heroRole", safe(me.role || "Agent"));
-      setText("heroCode", "Referral Code: " + safe(me.referral_code || me.code || "-"));
-      setText("heroWallet", money(wallet.balance || wallet.total || wallet.available_balance || summary.wallet_balance || 0));
-      setText("heroDrivers", Number(summary.drivers_total || summary.drivers_all || summary.drivers || 0));
-      setText("heroClients", Number(summary.clients_total || summary.clients_all || summary.clients || 0));
-      setText("heroTeam", Number(summary.team_agents || summary.team_agents_count || summary.team_total || summary.team_size || 0));
-      setText("earningsThisWeek", money(summary.earnings_this_week || summary.this_week_earnings || summary.wallet_balance || wallet.balance || wallet.total || 0));
-      setText("driversThisWeek", Number(summary.drivers_this_week || summary.week_drivers || summary.drivers_week || 0));
-      setText("clientsThisWeek", Number(summary.clients_this_week || summary.week_clients || summary.clients_week || 0));
-      setText("walletBalanceMain", money(wallet.balance || wallet.total || wallet.available_balance || summary.wallet_balance || 0));
-      setText("pendingApprovalSub", Number(summary.pending_approvals || 0) + " pending approvals not counted in earnings");
-      setText("qualityScore", Number(summary.quality_score || 0));
+      (() => { const el = document.getElementById("heroTitle"); if(el) el.textContent = "Welcome, " + name;
+      (() => { const el = document.getElementById("helloBadge"); if(el) el.textContent = name;
+      (() => { const el = document.getElementById("heroTown"); if(el) el.textContent = safe(me.town || me.region || "Windhoek");
+      (() => { const el = document.getElementById("heroRole"); if(el) el.textContent = safe(me.role || "Agent");
+      (() => { const el = document.getElementById("heroCode"); if(el) el.textContent = "Referral Code: " + safe(me.referral_code || me.code || "-");
+      (() => { const el = document.getElementById("heroWallet"); if(el) el.textContent = money(wallet.balance || wallet.total || wallet.available_balance || summary.wallet_balance || 0);
+
+      (() => { const el = document.getElementById("heroDrivers"); if(el) el.textContent = Number(summary.drivers_total || summary.drivers_all || summary.drivers || 0);
+      (() => { const el = document.getElementById("heroClients"); if(el) el.textContent = Number(summary.clients_total || summary.clients_all || summary.clients || 0);
+      (() => { const el = document.getElementById("heroTeam"); if(el) el.textContent = Number(summary.team_agents || summary.team_agents_count || summary.team_total || summary.team_size || 0);
+
+      (() => { const el = document.getElementById("earningsThisWeek"); if(el) el.textContent = money(summary.earnings_this_week || summary.this_week_earnings || summary.wallet_balance || wallet.balance || wallet.total || 0);
+      (() => { const el = document.getElementById("driversThisWeek"); if(el) el.textContent = Number(summary.drivers_this_week || summary.week_drivers || summary.drivers_week || 0);
+      (() => { const el = document.getElementById("clientsThisWeek"); if(el) el.textContent = Number(summary.clients_this_week || summary.week_clients || summary.clients_week || 0);
+      (() => { const el = document.getElementById("walletBalanceMain"); if(el) el.textContent = money(wallet.balance || wallet.total || wallet.available_balance || summary.wallet_balance || 0);
+      (() => { const el = document.getElementById("pendingApprovalSub"); if(el) el.textContent = Number(summary.pending_approvals || 0) + " pending approvals not counted in earnings";
+      (() => { const el = document.getElementById("qualityScore"); if(el) el.textContent = Number(summary.quality_score || 0);
       const delta = Number(summary.week_delta || 0);
-      setText("weekDeltaSub", `${delta >= 0 ? "+" : ""}${delta} registrations vs last week`);
+      (() => { const el = document.getElementById("weekDeltaSub"); if(el) el.textContent = `${delta >= 0 ? "+" : ""}${delta} registrations vs last week`;
+      renderAgentAlerts(summary.alerts || []);
 
-      // Generate alerts dynamically if not provided by backend
-      const alerts = summary.alerts || [];
-      if(!alerts.length) {
-        if(summary.profile_complete === false) alerts.push({type:'warning', message:'Complete your profile to unlock full features.', level:'warn'});
-        if(summary.pending_approvals > 0) alerts.push({type:'info', message:`You have ${summary.pending_approvals} registrations pending approval.`, level:'info'});
-        if(state.messages.some(m => String(m.status).toUpperCase() !== 'READ')) alerts.push({type:'info', message:'You have unread support messages.', level:'info'});
-        if(state.jobs.length > 0) alerts.push({type:'success', message:`${state.jobs.length} new remote jobs available.`, level:'ok'});
-      }
-      renderAgentAlerts(alerts);
-
-      setText("refCodeBig", safe(me.referral_code || me.code || "-"));
-      setValue("setName", safe(me.full_name || me.name || "", ""));
-      setValue("setUsername", safe(me.username || "", ""));
-      setValue("setEmail", safe(me.email || "", ""));
-      setValue("setPhone", safe(me.phone || "", ""));
-      setValue("setGender", safe(me.gender || "", ""));
-      setValue("setBirth", safe(me.date_of_birth || me.dob || "", "").slice(0,10));
-      setValue("setTown", safe(me.town || "", ""));
-      setValue("setRegion", safe(me.region || "", ""));
-      setValue("setNationalId", safe(me.national_id || me.id_number || "", ""));
-      setValue("setKinName", safe(me.next_of_kin_name || "", ""));
-      setValue("setKinPhone", safe(me.next_of_kin_phone || "", ""));
-      setValue("setAddress", safe(me.residential_address || me.address || "", ""));
-      setValue("setBio", safe(me.bio || me.about || "", ""));
-      setValue("setProfilePicture", safe(me.profile_picture_url || me.profile_pic_path || "", ""));
-      setValue("setReferral", safe(me.referral_code || me.code || "", ""));
+      (() => { const el = document.getElementById("refCodeBig"); if(el) el.textContent = safe(me.referral_code || me.code || "-");
+      $("setName").value = safe(me.full_name || me.name || "", "");
+      $("setUsername").value = safe(me.username || "", "");
+      $("setEmail").value = safe(me.email || "", "");
+      $("setPhone").value = safe(me.phone || "", "");
+      $("setGender").value = safe(me.gender || "", "");
+      $("setBirth").value = safe(me.date_of_birth || me.dob || "", "").slice(0,10);
+      $("setTown").value = safe(me.town || "", "");
+      $("setRegion").value = safe(me.region || "", "");
+      $("setNationalId").value = safe(me.national_id || me.id_number || "", "");
+      $("setKinName").value = safe(me.next_of_kin_name || "", "");
+      $("setKinPhone").value = safe(me.next_of_kin_phone || "", "");
+      $("setAddress").value = safe(me.residential_address || me.address || "", "");
+      $("setBio").value = safe(me.bio || me.about || "", "");
+      $("setProfilePicture").value = safe(me.profile_picture_url || me.profile_pic_path || "", "");
+      $("setReferral").value = safe(me.referral_code || me.code || "", "");
 
       const missing = Array.isArray(me.missing_profile_fields) ? me.missing_profile_fields : (Array.isArray(summary.missing_profile_fields) ? summary.missing_profile_fields : []);
       const complete = missing.length === 0 && (me.profile_complete !== false) && (summary.profile_complete !== false);
@@ -2290,19 +2184,13 @@
           ? ""
           : `<strong>Optional account details still missing.</strong><br>Driver and client registrations are still open. Missing: ${esc(missing.join(", ") || "profile details")}`;
       }
-      setText("profileStatusPill", complete ? "Complete" : "Incomplete");
+      (() => { const el = document.getElementById("profileStatusPill"); if(el) el.textContent = complete ? "Complete" : "Incomplete";
       const percent = Number(me.profile_completion_percent || summary.profile_completion_percent || (complete ? 100 : 0));
-      setText("profileCompletionText", complete ? `Profile ${percent}% complete. Your account is ready for registrations.` : `Profile ${percent}% complete. Registrations are allowed while you finish: ` + (missing.join(", ") || "profile details"));
-      const profileCompletionFill = $("profileCompletionFill");
-      if(profileCompletionFill) profileCompletionFill.style.width = Math.max(0, Math.min(100, percent)) + "%";
-      setText("profileNameLabel", name);
-      const regionLocked = !!me.region_locked;
-      if($("setTown")) $("setTown").readOnly = regionLocked;
-      if($("setRegion")) $("setRegion").readOnly = regionLocked;
-      const regionLockNote = $("regionLockNote");
-      if(regionLockNote) regionLockNote.style.display = regionLocked ? "block" : "none";
+      (() => { const el = document.getElementById("profileCompletionText"); if(el) el.textContent = complete ? `Profile ${percent}% complete. Your account is ready for registrations.` : `Profile ${percent}% complete. Registrations are allowed while you finish: ` + (missing.join(", ") || "profile details");
+      $("profileCompletionFill").style.width = Math.max(0, Math.min(100, percent)) + "%";
+      (() => { const el = document.getElementById("profileNameLabel"); if(el) el.textContent = name;
       const photo = me.profile_picture_url || me.profile_pic_path || "";
-      setSrc("profilePhoto", photo || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23edf6fd'/%3E%3Ctext x='48' y='56' text-anchor='middle' font-family='Arial' font-size='28' fill='%230ea5e9'%3EY%3C/text%3E%3C/svg%3E");
+      $("profilePhoto").src = photo || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='96' height='96' fill='%23edf6fd'/%3E%3Ctext x='48' y='56' text-anchor='middle' font-family='Arial' font-size='28' fill='%230ea5e9'%3EY%3C/text%3E%3C/svg%3E";
       document.querySelectorAll('#driverForm button[type="submit"], #clientForm button[type="submit"]').forEach(btn => {
         btn.disabled = false;
         btn.title = "";
@@ -2330,8 +2218,8 @@
     function renderMessages(targetId="messageList"){
       const rows = state.messages || [];
       const unread = rows.filter(r => String(r.status || "").toUpperCase() !== "READ").length;
-      (() => { const el = document.getElementById("noticeCount"); if(el) el.textContent = unread + " unread"; })();
-      (() => { const el = document.getElementById("inboxMeta"); if(el) el.textContent = rows.length + " messages"; })();
+      (() => { const el = document.getElementById("noticeCount"); if(el) el.textContent = unread + " unread";
+      (() => { const el = document.getElementById("inboxMeta"); if(el) el.textContent = rows.length + " messages";
 
       const target = $(targetId);
       if(!target) return;
@@ -2365,8 +2253,8 @@
       const body = $("activityTableBody");
 
       if(!rows.length){
-        recent.innerHTML = '<div class="muted">No registrations found for this period.</div>';
-        body.innerHTML = '<tr><td colspan="8" class="muted">No registrations found for this period.</td></tr>';
+        recent.innerHTML = '<div class="muted">Loading your saved registrations...</div>';
+        body.innerHTML = '<tr><td colspan="5" class="muted">No rows</td></tr>';
         buildCharts([]);
         return;
       }
@@ -2380,7 +2268,7 @@
               <div class="avatar">${type === "driver" ? "🚗" : "👤"}</div>
               <div class="stack">
                 <div class="title">${esc(safe(r.full_name || r.name || "Unnamed"))}</div>
-                <div class="sub">${esc(label)} • ${esc(safe(r.phone || "-"))} • ${esc(safe(r.town || "-"))} • ${esc(safe(r.status || r.approval_status || "pending_approval"))}</div>
+                <div class="sub">${esc(label)} • ${esc(safe(r.phone || "-"))} • ${esc(safe(r.town || "-"))}</div>
               </div>
             </div>
             <div class="pill">${esc(shortDate(r.created_at))}</div>
@@ -2397,9 +2285,6 @@
             <td>${esc(safe(r.full_name || r.name || "-"))}</td>
             <td>${esc(safe(r.phone || "-"))}</td>
             <td>${esc(safe(r.town || "-"))}</td>
-            <td>${esc(safe(r.region || "-"))}</td>
-            <td>${esc(safe(r.external_code || r.code || "-"))}</td>
-            <td>${esc(safe(r.status || r.approval_status || "-"))}</td>
             <td>${esc(shortDate(r.created_at))}</td>
           </tr>
         `;
@@ -2428,7 +2313,7 @@
       const entries = Object.entries(counts).slice(-7);
       const max = Math.max(1, ...entries.map(([,v]) => v));
 
-      if(trend) trend.innerHTML = entries.length ? entries.map(([k,v]) => `
+      trend.innerHTML = entries.length ? entries.map(([k,v]) => `
         <div class="bar-col">
           <div class="bar-value">${v}</div>
           <div class="bar" style="height:${Math.max(12, (v/max)*220)}px"></div>
@@ -2436,10 +2321,10 @@
         </div>
       `).join("") : '<div class="muted">No chart data yet.</div>';
 
-      (() => { const el = document.getElementById("mixDrivers"); if(el) el.textContent = drivers; })();
-      (() => { const el = document.getElementById("mixClients"); if(el) el.textContent = clients; })();
-      (() => { const el = document.getElementById("mixToday"); if(el) el.textContent = today; })();
-      (() => { const el = document.getElementById("mixTotal"); if(el) el.textContent = rows.length; })();
+      (() => { const el = document.getElementById("mixDrivers"); if(el) el.textContent = drivers;
+      (() => { const el = document.getElementById("mixClients"); if(el) el.textContent = clients;
+      (() => { const el = document.getElementById("mixToday"); if(el) el.textContent = today;
+      (() => { const el = document.getElementById("mixTotal"); if(el) el.textContent = rows.length;
     }
 
     function renderWallet(){
@@ -2447,11 +2332,11 @@
       const hist = state.walletHistory || [];
       const reqs = state.withdraws || [];
 
-      (() => { const el = document.getElementById("walletSummaryValue"); if(el) el.textContent = money(sum.balance || sum.total || sum.available_balance || 0); })();
-      (() => { const el = document.getElementById("withdrawCount"); if(el) el.textContent = reqs.length; })();
-      (() => { const el = document.getElementById("walletEntryCount"); if(el) el.textContent = hist.length; })();
+      (() => { const el = document.getElementById("walletSummaryValue"); if(el) el.textContent = money(sum.balance || sum.total || sum.available_balance || 0);
+      (() => { const el = document.getElementById("withdrawCount"); if(el) el.textContent = reqs.length;
+      (() => { const el = document.getElementById("walletEntryCount"); if(el) el.textContent = hist.length;
 
-      setHTML("walletHistoryList", hist.length ? hist.slice(0,12).map(r => `
+      $("walletHistoryList").innerHTML = hist.length ? hist.slice(0,12).map(r => `
         <div class="list-item">
           <div class="stack">
             <div class="title">${esc(safe(r.entry_type || r.type || "Wallet entry"))}</div>
@@ -2460,9 +2345,9 @@
           </div>
           <div class="pill">${esc(money(r.amount || 0))}</div>
         </div>
-      `).join("") : '<div class="muted">No wallet history yet.</div>');
+      `).join("") : '<div class="muted">No wallet history yet.</div>';
 
-      setHTML("withdrawList", reqs.length ? reqs.slice(0,10).map(r => `
+      $("withdrawList").innerHTML = reqs.length ? reqs.slice(0,10).map(r => `
         <div class="list-item">
           <div class="stack">
             <div class="title">${esc(money(r.amount || 0))}</div>
@@ -2471,14 +2356,14 @@
           </div>
           <div class="pill">${esc(safe(r.status || "PENDING"))}</div>
         </div>
-      `).join("") : '<div class="muted">No withdrawal requests yet.</div>');
+      `).join("") : '<div class="muted">No withdrawal requests yet.</div>';
     }
 
     function renderTeam(){
       const t = firstData(state.teamSummary || {});
       const rows = Array.isArray((state.teamSummary || {}).rows) ? state.teamSummary.rows : guessRows(state.teamSummary || {});
       const count = Number(t.team_agents || t.total || t.team_total || rows.length || 0);
-      (() => { const el = document.getElementById("teamSize"); if(el) el.textContent = count; })();
+      (() => { const el = document.getElementById("teamSize"); if(el) el.textContent = count;
       const activationTarget = document.querySelector('#team .grid-3 .card:nth-child(2) .stat-value');
       if(activationTarget) activationTarget.textContent = `${Math.min(count,10)} / 10`;
 
@@ -2518,7 +2403,7 @@
         `);
       }
 
-      if(list) list.innerHTML = pieces.join("");
+      list.innerHTML = pieces.join("");
     }
 
 
@@ -2543,9 +2428,9 @@
       const myDrivers = myDriver ? getCount(myDriver) : 0;
       const myClients = myClient ? getCount(myClient) : 0;
 
-      setText('compDrivers50', `${myDrivers} / 50`);
-      setText('compActivatedDrivers50', `${myDrivers} / 50`);
-      setText('compActivatedClients150', `${myClients} / 150`);
+      document.getElementById('compDrivers50').textContent = `${myDrivers} / 50`;
+      document.getElementById('compActivatedDrivers50').textContent = `${myDrivers} / 50`;
+      document.getElementById('compActivatedClients150').textContent = `${myClients} / 150`;
 
       function setBar(id, value, target){
         const el = document.getElementById(id);
@@ -2593,7 +2478,7 @@
       const periodLabel = state.leaderboardPeriod === 'month' ? 'Month' : (state.leaderboardPeriod === 'all' ? 'All Time' : 'Week');
       const leaderboardError = state.leaderboardError || "";
 
-      setText('leaderboardPeriodLabel', periodLabel);
+      $('leaderboardPeriodLabel').textContent = periodLabel;
 
       function getName(r){
         return String(r.agent_name || r.full_name || r.name || r.agent || 'Agent');
@@ -2608,9 +2493,9 @@
       const dBody = $('driverLeaderTable');
       const cBody = $('clientLeaderTable');
 
-      if(dBody && !driverRows.length){
+      if(!driverRows.length){
         dBody.innerHTML = `<tr><td colspan="4" class="muted">${leaderboardError ? esc(leaderboardError) : 'No driver leaderboard data yet.'}</td></tr>`;
-      } else if(dBody) {
+      } else {
         dBody.innerHTML = driverRows.map((r, i) => `
           <tr>
             <td>${i+1}</td>
@@ -2621,9 +2506,9 @@
         `).join('');
       }
 
-      if(cBody && !clientRows.length){
+      if(!clientRows.length){
         cBody.innerHTML = `<tr><td colspan="4" class="muted">${leaderboardError ? esc(leaderboardError) : 'No client leaderboard data yet.'}</td></tr>`;
-      } else if(cBody) {
+      } else {
         cBody.innerHTML = clientRows.map((r, i) => `
           <tr>
             <td>${i+1}</td>
@@ -2640,12 +2525,17 @@
       const myDriverValue = myDriverRank >= 0 ? getCount(driverRows[myDriverRank]) : 0;
       const myClientValue = myClientRank >= 0 ? getCount(clientRows[myClientRank]) : 0;
 
-      setText('rankDriversWeek', myDriverRank >= 0 ? '#' + (myDriverRank + 1) : '-');
-      setText('rankClientsWeek', myClientRank >= 0 ? '#' + (myClientRank + 1) : '-');
-      setText('rankAllTime', periodLabel);
-      setText('rankDriversWeekSub', myDriverRank >= 0 ? `${myDriverValue} drivers in ${periodLabel.toLowerCase()}` : `No driver rank found yet`);
-      setText('rankClientsWeekSub', myClientRank >= 0 ? `${myClientValue} clients in ${periodLabel.toLowerCase()}` : `No client rank found yet`);
-      setText('rankAllTimeSub', `Recruiter comparison`);
+      $('rankDriversWeek').textContent = myDriverRank >= 0 ? '#' + (myDriverRank + 1) : '-';
+      $('rankClientsWeek').textContent = myClientRank >= 0 ? '#' + (myClientRank + 1) : '-';
+      $('rankAllTime').textContent = periodLabel;
+
+      $('rankDriversWeekSub').textContent = myDriverRank >= 0
+        ? `${myDriverValue} drivers in ${periodLabel.toLowerCase()}`
+        : `No driver rank found yet`;
+      $('rankClientsWeekSub').textContent = myClientRank >= 0
+        ? `${myClientValue} clients in ${periodLabel.toLowerCase()}`
+        : `No client rank found yet`;
+      $('rankAllTimeSub').textContent = `Live recruiter comparison`;
 
       // Rival tracker
       const rival = document.getElementById('rivalTrackerList');
@@ -2681,7 +2571,7 @@
         });
       }
 
-      if(rival) rival.innerHTML = rivals.map(r => `
+      rival.innerHTML = rivals.map(r => `
         <div class="rival-box">
           <div class="row">
             <div class="pulse-dot"></div>
@@ -2702,7 +2592,7 @@
         {icon:'🚘', title:'50 Drivers', sub:'Reach 50 total drivers', on:(myDriverValue >= 50)},
         {icon:'👑', title:'Top 3', sub:'Enter top 3 on any leaderboard', on:((myDriverRank >= 0 && myDriverRank <= 2) || (myClientRank >= 0 && myClientRank <= 2))}
       ];
-      if(ach) ach.innerHTML = badges.map(b => `
+      ach.innerHTML = badges.map(b => `
         <div class="achievement ${b.on ? '' : 'locked'}">
           <div class="a-ico">${b.icon}</div>
           <div class="title">${esc(b.title)}</div>
@@ -2735,15 +2625,15 @@
           <div class="pill">${esc(safe(r.target_count || 0))} target</div>
         </div>
       `).join("") : '<div class="muted">No active job alerts right now.</div>';
-      setHTML("jobPreviewList", html);
-      setHTML("jobList", html);
-      setText("jobPreviewCount", rows.length + " active");
+      if($("jobPreviewList")) $("jobPreviewList").innerHTML = html;
+      if($("jobList")) $("jobList").innerHTML = html;
+      if($("jobPreviewCount")) (() => { const el = document.getElementById("jobPreviewCount"); if(el) el.textContent = rows.length + " active";
     }
 
     function renderGroupMessages(){
       const rows = state.groupMessages || [];
       if(!$("groupMessageList")) return;
-      setHTML("groupMessageList", rows.length ? rows.slice(0,20).map(r => `
+      $("groupMessageList").innerHTML = rows.length ? rows.slice(0,20).map(r => `
         <div class="list-item">
           <div class="stack">
             <div class="title">${esc(safe(r.title || r.subject || "Group notice"))}</div>
@@ -2751,35 +2641,7 @@
             <div class="sub">${esc(safe(r.message || r.body || ""))}</div>
           </div>
         </div>
-      `).join("") : '<div class="muted">No group notices yet.</div>');
-    }
-
-    function renderMessages(targetId="messageList"){
-      const rows = state.messages || [];
-      const unread = rows.filter(r => String(r.status || "").toUpperCase() !== "READ").length;
-      setText("noticeCount", unread + " unread");
-      setText("inboxMeta", rows.length + " messages");
-
-      const target = $(targetId);
-      if(!target) return;
-
-      if(!rows.length){
-        target.innerHTML = '<div class="muted">No messages yet.</div>';
-        return;
-      }
-
-      target.innerHTML = rows.map(r => `
-        <div class="list-item ${String(r.status || '').toUpperCase() !== 'READ' ? 'unread' : ''}">
-          <div class="stack">
-            <div class="title">${esc(safe(r.subject || r.type || "Support Notice"))}</div>
-            <div class="sub">${esc(shortDate(r.created_at))}</div>
-            <div class="sub">${esc(safe(r.message || ""))}</div>
-          </div>
-          <div class="toolbar">
-            ${String(r.status || '').toUpperCase() !== 'READ' ? `<button class="btn btn-soft" onclick="markMessageRead('${r.id}')">Mark Read</button>` : ''}
-          </div>
-        </div>
-      `).join("");
+      `).join("") : '<div class="muted">No group notices yet.</div>';
     }
     window.markMessageRead = markMessageRead;
 
@@ -3003,8 +2865,9 @@
     async function submitDriver(ev){
       ev.preventDefault();
       const btn = ev.target.querySelector('button[type="submit"]');
-      showInlineFeedback("driverFormFeedback", "YENE is checking and sending to admin approval...", "info");
-      setButtonLoading(btn, true, `<span class="loader"></span> YENE is checking and sending to admin approval...`);
+      const agentName = state.me?.full_name || state.me?.username || 'Agent';
+      showInlineFeedback("driverFormFeedback", `${agentName}, saving driver registration...`, "info");
+      setButtonLoading(btn, true, `<span class="loader"></span> ${esc(agentName)}, saving driver...`);
       const fd = new FormData(ev.target);
       const raw = Object.fromEntries(fd.entries());
 
@@ -3012,30 +2875,19 @@
         full_name: (raw.full_name || '').trim(),
         phone: (raw.phone || '').trim(),
         town: (raw.town || '').trim(),
-        region: (raw.region || '').trim(),
-        car_details: (raw.car_details || '').trim(),
         license_number: (raw.license_number || '').trim(),
+        car_details: (raw.car_details || '').trim(),
         external_code: (raw.external_code || '').trim()
       };
+
       try{
-        const res = await jget('/api/agent/register_driver_v4', {
+        await jget('/api/agent/register_driver_v4', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify(payload)
         });
-        if(res && res.ok === false){
-          throw new Error(res.error || 'Driver registration could not be completed.');
-        }
         ev.target.reset();
-        let message = 'Saved and sent to admin approval.';
-        try{
-          message = await hardRefreshDashboardAfterRegistration("Driver");
-        }catch(renderErr){
-          console.error('driver post-save refresh failed', renderErr);
-          await Promise.allSettled([loadActivity("week"), loadSummary()]);
-          try{ renderActivity(); }catch(_){}
-          try{ updateHero(); }catch(_){}
-        }
+        const message = await hardRefreshDashboardAfterRegistration("Driver");
         showInlineFeedback("driverFormFeedback", message, "success");
         toast(message, "success");
       }catch(e){
@@ -3051,8 +2903,9 @@
     async function submitClient(ev){
       ev.preventDefault();
       const btn = ev.target.querySelector('button[type="submit"]');
-      showInlineFeedback("clientFormFeedback", "YENE is checking and sending to admin approval...", "info");
-      setButtonLoading(btn, true, `<span class="loader"></span> YENE is checking and sending to admin approval...`);
+      const agentName = state.me?.full_name || state.me?.username || 'Agent';
+      showInlineFeedback("clientFormFeedback", `${agentName}, saving client registration...`, "info");
+      setButtonLoading(btn, true, `<span class="loader"></span> ${esc(agentName)}, saving client...`);
       const fd = new FormData(ev.target);
       const raw = Object.fromEntries(fd.entries());
 
@@ -3060,29 +2913,17 @@
         full_name: (raw.full_name || '').trim(),
         phone: (raw.phone || '').trim(),
         town: (raw.town || '').trim(),
-        region: (raw.region || '').trim(),
         external_code: (raw.external_code || '').trim()
       };
 
       try{
-        const res = await jget('/api/agent/register_client_v4', {
+        await jget('/api/agent/register_client_v4', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify(payload)
         });
-        if(res && res.ok === false){
-          throw new Error(res.error || 'Client registration could not be completed.');
-        }
         ev.target.reset();
-        let message = 'Saved and sent to admin approval.';
-        try{
-          message = await hardRefreshDashboardAfterRegistration("Client");
-        }catch(renderErr){
-          console.error('client post-save refresh failed', renderErr);
-          await Promise.allSettled([loadActivity("week"), loadSummary()]);
-          try{ renderActivity(); }catch(_){}
-          try{ updateHero(); }catch(_){}
-        }
+        const message = await hardRefreshDashboardAfterRegistration("Client");
         showInlineFeedback("clientFormFeedback", message, "success");
         toast(message, "success");
       }catch(e){
@@ -3219,7 +3060,7 @@
       pendingPhotoData = canvas.toDataURL("image/jpeg", 0.86);
       canvas.style.display = "block";
       video.style.display = "none";
-      setSrc("profilePhoto", pendingPhotoData);
+      $("profilePhoto").src = pendingPhotoData;
       setCameraStatus("Photo captured. Save Photo to upload it.");
       if(cameraStream){
         cameraStream.getTracks().forEach(t => t.stop());
@@ -3242,7 +3083,7 @@
       const reader = new FileReader();
       reader.onload = () => {
         pendingPhotoData = String(reader.result || "");
-        setSrc("profilePhoto", pendingPhotoData);
+        $("profilePhoto").src = pendingPhotoData;
         setCameraStatus("Gallery photo ready. Save Photo to upload it.");
       };
       reader.readAsDataURL(file);
@@ -3263,8 +3104,8 @@
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({image_data: pendingPhotoData})
         });
-        setValue("setProfilePicture", res.url || "");
-        setSrc("profilePhoto", res.url || pendingPhotoData);
+        $("setProfilePicture").value = res.url || "";
+        $("profilePhoto").src = res.url || pendingPhotoData;
         pendingPhotoData = "";
         setCameraStatus("Profile photo saved.");
         await loadMe();
@@ -3279,15 +3120,17 @@
     }
 
     async function refreshAll(showToast=true){
-      setHTML("helloBadge", '<span class="loader"></span>');
-      setLoadingText("weekBadge", "Checking weekly records...");
+      $("helloBadge").innerHTML = '<span class="loader"></span>';
+      setLoadingText("weekBadge", "Loading live data...");
       await loadAndRender("profile", loadMe, updateHero);
 
       await Promise.allSettled([
         loadAndRender("summary", loadSummary, updateHero),
         loadAndRender("activity", () => loadActivity(state.currentPeriod), renderActivity),
+        loadAndRender("messages", loadMessages, null),
         loadAndRender("wallet", loadWallet, () => { updateHero(); renderWallet(); }),
         loadAndRender("team", loadTeam, renderTeam),
+        loadAndRender("jobs", async () => { await loadJobs(); await loadGroupMessages(); }, () => { renderJobs(); renderGroupMessages(); }),
         loadAndRender("leaderboard", () => loadLeaderboard(state.leaderboardPeriod), () => {
           renderLeaderboard();
           if(window.loadLeaderboardOverride) window.loadLeaderboardOverride();
@@ -3296,25 +3139,12 @@
       ]);
       setTimeout(forceRenderCompetitionCards, 120);
       setTimeout(forceRenderCompetitionCards, 500);
-      (() => { const el = document.getElementById("weekBadge"); if(el) el.textContent = state.leaderboardPeriod === 'month' ? 'Current month' : (state.leaderboardPeriod === 'all' ? 'All time' : 'Current week'); })();
+      (() => { const el = document.getElementById("weekBadge"); if(el) el.textContent = state.leaderboardPeriod === 'month' ? 'Current month' : (state.leaderboardPeriod === 'all' ? 'All time' : 'Current week');
       if(showToast) toast('Dashboard refreshed');
     }
 
     document.querySelectorAll('.nav-btn[data-section]').forEach(btn => {
       btn.addEventListener('click', () => openSection(btn.dataset.section));
-    });
-
-    document.querySelectorAll('.js-prefixed-code').forEach(input => {
-      input.addEventListener('input', () => {
-        const prefix = String(input.dataset.prefix || '').trim().toUpperCase();
-        const raw = String(input.value || '').trim();
-        const help = input.parentElement && input.parentElement.querySelector('.field-help');
-        if (/^\d+$/.test(raw)) {
-          if (help) help.textContent = `YENE will format this as ${prefix}${raw}.`;
-        } else {
-          if (help) help.textContent = `If you type only numbers, YENE formats them as \`${prefix}<number>\`.`;
-        }
-      });
     });
 
     document.querySelectorAll('.period-btn').forEach(btn => {
@@ -3343,17 +3173,17 @@
       });
     });
 
-    $("refreshBtn")?.addEventListener('click', () => refreshAll(true));
-    $("driverForm")?.addEventListener('submit', submitDriver);
-    $("clientForm")?.addEventListener('submit', submitClient);
-    $("withdrawForm")?.addEventListener('submit', submitWithdraw);
-    $("settingsForm")?.addEventListener('submit', saveSettings);
-    $("copyCodeBtn")?.addEventListener('click', copyReferral);
-    $("openCameraBtn")?.addEventListener('click', openCamera);
-    $("capturePhotoBtn")?.addEventListener('click', capturePhoto);
-    $("retakePhotoBtn")?.addEventListener('click', retakePhoto);
-    $("uploadPhotoBtn")?.addEventListener('click', uploadProfilePhoto);
-    $("profilePhotoFile")?.addEventListener('change', (e) => loadGalleryPhoto(e.target.files && e.target.files[0]));
+    $("refreshBtn").addEventListener('click', () => refreshAll(true));
+    $("driverForm").addEventListener('submit', submitDriver);
+    $("clientForm").addEventListener('submit', submitClient);
+    $("withdrawForm").addEventListener('submit', submitWithdraw);
+    $("settingsForm").addEventListener('submit', saveSettings);
+    $("copyCodeBtn").addEventListener('click', copyReferral);
+    $("openCameraBtn").addEventListener('click', openCamera);
+    $("capturePhotoBtn").addEventListener('click', capturePhoto);
+    $("retakePhotoBtn").addEventListener('click', retakePhoto);
+    $("uploadPhotoBtn").addEventListener('click', uploadProfilePhoto);
+    $("profilePhotoFile").addEventListener('change', (e) => loadGalleryPhoto(e.target.files && e.target.files[0]));
 
     function bindAgentMenu(){
       $("menuBtn")?.addEventListener('click', toggleAgentMenu);
@@ -3371,36 +3201,11 @@
       bindAgentMenu();
       const hash = location.hash.replace('#','').trim();
       if(hash && $(hash)) openSection(hash);
-
-      // Load core data first
-      await Promise.allSettled([
-        loadMe().then(updateHero),
-        loadSummary().then(updateHero),
-        loadActivity(state.currentPeriod).then(renderActivity)
-      ]);
-
-      // Load other sections independently
-      loadWallet().then(() => { updateHero(); renderWallet(); });
-      loadTeam().then(renderTeam);
-      loadJobs().then(renderJobs);
-      loadMessages().then(renderMessages);
-      loadGroupMessages().then(renderGroupMessages);
-      loadLeaderboard(state.leaderboardPeriod).then(() => {
-        renderLeaderboard();
-        if (window.loadLeaderboardOverride) window.loadLeaderboardOverride();
-        forceRenderCompetitionCards();
-      });
-
+      await refreshAll(false);
       forceRenderCompetitionCards();
       setTimeout(forceRenderCompetitionCards, 200);
       setTimeout(forceRenderCompetitionCards, 800);
-
-      setInterval(() => {
-        try {
-          loadMessages();
-          loadMessageSummary && loadMessageSummary();
-        } catch (e) {}
-      }, 60000);
+      setInterval(forceRenderCompetitionCards, 2000);
     });
 
 
@@ -3433,7 +3238,7 @@
       if (!wrap) return;
 
       if (!Array.isArray(rows) || !rows.length) {
-        wrap.innerHTML = '<div class="empty">Checking your saved registrations...</div>';
+        wrap.innerHTML = '<div class="empty">Loading your saved registrations...</div>';
         return;
       }
 
@@ -3459,13 +3264,13 @@
       }).join("");
     }
 
-    function renderRankProgress(driverRows, clientRows, metricsData) {
-      const meId = String(metricsData?.agent?.id || "");
+    function renderRankProgress(driverRows, clientRows, debugData) {
+      const meId = String(debugData?.agent?.id || "");
       const myDriverRank = Array.isArray(driverRows) ? driverRows.findIndex(r => String(r.agent_id || "") === meId) : -1;
       const myClientRank = Array.isArray(clientRows) ? clientRows.findIndex(r => String(r.agent_id || "") === meId) : -1;
 
-      const driversAll = Number(metricsData?.counts?.drivers_all || 0);
-      const clientsAll = Number(metricsData?.counts?.clients_all || 0);
+      const driversAll = Number(debugData?.counts?.drivers_all || 0);
+      const clientsAll = Number(debugData?.counts?.clients_all || 0);
 
       const driverRankEl = document.getElementById("yourDriverRank");
       const clientRankEl = document.getElementById("yourClientRank");
@@ -3494,7 +3299,9 @@
     }
 
     async function loadTruthOverviewAndLeaderboard() {
+      const $ = (id) => document.getElementById(id);
       const num = (v) => Number(v || 0);
+      const setText = (id, v) => { const el = $(id); if (el) el.textContent = String(v); };
       const money = (v) => `N$ ${Number(v || 0).toFixed(2)}`;
 
       async function getJson(url) {
@@ -3509,16 +3316,19 @@
         const summaryRes = await getJson('/api/agent/summary_v4');
         let summary = (summaryRes.data && summaryRes.data.ok) ? summaryRes.data : null;
 
-        // 2) Linked registration metrics fallback
-        const metricsRes = await getJson('/api/agent/link_metrics_v4');
-        const metricsData = (metricsRes.data && metricsRes.data.ok) ? metricsRes.data : null;
+        // 2) Truth fallback
+        const debugRes = await getJson('/api/agent/debug_links_v4');
+        const debugData = (debugRes.data && debugRes.data.ok) ? debugRes.data : null;
 
-        const truthDriversAll = metricsData ? num(metricsData.counts?.drivers_all) : num(summary?.drivers_total || summary?.drivers_all || summary?.drivers);
-        const truthClientsAll = metricsData ? num(metricsData.counts?.clients_all) : num(summary?.clients_total || summary?.clients_all || summary?.clients);
-        const truthDriversWeek = metricsData ? num(metricsData.counts?.drivers_week) : num(summary?.drivers_this_week || summary?.week_drivers || summary?.drivers_week);
-        const truthClientsWeek = metricsData ? num(metricsData.counts?.clients_week) : num(summary?.clients_this_week || summary?.week_clients || summary?.clients_week);
+        const truthDriversAll = debugData ? num(debugData.counts?.drivers_all) : num(summary?.drivers_total || summary?.drivers_all || summary?.drivers);
+        const truthClientsAll = debugData ? num(debugData.counts?.clients_all) : num(summary?.clients_total || summary?.clients_all || summary?.clients);
+        const truthDriversWeek = debugData ? num(debugData.counts?.drivers_week) : num(summary?.drivers_this_week || summary?.week_drivers || summary?.drivers_week);
+        const truthClientsWeek = debugData ? num(debugData.counts?.clients_week) : num(summary?.clients_this_week || summary?.week_clients || summary?.clients_week);
 
         // Prefer truth endpoint for visible dashboard values.
+        const visibleDrivers = truthDriversWeek || truthDriversAll;
+        const visibleClients = truthClientsWeek || truthClientsAll;
+
         const teamCount = num(summary?.team_agents || summary?.team_agents_count || summary?.team_total || summary?.team_size || 0);
         const weekStart = summary?.week_start || '';
         const weekEnd = summary?.week_end || '';
@@ -3533,12 +3343,12 @@
         const weekDelta = num(summary?.week_delta || 0);
 
         // HERO / OVERVIEW cards
-        setText('heroDrivers', truthDriversAll);
-        setText('heroClients', truthClientsAll);
+        setText('heroDrivers', visibleDrivers);
+        setText('heroClients', visibleClients);
         setText('heroTeam', teamCount);
 
-        setText('driversThisWeek', truthDriversWeek);
-        setText('clientsThisWeek', truthClientsWeek);
+        setText('driversThisWeek', truthDriversWeek || visibleDrivers);
+        setText('clientsThisWeek', truthClientsWeek || visibleClients);
 
         if ($('earningsWeek')) $('earningsWeek').textContent = money(earningsWeek);
         if ($('walletBalance')) $('walletBalance').textContent = money(walletBalance);
@@ -3554,10 +3364,10 @@
         ['weeklyDrivers','weekDrivers'].forEach(id => setText(id, truthDriversWeek));
         ['weeklyClients','weekClients'].forEach(id => setText(id, truthClientsWeek));
 
-        // RECENT REGISTRATIONS fallback from linked metrics endpoint if activity section is stale
-        const recent = metricsData ? []
-            .concat((metricsData.drivers || []).map(r => ({...r, kind:'driver'})))
-            .concat((metricsData.clients || []).map(r => ({...r, kind:'client'})))
+        // RECENT REGISTRATIONS fallback from debug endpoint if activity section is stale
+        const recent = debugData ? []
+            .concat((debugData.drivers || []).map(r => ({...r, kind:'driver'})))
+            .concat((debugData.clients || []).map(r => ({...r, kind:'client'})))
             .sort((a,b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
             .slice(0, 8) : [];
 
@@ -3596,18 +3406,22 @@
         }
 
         // YOUR RANK
-        if (metricsData && metricsData.agent) {
-          renderRankProgress(driverRows, clientRows, metricsData);
+        if (debugData && debugData.agent) {
+          renderRankProgress(driverRows, clientRows, debugData);
         }
 
       } catch (err) {
         if (String(err?.message || err).toLowerCase().includes('abort')) {
         return;
       }
-      console.error('overview refresh failed', err);
+      console.error('loadTruthOverviewAndLeaderboard failed', err);
       }
     }
 
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(loadTruthOverviewAndLeaderboard, 300);
+      
+    });
 
   </script>
 </body>
@@ -3655,8 +3469,7 @@
   }
 
   function fillTable(tbodyId, rows, kindLabel){
-      const body = document.getElementById(tbodyId);
-      if(!body) return;
+    const body = document.getElementById(tbodyId);
     if(!body) return;
     if(!Array.isArray(rows) || !rows.length){
       body.innerHTML = `<tr><td colspan="4" class="muted">No ${kindLabel} leaderboard data yet.</td></tr>`;
@@ -3673,9 +3486,8 @@
   }
 
   function fillRank(rows, myName, rankId, subId, label){
-      const rankEl = document.getElementById(rankId);
-      const subEl = document.getElementById(subId);
-      if(!rankEl || !subEl) return;
+    const rankEl = document.getElementById(rankId);
+    const subEl = document.getElementById(subId);
     if(!rankEl || !subEl) return;
 
     if(!Array.isArray(rows) || !rows.length || !myName){
@@ -3697,8 +3509,7 @@
   }
 
   function fillCompetition(listId, rows, target, label){
-      const el = document.getElementById(listId);
-      if(!el) return;
+    const el = document.getElementById(listId);
     if(!el) return;
 
     const ranked = (Array.isArray(rows) ? rows : [])
@@ -3737,7 +3548,6 @@
 
   function fillRivals(driverRows, clientRows, myName){
     const el = document.getElementById('rivalTrackerList');
-    if(!el) return;
     if(!el) return;
 
     const rivals = [];
@@ -3785,7 +3595,6 @@
 
   function fillBadges(driverRows, clientRows, myName){
     const el = document.getElementById('achievementGrid');
-    if(!el) return;
     if(!el) return;
 
     const dIdx = driverRows.findIndex(r => nameOf(r).trim().toLowerCase() === myName);
@@ -3837,7 +3646,7 @@
       const allTimeSub = document.getElementById('rankAllTimeSub');
       if(lbl) lbl.textContent = periodLabel;
       if(allTime) allTime.textContent = periodLabel;
-      if(allTimeSub) allTimeSub.textContent = 'Recruiter comparison';
+      if(allTimeSub) allTimeSub.textContent = 'Live recruiter comparison';
 
       const myDriverRow = driverRows.find(r => nameOf(r).trim().toLowerCase() === myName);
       const myClientRow = clientRows.find(r => nameOf(r).trim().toLowerCase() === myName);
@@ -4061,7 +3870,7 @@
       await supportGet('/api/agent/messages/' + encodeURIComponent(messageId) + '/read', {
         method:'POST'
       });
-      // refreshSupport disabled in safe mode
+      await refreshSupport();
     }catch(e){
       alert(e.message);
     }
@@ -4106,7 +3915,7 @@
       if(message) message.value = '';
       if(replyTo) replyTo.value = '';
       if(hint) hint.textContent = 'New support message.';
-      // refreshSupport disabled in safe mode
+      await refreshSupport();
     }catch(e){
       alert(e.message);
     }
@@ -4138,5 +3947,11 @@
     }
   }
 
+  document.addEventListener('DOMContentLoaded', function(){
+    bindSupportTabs();
+    bindSupportForm();
+    setTimeout(refreshSupport, 400);
+    setInterval(refreshSupport, 15000);
+  });
 })();
 </script>

@@ -3,6 +3,161 @@ from datetime import datetime, timedelta, timezone
 from flask import jsonify
 
 
+
+def _safe_active_rule(sb_admin):
+    try:
+        rows = (
+            sb_admin.table("payment_rules")
+            .select("*")
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        return rows[0] if rows else {}
+    except Exception:
+        return {}
+
+def _ensure_wallet_credit(sb_admin, agent_id, source_type, source_id, amount, description):
+    if not agent_id or not amount or float(amount) <= 0:
+        return
+    try:
+        existing = (
+            sb_admin.table("agent_wallet_ledger")
+            .select("id")
+            .eq("agent_id", agent_id)
+            .eq("source_type", source_type)
+            .eq("source_id", source_id)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if existing:
+            return
+    except Exception:
+        pass
+
+    try:
+        sb_admin.table("agent_wallet_ledger").insert({
+            "agent_id": agent_id,
+            "amount": float(amount),
+            "entry_type": "credit",
+            "source_type": source_type,
+            "source_id": source_id,
+            "description": description,
+        }).execute()
+    except Exception:
+        pass
+
+def _notify_agent(sb_admin, agent_id, subject, message):
+    if not agent_id:
+        return
+    payload = {
+        "agent_id": agent_id,
+        "subject": subject,
+        "message": message,
+        "status": "OPEN",
+        "category": "Approval",
+        "priority": "NORMAL",
+    }
+    for table in ("agent_messages", "agent_notifications"):
+        try:
+            sb_admin.table(table).insert(payload).execute()
+            return
+        except Exception:
+            continue
+
+def _approve_client_common(sb_admin, client_id):
+    try:
+        rows = (
+            sb_admin.table("clients")
+            .select("*")
+            .eq("id", client_id)
+            .limit(1)
+            .execute()
+            .data
+        )
+        row = rows[0] if rows else None
+        if not row:
+            return {"ok": False, "error": "Client not found", "id": client_id}
+
+        updates = {
+            "status": "approved",
+            "admin_approved": True,
+        }
+        try:
+            sb_admin.table("clients").update(updates).eq("id", client_id).execute()
+        except Exception:
+            sb_admin.table("clients").update({"status": "approved"}).eq("id", client_id).execute()
+
+        agent_id = row.get("recruiter_agent_id") or row.get("agent_id")
+        rules = _safe_active_rule(sb_admin)
+        amount = float(rules.get("client_reg") or rules.get("client_register_amount") or 0)
+
+        _ensure_wallet_credit(
+            sb_admin,
+            agent_id,
+            "client_approval",
+            client_id,
+            amount,
+            f"Client approved: {row.get('full_name') or row.get('phone') or client_id}"
+        )
+        _notify_agent(
+            sb_admin,
+            agent_id,
+            "Client approved",
+            f"Your client registration for {row.get('full_name') or row.get('phone') or 'client'} was approved. Wallet credited: N$ {amount:.2f}"
+        )
+        return {"ok": True, "id": client_id}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "id": client_id}
+
+def _approve_driver_common(sb_admin, driver_id):
+    try:
+        rows = (
+            sb_admin.table("drivers")
+            .select("*")
+            .eq("id", driver_id)
+            .limit(1)
+            .execute()
+            .data
+        )
+        row = rows[0] if rows else None
+        if not row:
+            return {"ok": False, "error": "Driver not found", "id": driver_id}
+
+        updates = {
+            "status": "approved",
+            "admin_approved": True,
+        }
+        try:
+            sb_admin.table("drivers").update(updates).eq("id", driver_id).execute()
+        except Exception:
+            sb_admin.table("drivers").update({"status": "approved"}).eq("id", driver_id).execute()
+
+        agent_id = row.get("recruiter_agent_id") or row.get("agent_id")
+        rules = _safe_active_rule(sb_admin)
+        amount = float(rules.get("driver_reg") or rules.get("driver_register_amount") or 0)
+
+        _ensure_wallet_credit(
+            sb_admin,
+            agent_id,
+            "driver_approval",
+            driver_id,
+            amount,
+            f"Driver approved: {row.get('full_name') or row.get('phone') or driver_id}"
+        )
+        _notify_agent(
+            sb_admin,
+            agent_id,
+            "Driver approved",
+            f"Your driver registration for {row.get('full_name') or row.get('phone') or 'driver'} was approved. Wallet credited: N$ {amount:.2f}"
+        )
+        return {"ok": True, "id": driver_id}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "id": driver_id}
+
+
 def register_admin_agents_live_routes(app, sb_admin):
     def _safe_select(table, filters=None, cols="*", limit=None, order_col=None, desc=False):
         filters = filters or {}

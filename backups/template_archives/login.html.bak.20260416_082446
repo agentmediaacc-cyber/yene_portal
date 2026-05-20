@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if login_mode == 'admin' %}YENE Admin Login{% else %}YENE Agent Login{% endif %}</title>
+  <style>
+    :root{
+      --yene-blue:#0b5cff;
+      --yene-blue-dark:#083ea9;
+      --bg-1:#071126;
+      --bg-2:#0c1f46;
+      --white:#ffffff;
+      --muted:#d7deef;
+      --text:#111827;
+      --danger:#b91c1c;
+      --success:#166534;
+      --shadow:0 25px 60px rgba(0,0,0,.35);
+      --radius:24px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;font-family:Arial,sans-serif;background:#08101f;color:#fff}
+    body{
+      min-height:100vh;
+      background:
+        radial-gradient(circle at top left, rgba(11,92,255,.35), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(0,170,255,.18), transparent 28%),
+        linear-gradient(135deg,var(--bg-1),var(--bg-2));
+    }
+    .page{min-height:100vh;display:grid;grid-template-columns:1.1fr 0.9fr}
+    .hero{padding:56px;display:flex;flex-direction:column;justify-content:center;gap:24px}
+    .brand{display:inline-flex;align-items:center;gap:12px;font-size:30px;font-weight:800}
+    .brand-badge{
+      width:48px;height:48px;border-radius:14px;
+      background:linear-gradient(135deg,var(--yene-blue),#4fa3ff);
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 10px 25px rgba(11,92,255,.35);font-weight:900;
+    }
+    .hero-tag{
+      display:inline-block;width:max-content;padding:10px 14px;border-radius:999px;
+      background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);
+      color:#e8f0ff;font-size:13px;
+    }
+    .hero h1{margin:0;font-size:46px;line-height:1.1;max-width:650px}
+    .hero p{margin:0;max-width:640px;font-size:18px;line-height:1.7;color:var(--muted)}
+    .pill-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+    .pill{
+      padding:12px 16px;border:1px solid rgba(255,255,255,.14);border-radius:999px;
+      background:rgba(255,255,255,.08);color:#f5f8ff;font-size:14px;
+    }
+    .side{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:30px}
+    .card{
+      width:100%;max-width:460px;background:rgba(255,255,255,.96);color:var(--text);
+      border-radius:var(--radius);box-shadow:var(--shadow);padding:30px;position:relative;overflow:hidden;
+    }
+    .card::before{
+      content:"";position:absolute;inset:0 0 auto 0;height:6px;
+      background:linear-gradient(90deg,var(--yene-blue),#5fb7ff);
+    }
+    .mode{
+      display:inline-flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;
+      border-radius:999px;font-size:12px;font-weight:700;background:#eff6ff;color:var(--yene-blue-dark);
+    }
+    .card h2{margin:0 0 8px 0;font-size:30px;line-height:1.2}
+    .sub{margin:0 0 22px 0;color:#4b5563;font-size:15px;line-height:1.6}
+    form{display:flex;flex-direction:column;gap:16px}
+    .field label{display:block;margin-bottom:8px;font-weight:700;font-size:14px;color:#111827}
+    .input-wrap{position:relative}
+    .input-wrap input{
+      width:100%;border:1px solid #d1d5db;border-radius:14px;padding:15px 16px;
+      font-size:15px;outline:none;background:#fff;transition:.2s ease;
+    }
+    .input-wrap input:focus{border-color:var(--yene-blue);box-shadow:0 0 0 4px rgba(11,92,255,.12)}
+    .toggle-btn{
+      position:absolute;right:10px;top:50%;transform:translateY(-50%);
+      border:none;background:transparent;font-size:13px;font-weight:700;
+      color:var(--yene-blue-dark);cursor:pointer;padding:8px 10px;border-radius:10px;
+    }
+    .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .remember{display:flex;align-items:center;gap:10px;font-size:14px;color:#374151}
+    .remember input{width:16px;height:16px;accent-color:var(--yene-blue)}
+    .btn{
+      border:none;border-radius:16px;padding:16px 18px;font-size:16px;font-weight:800;color:#fff;
+      background:linear-gradient(135deg,var(--yene-blue),#247bff);
+      box-shadow:0 14px 30px rgba(11,92,255,.30);cursor:pointer;
+    }
+    .links{display:flex;justify-content:space-between;gap:10px;margin-top:18px;flex-wrap:wrap}
+    .links a{color:var(--yene-blue-dark);text-decoration:none;font-weight:700;font-size:14px}
+    .flash{padding:12px 14px;border-radius:14px;font-size:14px;line-height:1.5;margin-bottom:10px;background:#fef2f2;color:var(--danger);border:1px solid #fecaca}
+    .hint{margin-top:14px;font-size:13px;color:#6b7280;line-height:1.6}
+    @media (max-width:980px){
+      .page{grid-template-columns:1fr}
+      .hero{padding:34px 22px 16px}
+      .hero h1{font-size:34px}
+      .hero p{font-size:16px}
+      .side{min-height:auto;padding:20px}
+      .card{max-width:100%}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="brand">
+        <div class="brand-badge">Y</div>
+        <div>YENE Network</div>
+      </div>
+
+      <div class="hero-tag">Namibia • Secure Promoter & Agent Platform</div>
+
+      {% if login_mode == 'admin' %}
+        <h1>Secure admin access for the YENE command center.</h1>
+        <p>Manage approvals, monitor registrations, control operations, and access the protected YENE admin dashboard.</p>
+      {% else %}
+        <h1>Welcome back to your YENE agent workspace.</h1>
+        <p>Login to register drivers and clients, track your progress, and continue building your network across Namibia.</p>
+      {% endif %}
+
+      <div class="pill-row">
+        <div class="pill">Live network access</div>
+        <div class="pill">Secure session</div>
+        <div class="pill">Fast dashboard entry</div>
+      </div>
+    </section>
+
+    <section class="side">
+      <div class="card">
+        <div class="mode">
+          {% if login_mode == 'admin' %}Admin Portal{% else %}Agent Portal{% endif %}
+        </div>
+
+        <h2>
+          {% if login_mode == 'admin' %}
+            Sign in as Admin
+          {% else %}
+            Sign in as Agent
+          {% endif %}
+        </h2>
+
+        <p class="sub">
+          {% if login_mode == 'admin' %}
+            Use your approved admin credentials to access the YENE admin dashboard.
+          {% else %}
+            Use your approved YENE account to continue to your agent dashboard.
+          {% endif %}
+        </p>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="flash">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/login" autocomplete="on">
+          <input type="hidden" name="login_mode" value="{{ login_mode }}">
+
+          <div class="field">
+            <label for="username">Email Address</label>
+            <div class="input-wrap">
+              <input type="email" id="username" name="username" placeholder="you@example.com" autocomplete="username" required>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="input-wrap">
+              <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+              <button type="button" class="toggle-btn" id="togglePassword">Show</button>
+            </div>
+          </div>
+
+          <div class="row">
+            <label class="remember">
+              <input type="checkbox" id="remember_me" name="remember_me" value="1">
+              Remember this device
+            </label>
+
+            {% if login_mode == 'admin' %}
+              <a href="/login" style="font-size:14px;color:#0b5cff;text-decoration:none;font-weight:700;">Switch to Agent Login</a>
+            {% else %}
+              <a href="/admin/login" style="font-size:14px;color:#0b5cff;text-decoration:none;font-weight:700;">Switch to Admin Login</a>
+            {% endif %}
+          </div>
+
+          <button type="submit" class="btn">
+            {% if login_mode == 'admin' %}
+              Open Admin Dashboard
+            {% else %}
+              Open Agent Dashboard
+            {% endif %}
+          </button>
+        </form>
+
+        <div class="links">
+          <a href="/">← Back to Home</a>
+          {% if login_mode != 'admin' %}
+            <a href="/register">Apply to Join</a>
+          {% endif %}
+        </div>
+
+        <div class="hint">
+          {% if login_mode == 'admin' %}
+            Authorized administrators only.
+          {% else %}
+            Your device can stay signed in after successful login when remember mode is enabled.
+          {% endif %}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const passwordInput = document.getElementById("password");
+    const togglePassword = document.getElementById("togglePassword");
+    if (togglePassword && passwordInput) {
+      togglePassword.addEventListener("click", function () {
+        const isPassword = passwordInput.getAttribute("type") === "password";
+        passwordInput.setAttribute("type", isPassword ? "text" : "password");
+        togglePassword.textContent = isPassword ? "Hide" : "Show";
+      });
+    }
+  </script>
+</body>
+</html>
