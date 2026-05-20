@@ -11,7 +11,8 @@ def register_agent_team_routes(app, sb_admin):
         return datetime.utcnow().isoformat() + "Z"
 
     def _email():
-        return (session.get("email") or "").strip().lower()
+        from app import get_current_agent_email
+        return get_current_agent_email()
 
     def _role():
         return (session.get("role") or "").strip().upper()
@@ -85,6 +86,12 @@ def register_agent_team_routes(app, sb_admin):
             return False
 
     def _agent_profile_by_email(email):
+        from app import get_current_agent
+        current_email = _email()
+        if email == current_email:
+            agent = get_current_agent()
+            if agent:
+                return agent, "agent_profiles"
         rows = _safe_select("agent_profiles", {"email": email}, "*", 1)
         if rows:
             return rows[0], "agent_profiles"

@@ -68,24 +68,14 @@ def register_agent_wallet_v1_routes(app, sb_admin, require_login):
         return [r for r in safe_select(table) if matches_identity(r, values, fields)]
 
     def get_agent():
-        email = (session.get("email") or session.get("agent_email") or "").strip().lower()
+        from app import get_current_agent, get_current_agent_email
+        email = get_current_agent_email()
         if not email:
             return None, "Missing session email"
-        try:
-            rows = (
-                sb_admin.table("agent_profiles")
-                .select("*")
-                .eq("email", email)
-                .limit(1)
-                .execute()
-                .data or []
-            )
-            debug("get_agent", {"email": email}, agent_profiles=len(rows))
-            if not rows:
-                return None, f"Agent profile not found for {email}"
-            return rows[0], None
-        except Exception as e:
-            return None, str(e)
+        agent = get_current_agent()
+        if agent:
+            return agent, None
+        return None, f"Agent profile not found for {email}"
 
     def wallet_from_wallets(agent):
         rows = agent_rows("agent_wallets", agent)
@@ -113,10 +103,13 @@ def register_agent_wallet_v1_routes(app, sb_admin, require_login):
         return {"source": "agent_wallet_ledger", "balance": round(available, 2), "available": round(available, 2), "pending": round(pending, 2), "lifetime": round(available + pending, 2)}
 
     def wallet_summary(agent):
+        from_ledger = wallet_from_ledger(agent)
+        if from_ledger["balance"] or from_ledger["pending"] or from_ledger["lifetime"]:
+            return from_ledger
         from_wallets = wallet_from_wallets(agent)
         if from_wallets:
             return from_wallets
-        return wallet_from_ledger(agent)
+        return from_ledger
 
     @app.route("/api/agent/wallet_summary_v1", methods=["GET"], endpoint="agent_wallet_summary_v1")
     @require_login("AGENT")

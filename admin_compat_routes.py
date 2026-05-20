@@ -268,7 +268,7 @@ def register_admin_compat_routes(app, sb_admin):
         return [
             {
                 "status": "APPROVED",
-                "approval_state": "APPROVED",
+                "approval_status": "approved",
                 "approved_at": now,
                 "rejection_reason": None,
                 "admin_approved": True,
@@ -283,7 +283,7 @@ def register_admin_compat_routes(app, sb_admin):
         return [
             {
                 "status": "REJECTED",
-                "approval_state": "REJECTED",
+                "approval_status": "rejected",
                 "rejected_at": now,
                 "rejection_reason": reason,
                 "admin_approved": False,
@@ -450,7 +450,7 @@ def register_admin_compat_routes(app, sb_admin):
         ids, _ = _bulk_ids()
         results = []
         for agent_id in ids:
-            payload = {"status": "ACTIVE", "approval_state": "APPROVED", "approved_at": _now_iso(), "rejection_reason": None}
+            payload = {"status": "ACTIVE", "approval_status": "approved", "approved_at": _now_iso(), "rejection_reason": None}
             res = _safe_update("agent_profiles", {"id": agent_id}, payload)
             _safe_update("agents", {"id": agent_id}, payload)
             results.append({"id": agent_id, "ok": not isinstance(res, Exception), "error": str(res) if isinstance(res, Exception) else ""})
@@ -462,7 +462,7 @@ def register_admin_compat_routes(app, sb_admin):
         reason = str(data.get("reason") or "Admin rejected").strip()
         results = []
         for agent_id in ids:
-            payload = {"status": "REJECTED", "approval_state": "REJECTED", "rejected_at": _now_iso(), "rejection_reason": reason}
+            payload = {"status": "REJECTED", "approval_status": "rejected", "rejected_at": _now_iso(), "rejection_reason": reason}
             res = _safe_update("agent_profiles", {"id": agent_id}, payload)
             _safe_update("agents", {"id": agent_id}, payload)
             results.append({"id": agent_id, "ok": not isinstance(res, Exception), "error": str(res) if isinstance(res, Exception) else ""})

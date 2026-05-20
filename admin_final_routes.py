@@ -184,6 +184,43 @@ def register_admin_final_routes(app, sb_admin):
 
         return jsonify({"ok": True, "message": "Town broadcast saved"})
 
+    @app.get("/api/admin/broadcasts")
+    def admin_broadcasts():
+        rows = _safe_select("agent_group_messages", {}, "*", 200, "created_at", True)
+        if rows:
+            return jsonify({"ok": True, "rows": rows})
+        rows = _safe_select("broadcasts", {}, "*", 200, "created_at", True)
+        return jsonify({"ok": True, "rows": rows})
+
+    @app.post("/api/admin/broadcast")
+    def admin_broadcast():
+        data = request.get_json(force=True) or {}
+        title = str(data.get("title") or "Broadcast").strip()
+        message = str(data.get("message") or "").strip()
+        if not message:
+            return jsonify({"ok": False, "error": "message required"}), 400
+
+        payload = {
+            "title": title,
+            "message": message,
+            "audience": "agents",
+            "status": "ACTIVE",
+            "created_at": _now_iso(),
+        }
+        res = _safe_insert("agent_group_messages", payload)
+        if isinstance(res, Exception):
+            fallback = {
+                "title": title,
+                "message": message,
+                "audience": "agents",
+                "created_at": _now_iso(),
+            }
+            res = _safe_insert("broadcasts", fallback)
+            if isinstance(res, Exception):
+                return jsonify({"ok": False, "error": str(res)}), 500
+
+        return jsonify({"ok": True, "message": "Broadcast saved"})
+
     @app.post("/api/admin/bulk_assign_by_town")
     def admin_bulk_assign_by_town():
         data = request.get_json(force=True) or {}

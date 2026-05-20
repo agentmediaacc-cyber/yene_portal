@@ -32,17 +32,18 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from supabase import create_client
 
-from admin_agents_live_routes import register_admin_agents_live_routes
-from admin_agents_master_routes import register_admin_agents_master_routes
-from admin_agents_reject_fix_routes import register_admin_agents_reject_fix_routes
+from admin_actions_routes import register_admin_actions_routes
+# from admin_agents_live_routes import register_admin_agents_live_routes
+# from admin_agents_master_routes import register_admin_agents_master_routes
+# from admin_agents_reject_fix_routes import register_admin_agents_reject_fix_routes
 from admin_approval_working_routes import register_admin_approval_working_routes
-from admin_broadcast_fix_routes import register_admin_broadcast_fix_routes
-from admin_compat_routes import register_admin_compat_routes
-from admin_error_fixes_routes import register_admin_error_fixes_routes
-from admin_extended_routes import register_admin_extended_routes
+# from admin_broadcast_fix_routes import register_admin_broadcast_fix_routes
+# from admin_compat_routes import register_admin_compat_routes
+# from admin_error_fixes_routes import register_admin_error_fixes_routes
+# from admin_extended_routes import register_admin_extended_routes
 from admin_final_routes import register_admin_final_routes
-from admin_presence_town_routes import register_admin_presence_town_routes
-from admin_workflow_routes import register_admin_workflow_routes
+# from admin_presence_town_routes import register_admin_presence_town_routes
+# from admin_workflow_routes import register_admin_workflow_routes
 from agent_academy_v1 import register_agent_academy_v1_routes
 from agent_dashboard_v4 import register_agent_dashboard_v4_routes
 from agent_team_features import register_agent_team_routes
@@ -64,7 +65,7 @@ def _sb_get_user_id_from_token(access_token: str):
                 "apikey": apikey,
                 "Authorization": f"Bearer {access_token}",
             },
-            timeout=10,
+            timeout=5,
         )
         if r.status_code != 200:
             return None
@@ -84,12 +85,20 @@ def require_login(required_role=None):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             role = (session.get("role") or "").upper()
+            is_api = request.path.startswith("/api/") or request.is_json
+
             if not role:
+                if is_api:
+                    return jsonify({"ok": False, "error": "Login required"}), 401
                 return redirect(url_for("login"))
+
             if required_role and role != str(required_role).upper():
+                if is_api:
+                    return jsonify({"ok": False, "error": f"{required_role} role required"}), 403
                 if role == "ADMIN":
                     return redirect(url_for("admin_dashboard"))
                 return redirect(url_for("login"))
+
             return fn(*args, **kwargs)
         return wrapper
     return decorator
@@ -127,6 +136,12 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 
 # --- 1. THE FOUNDATION & TOOLS ---
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "yene-portal-secret-key-2026")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+# Only set SECURE=True if not in local dev/debug
+app.config["SESSION_COOKIE_SECURE"] = os.getenv("FLASK_ENV") == "production"
 
 # ---------------------------
 # PUBLIC DASHBOARD PAGES
@@ -136,21 +151,36 @@ app = Flask(__name__)
 
 
 
+def get_current_agent_email():
+    """Consistently get normalized email from session."""
+    return (session.get("agent_email") or session.get("email") or "").strip().lower()
+
+def get_current_agent():
+    """Retrieve full agent profile with caching."""
+    email = get_current_agent_email()
+    if not email:
+        return None
+    return _lookup_profile("agent_profiles", email)
+
 def _agent_session_email():
-    return session.get("agent_email")
+    return get_current_agent_email()
 
 def _set_agent_session(email):
     session.clear()
+    email = (email or "").strip().lower()
     session["email"] = email
     session["agent_email"] = email
     session["role"] = "AGENT"
+    session.permanent = True
 
 def _set_admin_session(email):
     session.clear()
+    email = (email or "").strip().lower()
     session["email"] = email
     session["admin_email"] = email
     session["role"] = "ADMIN"
     session["is_admin"] = True
+    session.permanent = True
 
 def _require_admin():
     return bool(session.get("admin_email")) and session.get("role") == "ADMIN"
@@ -198,6 +228,10 @@ def _lookup_profile(table_name, email):
     cache_key = f"_profile_cache_{table_name}_{email}"
     cached = session.get(cache_key)
 
+    # Use cached profile first to keep dashboard responsive when Supabase is slow.
+    if isinstance(cached, dict) and cached.get("email") == email:
+        return cached
+
     def _query():
         return (
             sb_admin.table(table_name)
@@ -206,13 +240,12 @@ def _lookup_profile(table_name, email):
             .limit(1)
         )
 
-    last_exc = None
-    for attempt in range(4):
+    for attempt in range(2):
         try:
             rows = _query().execute().data or []
             if rows:
                 row = rows[0]
-                session[cache_key] = {
+                slim = {
                     "id": row.get("id"),
                     "auth_id": row.get("auth_id"),
                     "user_id": row.get("user_id"),
@@ -221,16 +254,24 @@ def _lookup_profile(table_name, email):
                     "username": row.get("username"),
                     "role": row.get("role"),
                     "status": row.get("status"),
+                    "phone": row.get("phone") or row.get("phone_number"),
+                    "phone_number": row.get("phone_number"),
+                    "town": row.get("town"),
+                    "region": row.get("region"),
+                    "operation_region": row.get("operation_region"),
+                    "referral_code": row.get("referral_code"),
+                    "profile_picture_url": row.get("profile_picture_url"),
+                    "profile_pic_path": row.get("profile_pic_path"),
                 }
-                return row
+                session[cache_key] = slim
+                return slim
             return cached if isinstance(cached, dict) else None
         except Exception as exc:
-            last_exc = exc
             app.logger.warning(
                 "profile_lookup_failed table=%s email=%s attempt=%s error=%s",
                 table_name, email, attempt + 1, exc
             )
-            time.sleep(0.2 * (attempt + 1))
+            time.sleep(0.15 * (attempt + 1))
     return cached if isinstance(cached, dict) else None
 
 def _sign_in_supabase(email, password):
@@ -315,9 +356,11 @@ def agent_dashboard_alias():
 
 @app.context_processor
 def inject_supabase_env():
+    from yene_shared import NAMIBIA_REGIONS
     return {
         "SUPABASE_URL": os.getenv("SUPABASE_URL", ""),
         "SUPABASE_ANON_KEY": os.getenv("SUPABASE_ANON_KEY", ""),
+        "NAMIBIA_REGIONS": NAMIBIA_REGIONS,
     }
 
 
@@ -336,11 +379,17 @@ def protect_role_scoped_api_routes():
 
     if request.path.startswith("/api/agent/"):
         role = (session.get("role") or "").upper()
-        email = (session.get("agent_email") or session.get("email") or "").strip().lower()
+        email = get_current_agent_email()
         if role != "AGENT" or not email:
+            app.logger.warning(
+                "agent_api_auth_failed path=%s role=%s email=%s session_keys=%s",
+                request.path, role, email, list(session.keys())
+            )
             return jsonify({"ok": False, "error": "Agent login required"}), 401
-        profile = _lookup_profile("agent_profiles", email)
-        if not profile or _role_is_admin(profile) or not _is_active_profile(profile):
+
+        profile = get_current_agent()
+        if profile and (_role_is_admin(profile) or not _is_active_profile(profile)):
+            app.logger.warning("agent_api_blocked email=%s status=%s", email, profile.get("status"))
             return jsonify({"ok": False, "error": "Agent account is blocked or unavailable"}), 403
 
 
@@ -390,18 +439,19 @@ register_agent_team_routes(app, sb_admin)
 register_agent_dashboard_v4_routes(app, sb_admin, require_login, _safe_log_system_event)
 register_agent_wallet_v1_routes(app, sb_admin, require_login)
 register_agent_academy_v1_routes(app, sb_admin, require_login)
-register_admin_compat_routes(app, sb_admin)
-register_admin_presence_town_routes(app, sb_admin)
-register_admin_extended_routes(app, sb_admin)
+# register_admin_compat_routes(app, sb_admin)
+# register_admin_presence_town_routes(app, sb_admin)
+# register_admin_extended_routes(app, sb_admin)
 register_admin_final_routes(app, sb_admin)
-register_admin_workflow_routes(app, sb_admin)
-register_admin_agents_reject_fix_routes(app, sb_admin)
-register_admin_agents_master_routes(app, sb_admin)
-register_admin_agents_live_routes(app, sb_admin)
+# register_admin_workflow_routes(app, sb_admin)
+# register_admin_agents_reject_fix_routes(app, sb_admin)
+# register_admin_agents_master_routes(app, sb_admin)
+# register_admin_agents_live_routes(app, sb_admin)
 register_admin_approval_working_routes(app, sb_admin)
-register_admin_error_fixes_routes(app, sb_admin)
-register_admin_broadcast_fix_routes(app, sb_admin)
+# register_admin_error_fixes_routes(app, sb_admin)
+# register_admin_broadcast_fix_routes(app, sb_admin)
 register_yene_compat_routes(app, sb_admin)
+register_admin_actions_routes(app, sb_admin)
 
 
 def homepage_stats(sb_admin):
@@ -572,6 +622,9 @@ def homepage_stats(sb_admin):
             source = "payment_rules"
         out = []
         for r in rows:
+            status = _clean(r.get("status")) or "Active"
+            if status.lower() != "active":
+                continue
             out.append({
                 "source": source,
                 "region": _clean(r.get("region") or r.get("operation_region")) or "Namibia",
@@ -582,7 +635,7 @@ def homepage_stats(sb_admin):
                 "client_daily_bonus": _payment_value(r, "daily_5_clients_bonus", "client_daily_bonus", "daily_client_bonus"),
                 "activation_bonus": _payment_value(r, "weekly_30_activations_bonus", "activation_bonus", "weekly_activation_bonus"),
                 "first_trip_bonus": _payment_value(r, "first_trip_bonus"),
-                "status": _clean(r.get("status")) or "Active",
+                "status": status,
             })
         return out[:8]
 

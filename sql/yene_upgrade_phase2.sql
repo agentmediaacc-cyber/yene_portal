@@ -21,7 +21,7 @@ alter table if exists agent_profiles
   add column if not exists reset_by_admin text,
   add column if not exists approved_at timestamptz,
   add column if not exists rejected_at timestamptz,
-  add column if not exists approval_state text,
+  add column if not exists approval_status text,
   add column if not exists rejection_reason text,
   add column if not exists team_leader_id uuid,
   add column if not exists team_leader_name text,
@@ -37,7 +37,7 @@ alter table if exists agents
   add column if not exists temp_password text,
   add column if not exists last_reset_at timestamptz,
   add column if not exists reset_by_admin text,
-  add column if not exists approval_state text,
+  add column if not exists approval_status text,
   add column if not exists rejection_reason text;
 
 alter table if exists drivers
@@ -50,7 +50,7 @@ alter table if exists drivers
   add column if not exists recruiter_name text,
   add column if not exists approved_at timestamptz,
   add column if not exists rejected_at timestamptz,
-  add column if not exists approval_state text,
+  add column if not exists approval_status text,
   add column if not exists rejection_reason text,
   add column if not exists admin_approved boolean default false,
   add column if not exists payout_excluded boolean default false,
@@ -66,7 +66,7 @@ alter table if exists clients
   add column if not exists recruiter_name text,
   add column if not exists approved_at timestamptz,
   add column if not exists rejected_at timestamptz,
-  add column if not exists approval_state text,
+  add column if not exists approval_status text,
   add column if not exists rejection_reason text,
   add column if not exists admin_approved boolean default false,
   add column if not exists payout_excluded boolean default false,

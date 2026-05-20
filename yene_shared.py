@@ -8,9 +8,30 @@ ONBOARDING_STATUSES = PENDING_STATUSES | {"ONBOARDING"}
 BLOCKED_STATUSES = {"BLOCKED", "REJECTED", "SUSPENDED", "DISABLED", "BANNED"}
 WORKING_AGENT_STATUSES = APPROVED_STATUSES | ONBOARDING_STATUSES
 
+NAMIBIA_REGIONS = [
+    "Erongo",
+    "Hardap",
+    "//Kharas",
+    "Kavango East",
+    "Kavango West",
+    "Khomas",
+    "Kunene",
+    "Ohangwena",
+    "Omaheke",
+    "Omusati",
+    "Oshana",
+    "Oshikoto",
+    "Otjozondjupa",
+    "Zambezi"
+]
+
 
 def clean(value):
     return str(value or "").strip()
+
+
+def clean_lower(value):
+    return clean(value).lower()
 
 
 def clean_status(value):
@@ -112,6 +133,38 @@ def normalize_phone(phone):
     return normalized, None
 
 
+def normalize_na_phone(value):
+    raw = clean(value)
+    if not raw:
+        return None, "Phone number is required"
+    if re.search(r"[A-Za-z]", raw):
+        return None, "Phone number cannot contain letters"
+
+    digits = re.sub(r"\D+", "", raw)
+    if not digits:
+        return None, "Phone number is required"
+    if len(set(digits)) <= 1:
+        return None, "Enter a real Namibia phone number"
+
+    if raw.startswith("+264"):
+        local = digits[3:]
+    elif digits.startswith("264"):
+        local = digits[3:]
+    elif digits.startswith("0"):
+        local = digits[1:]
+    else:
+        local = digits
+
+    if not local.isdigit():
+        return None, "Enter a valid Namibia phone number"
+    if len(local) != 9:
+        return None, "Enter a valid Namibia phone number in 081... or +264... format"
+    if not local.startswith("8"):
+        return None, "Namibia mobile numbers must start with 08 or +2648"
+
+    return f"+264{local}", None
+
+
 def identity_values(agent):
     vals = []
     for key in ("id", "auth_id", "user_id", "email"):
@@ -150,6 +203,42 @@ def current_week_bounds():
     start = start.replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=6, hours=23, minutes=59, seconds=59)
     return start, end
+
+
+def pick_region_access_rule(rows, region="", town=""):
+    region = clean(region)
+    town = clean(town)
+    candidates = []
+    for row in rows or []:
+        row_region = clean(row.get("region") or "Namibia")
+        row_town = clean(row.get("town") or "All")
+        score = 0
+        if region and town and row_region.lower() == region.lower() and row_town.lower() == town.lower():
+            score = 300
+        elif region and row_region.lower() == region.lower() and row_town.lower() == "all":
+            score = 200
+        elif row_region.lower() == "namibia" and row_town.lower() == "all":
+            score = 100
+        if score:
+            candidates.append((score, clean(row.get("updated_at") or row.get("created_at")), row))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidates[0][2]
+
+
+def region_registration_open(rows, region="", town=""):
+    rule = pick_region_access_rule(rows, region=region, town=town)
+    if not rule:
+        return True, None
+    is_active = rule.get("is_active")
+    if is_active is None:
+        is_active = True
+    registration_open = rule.get("registration_open")
+    if registration_open is None:
+        registration_open = True
+    allowed = bool(is_active) and bool(registration_open)
+    return allowed, rule
 
 
 def agent_quality_score(agent, drivers=None, clients=None, team=None):

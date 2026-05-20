@@ -49,7 +49,7 @@ alter table if exists public.agent_profiles
   add column if not exists referred_by_code text;
 
 alter table if exists public.drivers
-  add column if not exists approval_state text,
+  add column if not exists approval_status text,
   add column if not exists approved_at timestamptz,
   add column if not exists rejected_at timestamptz,
   add column if not exists rejection_reason text,
@@ -58,7 +58,7 @@ alter table if exists public.drivers
   add column if not exists driver_code text;
 
 alter table if exists public.clients
-  add column if not exists approval_state text,
+  add column if not exists approval_status text,
   add column if not exists approved_at timestamptz,
   add column if not exists rejected_at timestamptz,
   add column if not exists rejection_reason text,
