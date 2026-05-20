@@ -49,6 +49,7 @@ from agent_dashboard_v4 import register_agent_dashboard_v4_routes
 from agent_team_features import register_agent_team_routes
 from agent_wallet_v1 import register_agent_wallet_v1_routes
 from yene_compat_routes import register_yene_compat_routes
+from yene_shared import VEHICLE_BRANDS, VEHICLE_MODEL_OPTIONS, current_vehicle_year
 
 
 def _sb_get_user_id_from_token(access_token: str):
@@ -336,7 +337,13 @@ def agent_dashboard():
     except Exception:
         pass
 
-    return render_template("agent_dashboard.html")
+    return render_template(
+        "agent_dashboard.html",
+        vehicle_brands=VEHICLE_BRANDS,
+        vehicle_models=VEHICLE_MODEL_OPTIONS,
+        vehicle_year_start=2000,
+        vehicle_year_end=current_vehicle_year(),
+    )
 
 
 @app.route("/dashboard/agent")

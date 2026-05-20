@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from flask import jsonify, request, session, redirect
 from yene_shared import (
     agent_quality_score,
+    compose_vehicle_details,
     identity_values as shared_identity_values,
     matches_identity as shared_matches_identity,
     normalize_na_phone,
@@ -1024,8 +1025,22 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         phone, phone_error = _normalize_phone(data.get("phone"))
         town = (data.get("town") or "").strip() or (agent.get("current_working_town") or "").strip() or (agent.get("town") or "").strip()
         region = (data.get("region") or "").strip() or (agent.get("operation_region") or "").strip() or (agent.get("region") or "").strip()
-        raw_driver_code = (data.get("external_code") or data.get("license_number") or "").strip()
-        car_details = (data.get("car_details") or "").strip()
+        raw_driver_code = (data.get("external_code") or "").strip()
+        vehicle_brand = (data.get("vehicle_brand") or "").strip()
+        vehicle_model = (data.get("vehicle_model") or "").strip()
+        vehicle_model_custom = (data.get("vehicle_model_custom") or "").strip()
+        vehicle_year = (data.get("vehicle_year") or "").strip()
+        vehicle_color = (data.get("vehicle_color") or "").strip()
+        plate_number = (data.get("plate_number") or "").strip()
+        license_number = (data.get("license_number") or "").strip()
+        resolved_vehicle_model = vehicle_model_custom or vehicle_model
+        car_details = compose_vehicle_details(
+            brand=vehicle_brand,
+            model=resolved_vehicle_model,
+            year=vehicle_year,
+            color=vehicle_color,
+            plate=plate_number,
+        ) or (data.get("car_details") or "").strip()
         driver_code, code_error = _validate_prefixed_code(
             raw_driver_code,
             "PAR",
@@ -1083,9 +1098,11 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "phone_number": phone,
             "phone": phone,
             "normalized_phone": phone,
-            "license_number": driver_code,
-            "par_number": driver_code,
             "external_code": driver_code,
+            "driver_code": driver_code,
+            "par_code": driver_code,
+            "par_number": driver_code,
+            "code": driver_code,
             "car_details": car_details,
             "town": town,
             "region": region,
@@ -1099,6 +1116,19 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
             "referral_code": agent.get("referral_code") or "",
             "created_at": iso(datetime.now(UTC)),
         }
+        if license_number:
+            payload["license_number"] = license_number
+            payload["driver_license_number"] = license_number
+        if vehicle_brand:
+            payload["vehicle_brand"] = vehicle_brand
+        if resolved_vehicle_model:
+            payload["vehicle_model"] = resolved_vehicle_model
+        if vehicle_year:
+            payload["vehicle_year"] = vehicle_year
+        if vehicle_color:
+            payload["vehicle_color"] = vehicle_color
+        if plate_number:
+            payload["plate_number"] = plate_number
 
         try:
             res = _insert_resilient(
@@ -1107,16 +1137,19 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
                 [
                     (
                         "full_name", "name", "phone", "phone_number", "normalized_phone", "town", "region",
-                        "external_code", "license_number", "par_number", "status", "approval_status",
+                        "external_code", "driver_code", "par_code", "par_number", "code", "license_number",
+                        "driver_license_number", "vehicle_brand", "vehicle_model", "vehicle_year", "vehicle_color",
+                        "plate_number", "status", "approval_status",
                         "recruiter_agent_id", "recruiter_email", "recruiter_name", "recruiter_auth_id",
                         "referral_code", "created_by", "created_at", "car_details",
                     ),
                     (
                         "full_name", "phone", "phone_number", "town", "region", "external_code",
+                        "driver_code", "par_number", "license_number", "car_details",
                         "status", "recruiter_agent_id", "recruiter_email", "recruiter_name", "created_at",
                     ),
                     (
-                        "full_name", "phone_number", "town", "external_code",
+                        "full_name", "phone_number", "town", "external_code", "car_details",
                         "status", "recruiter_agent_id", "recruiter_email", "recruiter_name",
                     ),
                 ],

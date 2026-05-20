@@ -1038,16 +1038,35 @@
       display:flex;
       flex-direction:column;
       gap:6px;
+      min-width:0;
     }
     .field-label{
       font-size:12px;
       font-weight:800;
       letter-spacing:.04em;
       text-transform:uppercase;
-      color:#dceaff;
+      color:#24384f;
     }
+    .field::placeholder,.textarea::placeholder{
       color:#7f96af;
       opacity:1;
+    }
+    .registration-form .field,
+    .registration-form .select{
+      min-height:56px;
+      padding:15px 16px;
+      background:#ffffff;
+      color:#142231;
+      border:1px solid rgba(20,36,54,.24);
+      box-shadow:inset 0 1px 1px rgba(20,36,54,.04);
+    }
+    .registration-form .field:focus,
+    .registration-form .select:focus{
+      border-color:#0ea5e9;
+      box-shadow:0 0 0 3px rgba(14,165,233,.16);
+    }
+    .registration-form .field-group.hidden{
+      display:none;
     }
     .btn-loading {
       opacity: .75;
@@ -1284,28 +1303,70 @@
                 <div class="pill">Open</div>
               </div>
               <div class="card-body">
-                <form id="driverForm" class="form-grid">
+                <form
+                  id="driverForm"
+                  class="form-grid registration-form"
+                  data-vehicle-models='{{ vehicle_models|tojson|forceescape }}'
+                  data-vehicle-year-start="{{ vehicle_year_start }}"
+                  data-vehicle-year-end="{{ vehicle_year_end }}"
+                >
                   <div id="driverFormFeedback" class="inline-feedback info full" style="display:none;"></div>
                   <label class="field-group">
                     <span class="field-label">Driver Full Name</span>
+                    <input class="field" name="full_name" aria-label="Driver full name" placeholder="Enter driver full name" required />
                   </label>
                   <label class="field-group">
                     <span class="field-label">Driver Phone Number</span>
+                    <input class="field" name="phone" aria-label="Driver phone number" placeholder="0812613261 or +264812613261" required />
                   </label>
                   <label class="field-group">
                     <span class="field-label">Town</span>
+                    <input class="field" name="town" aria-label="Town" placeholder="Enter town" required />
                   </label>
                   <label class="field-group">
                     <span class="field-label">Region</span>
+                    <input class="field" name="region" aria-label="Region" placeholder="Enter region" list="namibiaRegions" />
                   </label>
                   <label class="field-group">
-                    <span class="field-label">Car Details</span>
+                    <span class="field-label">Vehicle Brand</span>
+                    <select class="select" id="driverVehicleBrand" name="vehicle_brand" aria-label="Vehicle brand">
+                      <option value="">Select vehicle brand</option>
+                      {% for brand in vehicle_brands %}
+                      <option value="{{ brand }}">{{ brand }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label class="field-group">
+                    <span class="field-label">Vehicle Model</span>
+                    <select class="select" id="driverVehicleModel" name="vehicle_model" aria-label="Vehicle model">
+                      <option value="">Select vehicle model</option>
+                    </select>
+                  </label>
+                  <label class="field-group hidden full" id="driverVehicleModelCustomWrap">
+                    <span class="field-label">Custom Vehicle Model</span>
+                    <input class="field" id="driverVehicleModelCustom" name="vehicle_model_custom" aria-label="Custom vehicle model" placeholder="Type the exact model" />
+                  </label>
+                  <label class="field-group">
+                    <span class="field-label">Vehicle Year</span>
+                    <select class="select" id="driverVehicleYear" name="vehicle_year" aria-label="Vehicle year">
+                      <option value="">Select vehicle year</option>
+                    </select>
+                  </label>
+                  <label class="field-group">
+                    <span class="field-label">Vehicle Color</span>
+                    <input class="field" name="vehicle_color" aria-label="Vehicle color" placeholder="White, silver, blue" />
+                  </label>
+                  <label class="field-group">
+                    <span class="field-label">Plate / Registration Number</span>
+                    <input class="field" name="plate_number" aria-label="Plate or registration number" placeholder="N 12345 W" />
                   </label>
                   <label class="field-group">
                     <span class="field-label">Licence Number</span>
+                    <input class="field" name="license_number" aria-label="Licence number" placeholder="Enter licence number" />
                   </label>
                   <div class="field-group">
                     <span class="field-label">Driver PAR Code</span>
+                    <input class="field js-prefixed-code" data-prefix="PAR" name="external_code" aria-label="Driver PAR code" placeholder="3232 or PAR3232" required />
                     <div class="field-help">Type the real driver code. If you enter only numbers, YENE formats them as `PAR<number>`.</div>
                   </div>
                   <div class="full toolbar">
@@ -1322,22 +1383,27 @@
                 <div class="pill">Open</div>
               </div>
               <div class="card-body">
-                <form id="clientForm" class="form-grid">
+                <form id="clientForm" class="form-grid registration-form">
                   <div id="clientFormFeedback" class="inline-feedback info full" style="display:none;"></div>
                   <label class="field-group">
                     <span class="field-label">Client Full Name</span>
+                    <input class="field" name="full_name" aria-label="Client full name" placeholder="Enter client full name" required />
                   </label>
                   <label class="field-group">
                     <span class="field-label">Client Phone Number</span>
+                    <input class="field" name="phone" aria-label="Client phone number" placeholder="0812613261 or +264812613261" required />
                   </label>
                   <label class="field-group">
                     <span class="field-label">Town</span>
+                    <input class="field" name="town" aria-label="Town" placeholder="Enter town" required />
                   </label>
                   <label class="field-group">
                     <span class="field-label">Region</span>
+                    <input class="field" name="region" aria-label="Region" placeholder="Enter region" list="namibiaRegions" />
                   </label>
                   <div class="field-group">
                     <span class="field-label">Client CUS Code</span>
+                    <input class="field js-prefixed-code" data-prefix="CUS" name="external_code" aria-label="Client CUS code" placeholder="3323 or CUS3323" required />
                     <div class="field-help">Type the real client code. If you enter only numbers, YENE formats them as `CUS<number>`.</div>
                   </div>
                   <div class="full toolbar">
@@ -3000,7 +3066,12 @@
         phone: (raw.phone || '').trim(),
         town: (raw.town || '').trim(),
         region: (raw.region || '').trim(),
-        car_details: (raw.car_details || '').trim(),
+        vehicle_brand: (raw.vehicle_brand || '').trim(),
+        vehicle_model: (raw.vehicle_model || '').trim(),
+        vehicle_model_custom: (raw.vehicle_model_custom || '').trim(),
+        vehicle_year: (raw.vehicle_year || '').trim(),
+        vehicle_color: (raw.vehicle_color || '').trim(),
+        plate_number: (raw.plate_number || '').trim(),
         license_number: (raw.license_number || '').trim(),
         external_code: (raw.external_code || '').trim()
       };
@@ -3014,6 +3085,7 @@
           throw new Error(res.error || 'Driver registration could not be completed.');
         }
         ev.target.reset();
+        resetDriverVehicleForm();
         let message = 'Saved and sent to admin approval.';
         try{
           message = await hardRefreshDashboardAfterRegistration("Driver");
@@ -3303,6 +3375,64 @@
         }
       });
     });
+
+    const driverFormEl = $("driverForm");
+    const vehicleModelsByBrand = JSON.parse(driverFormEl?.dataset.vehicleModels || '{}');
+    const vehicleYearStart = Number(driverFormEl?.dataset.vehicleYearStart || 2000);
+    const vehicleYearEnd = Number(driverFormEl?.dataset.vehicleYearEnd || new Date().getFullYear());
+
+    function populateVehicleYears(){
+      const yearSelect = $("driverVehicleYear");
+      if(!yearSelect) return;
+      const currentValue = yearSelect.value;
+      yearSelect.innerHTML = '<option value="">Select vehicle year</option>';
+      for(let year = vehicleYearEnd; year >= vehicleYearStart; year -= 1){
+        const option = document.createElement('option');
+        option.value = String(year);
+        option.textContent = String(year);
+        yearSelect.appendChild(option);
+      }
+      yearSelect.value = currentValue || '';
+    }
+
+    function syncCustomVehicleModel(){
+      const brand = $("driverVehicleBrand")?.value || '';
+      const model = $("driverVehicleModel")?.value || '';
+      const wrap = $("driverVehicleModelCustomWrap");
+      const input = $("driverVehicleModelCustom");
+      const showCustom = brand === 'Other' || model === 'Other';
+      if(wrap) wrap.classList.toggle('hidden', !showCustom);
+      if(input){
+        input.disabled = !showCustom;
+        if(!showCustom) input.value = '';
+      }
+    }
+
+    function populateVehicleModels(selectedModel = ''){
+      const brand = $("driverVehicleBrand")?.value || '';
+      const modelSelect = $("driverVehicleModel");
+      if(!modelSelect) return;
+      const models = Array.isArray(vehicleModelsByBrand[brand]) ? vehicleModelsByBrand[brand] : ['Other'];
+      modelSelect.innerHTML = '<option value="">Select vehicle model</option>';
+      models.forEach((model) => {
+        const option = document.createElement('option');
+        option.value = model;
+        option.textContent = model;
+        modelSelect.appendChild(option);
+      });
+      modelSelect.value = selectedModel && models.includes(selectedModel) ? selectedModel : '';
+      syncCustomVehicleModel();
+    }
+
+    function resetDriverVehicleForm(){
+      populateVehicleYears();
+      populateVehicleModels('');
+      syncCustomVehicleModel();
+    }
+
+    $("driverVehicleBrand")?.addEventListener('change', () => populateVehicleModels(''));
+    $("driverVehicleModel")?.addEventListener('change', syncCustomVehicleModel);
+    resetDriverVehicleForm();
 
     document.querySelectorAll('.period-btn').forEach(btn => {
       btn.addEventListener('click', async () => {

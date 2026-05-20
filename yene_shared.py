@@ -25,9 +25,74 @@ NAMIBIA_REGIONS = [
     "Zambezi"
 ]
 
+VEHICLE_MODEL_OPTIONS = {
+    "Toyota": ["Corolla", "Corolla Quest", "Hilux", "Fortuner", "Quantum", "Hiace", "Yaris", "Vitz", "Etios", "Avanza", "RAV4", "Land Cruiser", "Land Cruiser Prado", "Camry", "Auris", "Urban Cruiser", "Rush", "Starlet", "Agya", "C-HR", "Innova", "Dyna", "Coaster", "Tazz", "Other"],
+    "Volkswagen": ["Polo", "Polo Vivo", "Golf", "Jetta", "Passat", "Tiguan", "T-Cross", "Touareg", "Amarok", "Caddy", "Transporter", "Caravelle", "Kombi", "Arteon", "Up", "Touran", "Beetle", "Other"],
+    "Nissan": ["March", "Micra", "Almera", "NP200", "NP300", "Navara", "Hardbody", "X-Trail", "Qashqai", "Juke", "Tiida", "Sentra", "Livina", "Patrol", "Pathfinder", "Magnite", "Sunny", "1400 Bakkie", "Other"],
+    "Mazda": ["Demio", "Mazda2", "Mazda3", "Mazda5", "Mazda6", "CX-3", "CX-5", "CX-7", "CX-9", "BT-50", "B-Series", "MX-5", "Other"],
+    "BMW": ["1 Series", "2 Series", "3 Series", "4 Series", "5 Series", "6 Series", "7 Series", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "Z4", "i3", "i4", "iX", "Other"],
+    "Mercedes-Benz": ["A-Class", "B-Class", "C-Class", "E-Class", "S-Class", "CLA", "CLS", "GLA", "GLB", "GLC", "GLE", "GLS", "Vito", "Viano", "Sprinter", "X-Class", "G-Class", "ML-Class", "Other"],
+    "Audi": ["A1", "A3", "A4", "A5", "A6", "A7", "A8", "Q2", "Q3", "Q5", "Q7", "Q8", "TT", "RS3", "RS4", "RS5", "RS6", "Other"],
+    "Ford": ["Fiesta", "Figo", "Focus", "Fusion", "EcoSport", "Kuga", "Ranger", "Everest", "Territory", "Bantam", "Ikon", "Mondeo", "Tourneo", "Transit", "Mustang", "Other"],
+    "Hyundai": ["Atos", "i10", "Grand i10", "i20", "i30", "Accent", "Elantra", "Sonata", "Tucson", "Santa Fe", "Creta", "Venue", "H1", "H100", "Getz", "Kona", "Other"],
+    "Kia": ["Picanto", "Rio", "Cerato", "Optima", "Sportage", "Sorento", "Seltos", "Sonet", "Soul", "Carnival", "K2700", "K2500", "Other"],
+    "Honda": ["Fit", "Jazz", "Civic", "Accord", "Ballade", "CR-V", "HR-V", "BR-V", "WR-V", "Amaze", "City", "Stream", "Other"],
+    "Suzuki": ["Swift", "Baleno", "Vitara", "Grand Vitara", "Jimny", "Ertiga", "Ciaz", "Dzire", "Alto", "S-Presso", "Ignis", "SX4", "Other"],
+    "Isuzu": ["KB", "D-Max", "MU-X", "Frontier", "N-Series", "F-Series", "Other"],
+    "Haval": ["Jolion", "H2", "H6", "H9", "H1", "H5", "H6 GT", "Big Dog", "Other"],
+    "Renault": ["Clio", "Kwid", "Sandero", "Duster", "Captur", "Megane", "Koleos", "Triber", "Kangoo", "Trafic", "Logan", "Other"],
+    "Chevrolet": ["Spark", "Aveo", "Cruze", "Utility", "Captiva", "Trailblazer", "Sonic", "Optra", "Lumina", "Other"],
+    "Opel": ["Corsa", "Astra", "Mokka", "Meriva", "Zafira", "Insignia", "Adam", "Crossland", "Grandland", "Other"],
+    "Mitsubishi": ["Pajero", "Pajero Sport", "Triton", "ASX", "Outlander", "Lancer", "Colt", "Eclipse Cross", "Other"],
+    "Subaru": ["Impreza", "Forester", "Outback", "Legacy", "XV", "WRX", "BRZ", "Other"],
+    "Lexus": ["IS", "ES", "GS", "LS", "NX", "RX", "LX", "UX", "CT", "Other"],
+    "Land Rover": ["Defender", "Discovery", "Discovery Sport", "Freelander", "Other"],
+    "Range Rover": ["Evoque", "Sport", "Velar", "Vogue", "Autobiography", "Other"],
+    "Jeep": ["Wrangler", "Cherokee", "Grand Cherokee", "Compass", "Renegade", "Patriot", "Other"],
+    "Peugeot": ["206", "207", "208", "307", "308", "3008", "5008", "Partner", "Boxer", "Other"],
+    "Citroën": ["C1", "C2", "C3", "C4", "C5", "Berlingo", "DS3", "DS4", "Other"],
+    "Volvo": ["S40", "S60", "S80", "S90", "V40", "V60", "XC40", "XC60", "XC90", "Other"],
+    "Fiat": ["Panda", "Punto", "500", "Tipo", "Doblo", "Ducato", "Strada", "Other"],
+    "Datsun": ["Go", "Go+", "Go Lux", "Other"],
+    "Mahindra": ["Scorpio", "Pik Up", "XUV300", "XUV500", "XUV700", "Bolero", "KUV100", "Other"],
+    "Tata": ["Indica", "Indigo", "Bolt", "Vista", "Xenon", "Safari", "Telcoline", "Super Ace", "Other"],
+    "Great Wall": ["Steed", "Wingle", "Florid", "Hover", "Other"],
+    "Chery": ["QQ", "Tiggo", "Tiggo 4", "Tiggo 7", "Tiggo 8", "Other"],
+    "Geely": ["LC", "Emgrand", "Coolray", "Okavango", "Other"],
+    "JAC": ["T6", "T8", "X200", "N-Series", "Other"],
+    "GWM": ["P-Series", "Steed", "Tank 300", "Ora", "Other"],
+    "Mini": ["Cooper", "Clubman", "Countryman", "Paceman", "Other"],
+    "Porsche": ["Cayenne", "Macan", "Panamera", "Boxster", "Cayman", "911", "Other"],
+    "Jaguar": ["XE", "XF", "XJ", "F-Pace", "E-Pace", "F-Type", "Other"],
+    "Daihatsu": ["Charade", "Terios", "Sirion", "Mira", "Gran Max", "Other"],
+    "Dodge": ["Caliber", "Journey", "Ram", "Nitro", "Other"],
+    "Chrysler": ["PT Cruiser", "300C", "Voyager", "Grand Voyager", "Other"],
+    "SsangYong": ["Korando", "Actyon", "Musso", "Rexton", "Tivoli", "Other"],
+    "Other": ["Other"],
+}
+
+VEHICLE_BRANDS = list(VEHICLE_MODEL_OPTIONS.keys())
+
 
 def clean(value):
     return str(value or "").strip()
+
+
+def current_vehicle_year():
+    return datetime.now(timezone.utc).year
+
+
+def compose_vehicle_details(brand="", model="", year="", color="", plate=""):
+    brand = clean(brand)
+    model = clean(model)
+    year = clean(year)
+    color = clean(color)
+    plate = clean(plate)
+    summary = " ".join(part for part in (brand, model) if part)
+    parts = [part for part in (summary, year, color) if part]
+    if plate:
+        parts.append(f"Plate {plate}")
+    return ", ".join(parts)
 
 
 def clean_lower(value):
