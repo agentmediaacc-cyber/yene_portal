@@ -1271,14 +1271,14 @@
               <div class="card-body">
                 <form id="driverForm" class="form-grid">
                   <div id="driverFormFeedback" class="inline-feedback info full" style="display:none;"></div>
-                  <input class="field" name="full_name" placeholder="Driver full name" required />
-                  <input class="field" name="phone" placeholder="081... or +264..." required />
-                  <input class="field" name="town" placeholder="Town" required />
-                  <input class="field" name="region" placeholder="Region" list="namibiaRegions" />
+                  <input class="field" name="full_name" aria-label="Driver full name" required />
+                  <input class="field" name="phone" aria-label="081... or +264..." required />
+                  <input class="field" name="town" aria-label="Town" required />
+                  <input class="field" name="region" aria-label="Region" list="namibiaRegions" />
 
-                  <input class="field" name="car_details" placeholder="Car details" />
+                  <input class="field" name="car_details" aria-label="Car details" />
                   <div>
-                    <input class="field js-prefixed-code" data-prefix="PAR" name="external_code" placeholder="Driver PAR code" required />
+                    <input class="field js-prefixed-code" data-prefix="PAR" name="external_code" aria-label="Driver PAR code" required />
                     <div class="field-help">Type the real driver code. If you enter only numbers, YENE formats them as `PAR<number>`.</div>
                   </div>
                   <div class="full toolbar">
@@ -1297,13 +1297,13 @@
               <div class="card-body">
                 <form id="clientForm" class="form-grid">
                   <div id="clientFormFeedback" class="inline-feedback info full" style="display:none;"></div>
-                  <input class="field" name="full_name" placeholder="Client full name" required />
-                  <input class="field" name="phone" placeholder="081... or +264..." required />
-                  <input class="field" name="town" placeholder="Town" required />
-                  <input class="field" name="region" placeholder="Region" list="namibiaRegions" />
+                  <input class="field" name="full_name" aria-label="Client full name" required />
+                  <input class="field" name="phone" aria-label="081... or +264..." required />
+                  <input class="field" name="town" aria-label="Town" required />
+                  <input class="field" name="region" aria-label="Region" list="namibiaRegions" />
 
                   <div>
-                    <input class="field js-prefixed-code" data-prefix="CUS" name="external_code" placeholder="Client CUS code" required />
+                    <input class="field js-prefixed-code" data-prefix="CUS" name="external_code" aria-label="Client CUS code" required />
                     <div class="field-help">Type the real client code. If you enter only numbers, YENE formats them as `CUS<number>`.</div>
                   </div>
                   <div class="full toolbar">
@@ -1429,8 +1429,8 @@
               </div>
               <div class="card-body">
                 <form id="withdrawForm" class="form-grid">
-                  <input class="field" name="amount" type="number" min="1" step="0.01" placeholder="Amount N$" required />
-                  <input class="field" name="note" placeholder="Optional note" />
+                  <input class="field" name="amount" type="number" min="1" step="0.01" aria-label="Amount N$" required />
+                  <input class="field" name="note" aria-label="Optional note" />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Request Withdrawal</button>
                   </div>
@@ -1761,8 +1761,8 @@
                     <option value="URGENT">Urgent</option>
                   </select>
 
-                  <input class="field full" id="supportSubject" name="subject" placeholder="Subject" required />
-                  <textarea class="textarea full" id="supportMessage" name="message" placeholder="Describe the issue or reply..." required></textarea>
+                  <input class="field full" id="supportSubject" name="subject" aria-label="Subject" required />
+                  <textarea class="textarea full" id="supportMessage" name="message" aria-label="Describe the issue or reply..." required></textarea>
                   <input type="hidden" id="supportReplyToId" value="" />
 
                   <div class="full reply-actions">
@@ -1903,10 +1903,10 @@
                   <div class="mini-note" id="cameraStatus">Use camera or upload from gallery. Saved photos are stored in Supabase Storage.</div>
                 </div>
                 <form id="settingsForm" class="form-grid">
-                  <input class="field" name="full_name" id="setName" placeholder="Full name" />
-                  <input class="field" name="username" id="setUsername" placeholder="Username" />
-                  <input class="field" name="email" id="setEmail" placeholder="Email" readonly />
-                  <input class="field" name="phone" id="setPhone" placeholder="Phone" />
+                  <input class="field" name="full_name" id="setName" aria-label="Full name" />
+                  <input class="field" name="username" id="setUsername" aria-label="Username" />
+                  <input class="field" name="email" id="setEmail" aria-label="Email" readonly />
+                  <input class="field" name="phone" id="setPhone" aria-label="Phone" />
                   <select class="select" name="gender" id="setGender">
                     <option value="">Gender</option>
                     <option value="Female">Female</option>
@@ -1914,9 +1914,9 @@
                     <option value="Other">Other</option>
                     <option value="Prefer not to say">Prefer not to say</option>
                   </select>
-                  <input class="field" name="date_of_birth" id="setBirth" type="date" placeholder="Date of birth" />
-                  <input class="field" name="town" id="setTown" placeholder="Town" />
-                  <input class="field" name="region" id="setRegion" placeholder="Region" list="namibiaRegions" />
+                  <input class="field" name="date_of_birth" id="setBirth" type="date" aria-label="Date of birth" />
+                  <input class="field" name="town" id="setTown" aria-label="Town" />
+                  <input class="field" name="region" id="setRegion" aria-label="Region" list="namibiaRegions" />
                   <div class="mini-note full" id="regionLockNote" style="display:none">Region locked by admin</div>
                   <datalist id="namibiaRegions">
                     {% for region in NAMIBIA_REGIONS %}
@@ -1924,13 +1924,13 @@
                     {% endfor %}
                   </datalist>
 
-                  <input class="field" name="national_id" id="setNationalId" placeholder="National ID / ID number" />
-                  <input class="field" name="next_of_kin_name" id="setKinName" placeholder="Next of kin name" />
-                  <input class="field" name="next_of_kin_phone" id="setKinPhone" placeholder="Next of kin phone" />
-                  <input class="field full" name="residential_address" id="setAddress" placeholder="Residential address" />
-                  <textarea class="textarea full" name="bio" id="setBio" placeholder="Bio / about"></textarea>
-                  <input class="field full" name="profile_picture_url" id="setProfilePicture" placeholder="Profile picture (optional) URL" />
-                  <input class="field full" id="setReferral" placeholder="Referral code" readonly />
+                  <input class="field" name="national_id" id="setNationalId" aria-label="National ID / ID number" />
+                  <input class="field" name="next_of_kin_name" id="setKinName" aria-label="Next of kin name" />
+                  <input class="field" name="next_of_kin_phone" id="setKinPhone" aria-label="Next of kin phone" />
+                  <input class="field full" name="residential_address" id="setAddress" aria-label="Residential address" />
+                  <textarea class="textarea full" name="bio" id="setBio" aria-label="Bio / about"></textarea>
+                  <input class="field full" name="profile_picture_url" id="setProfilePicture" aria-label="Profile picture (optional) URL" />
+                  <input class="field full" id="setReferral" aria-label="Referral code" readonly />
                   <div class="full toolbar">
                     <button class="btn btn-primary" type="submit">Save My Account</button>
                     <button class="btn btn-soft" type="button" id="copyCodeBtn">Copy Referral Code</button>
@@ -3411,13 +3411,13 @@
       }).join("");
     }
 
-    function renderRankProgress(driverRows, clientRows, debugData) {
-      const meId = String(debugData?.agent?.id || "");
+    function renderRankProgress(driverRows, clientRows, metricsData) {
+      const meId = String(metricsData?.agent?.id || "");
       const myDriverRank = Array.isArray(driverRows) ? driverRows.findIndex(r => String(r.agent_id || "") === meId) : -1;
       const myClientRank = Array.isArray(clientRows) ? clientRows.findIndex(r => String(r.agent_id || "") === meId) : -1;
 
-      const driversAll = Number(debugData?.counts?.drivers_all || 0);
-      const clientsAll = Number(debugData?.counts?.clients_all || 0);
+      const driversAll = Number(metricsData?.counts?.drivers_all || 0);
+      const clientsAll = Number(metricsData?.counts?.clients_all || 0);
 
       const driverRankEl = document.getElementById("yourDriverRank");
       const clientRankEl = document.getElementById("yourClientRank");
@@ -3461,14 +3461,14 @@
         const summaryRes = await getJson('/api/agent/summary_v4');
         let summary = (summaryRes.data && summaryRes.data.ok) ? summaryRes.data : null;
 
-        // 2) Truth fallback
-        const debugRes = await getJson('/api/agent/debug_links_v4');
-        const debugData = (debugRes.data && debugRes.data.ok) ? debugRes.data : null;
+        // 2) Linked registration metrics fallback
+        const metricsRes = await getJson('/api/agent/link_metrics_v4');
+        const metricsData = (metricsRes.data && metricsRes.data.ok) ? metricsRes.data : null;
 
-        const truthDriversAll = debugData ? num(debugData.counts?.drivers_all) : num(summary?.drivers_total || summary?.drivers_all || summary?.drivers);
-        const truthClientsAll = debugData ? num(debugData.counts?.clients_all) : num(summary?.clients_total || summary?.clients_all || summary?.clients);
-        const truthDriversWeek = debugData ? num(debugData.counts?.drivers_week) : num(summary?.drivers_this_week || summary?.week_drivers || summary?.drivers_week);
-        const truthClientsWeek = debugData ? num(debugData.counts?.clients_week) : num(summary?.clients_this_week || summary?.week_clients || summary?.clients_week);
+        const truthDriversAll = metricsData ? num(metricsData.counts?.drivers_all) : num(summary?.drivers_total || summary?.drivers_all || summary?.drivers);
+        const truthClientsAll = metricsData ? num(metricsData.counts?.clients_all) : num(summary?.clients_total || summary?.clients_all || summary?.clients);
+        const truthDriversWeek = metricsData ? num(metricsData.counts?.drivers_week) : num(summary?.drivers_this_week || summary?.week_drivers || summary?.drivers_week);
+        const truthClientsWeek = metricsData ? num(metricsData.counts?.clients_week) : num(summary?.clients_this_week || summary?.week_clients || summary?.clients_week);
 
         // Prefer truth endpoint for visible dashboard values.
         const visibleDrivers = truthDriversWeek || truthDriversAll;
@@ -3509,10 +3509,10 @@
         ['weeklyDrivers','weekDrivers'].forEach(id => setText(id, truthDriversWeek));
         ['weeklyClients','weekClients'].forEach(id => setText(id, truthClientsWeek));
 
-        // RECENT REGISTRATIONS fallback from debug endpoint if activity section is stale
-        const recent = debugData ? []
-            .concat((debugData.drivers || []).map(r => ({...r, kind:'driver'})))
-            .concat((debugData.clients || []).map(r => ({...r, kind:'client'})))
+        // RECENT REGISTRATIONS fallback from linked metrics endpoint if activity section is stale
+        const recent = metricsData ? []
+            .concat((metricsData.drivers || []).map(r => ({...r, kind:'driver'})))
+            .concat((metricsData.clients || []).map(r => ({...r, kind:'client'})))
             .sort((a,b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
             .slice(0, 8) : [];
 
@@ -3551,8 +3551,8 @@
         }
 
         // YOUR RANK
-        if (debugData && debugData.agent) {
-          renderRankProgress(driverRows, clientRows, debugData);
+        if (metricsData && metricsData.agent) {
+          renderRankProgress(driverRows, clientRows, metricsData);
         }
 
       } catch (err) {

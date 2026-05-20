@@ -99,7 +99,7 @@
     <section class="section" id="agents">
       <div class="card">
         <div class="row" style="justify-content:space-between"><div><div class="title">All Agents</div><div class="sub">All-time and current-week totals come from linked driver/client rows.</div></div><button class="btn ghost" onclick="exportCsv('agents')">Export CSV</button></div>
-        <div class="filters"><input id="agentSearch" placeholder="Search name, email, phone, referral code" oninput="renderAgents()"><input id="agentRegionFilter" placeholder="Region" oninput="loadAgents()"><input id="agentTownFilter" placeholder="Town" oninput="loadAgents()"><select id="agentStatusFilter" onchange="loadAgents()"><option value="">All statuses</option><option>PENDING</option><option>ACTIVE</option><option>APPROVED</option><option>BLOCKED</option><option>REJECTED</option></select><button class="btn" onclick="clearAgentFilters()">Clear</button></div>
+        <div class="filters"><input id="agentSearch" aria-label="Search name, email, phone, referral code" oninput="renderAgents()"><input id="agentRegionFilter" aria-label="Region" oninput="loadAgents()"><input id="agentTownFilter" aria-label="Town" oninput="loadAgents()"><select id="agentStatusFilter" onchange="loadAgents()"><option value="">All statuses</option><option>PENDING</option><option>ACTIVE</option><option>APPROVED</option><option>BLOCKED</option><option>REJECTED</option></select><button class="btn" onclick="clearAgentFilters()">Clear</button></div>
         <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Name</th><th>Status</th><th>Email</th><th>Phone</th><th>Referral</th><th>All Drivers</th><th>All Clients</th><th>Week D/C</th><th>Pending</th><th>Actions</th></tr></thead><tbody id="agentRows"><tr><td colspan="10">Checking records...</td></tr></tbody></table></div>
       </div>
     </section>
@@ -110,9 +110,9 @@
           <div class="title">Selected Agent</div><div class="sub" id="selectedAgentMeta">Select an agent from All Agents.</div>
           <div class="row" style="margin-top:12px"><button class="btn ok" onclick="approveSelectedAgent()">Approve</button><button class="btn warn" onclick="resetSelectedAgent()">Reset Login</button><button class="btn bad" onclick="blockSelectedAgent()">Block</button><button class="btn ghost" onclick="openSelectedProfile()">Open Profile</button></div>
           <div class="grid2" style="margin-top:12px">
-            <input id="adminAgentTown" placeholder="Town">
-            <input id="adminAgentRegion" placeholder="Region">
-            <input id="adminAgentWorkingTown" placeholder="Current working town">
+            <input id="adminAgentTown" aria-label="Town">
+            <input id="adminAgentRegion" aria-label="Region">
+            <input id="adminAgentWorkingTown" aria-label="Current working town">
             <label class="pill"><input type="checkbox" id="adminAgentRegionLocked"> Region locked</label>
           </div>
           <div class="row" style="margin-top:10px"><button class="btn" onclick="saveSelectedAgentRegion()">Save Region</button></div>
@@ -138,11 +138,11 @@
     </section>
 
     <section class="section" id="drivers">
-      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">All Registered Drivers</div><div class="sub">Search, filter, approve, or reject driver registrations.</div></div><button class="btn ghost" onclick="exportCsv('drivers')">Export CSV</button></div><div id="driversAdminFeedback" class="admin-feedback info" style="display:none;"></div><div class="filters"><input id="driverSearch" placeholder="Search drivers, phone, town, agent" oninput="renderDrivers()"><input id="driverRegionFilter" placeholder="Region" oninput="loadDrivers()"><input id="driverTownFilter" placeholder="Town" oninput="loadDrivers()"><select id="driverStatusFilter" onchange="loadDrivers()"><option value="">All statuses</option><option>PENDING</option><option>APPROVED</option><option>ACTIVE</option><option>REJECTED</option></select><button class="btn" onclick="clearDriverFilters()">Clear</button></div><div class="row" style="margin-top:8px"><input id="driverAgentFilter" placeholder="Filter by agent" oninput="loadDrivers()"><input id="driverFrom" type="date" onchange="loadDrivers()"><input id="driverTo" type="date" onchange="loadDrivers()"></div><div class="row" style="margin-top:12px"><label class="pill"><input type="checkbox" id="driverSelectAll" onchange="setAllVisible('driver',this.checked)"> Select visible</label><button class="btn ok" onclick="bulkApprove('driver')">Bulk approve selected</button><button class="btn bad" onclick="bulkReject('driver')">Bulk reject selected</button><button class="btn ghost" onclick="bulkApprove('driver',true)">Approve all filtered</button><button class="btn ghost" onclick="bulkReject('driver',true)">Reject all filtered</button><span class="pill" id="driverBulkCount">0 selected</span></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Status</th><th>Name</th><th>Phone</th><th>Town/Region</th><th>Recruiter</th><th>Created</th><th>Actions</th></tr></thead><tbody id="driverRows"><tr><td colspan="8">Checking records...</td></tr></tbody></table></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">All Registered Drivers</div><div class="sub">Search, filter, approve, or reject driver registrations.</div></div><button class="btn ghost" onclick="exportCsv('drivers')">Export CSV</button></div><div id="driversAdminFeedback" class="admin-feedback info" style="display:none;"></div><div class="filters"><input id="driverSearch" aria-label="Search drivers, phone, town, agent" oninput="renderDrivers()"><input id="driverRegionFilter" aria-label="Region" oninput="loadDrivers()"><input id="driverTownFilter" aria-label="Town" oninput="loadDrivers()"><select id="driverStatusFilter" onchange="loadDrivers()"><option value="">All statuses</option><option>PENDING</option><option>APPROVED</option><option>ACTIVE</option><option>REJECTED</option></select><button class="btn" onclick="clearDriverFilters()">Clear</button></div><div class="row" style="margin-top:8px"><input id="driverAgentFilter" aria-label="Filter by agent" oninput="loadDrivers()"><input id="driverFrom" type="date" onchange="loadDrivers()"><input id="driverTo" type="date" onchange="loadDrivers()"></div><div class="row" style="margin-top:12px"><label class="pill"><input type="checkbox" id="driverSelectAll" onchange="setAllVisible('driver',this.checked)"> Select visible</label><button class="btn ok" onclick="bulkApprove('driver')">Bulk approve selected</button><button class="btn bad" onclick="bulkReject('driver')">Bulk reject selected</button><button class="btn ghost" onclick="bulkApprove('driver',true)">Approve all filtered</button><button class="btn ghost" onclick="bulkReject('driver',true)">Reject all filtered</button><span class="pill" id="driverBulkCount">0 selected</span></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Status</th><th>Name</th><th>Phone</th><th>Town/Region</th><th>Recruiter</th><th>Created</th><th>Actions</th></tr></thead><tbody id="driverRows"><tr><td colspan="8">Checking records...</td></tr></tbody></table></div></div>
     </section>
 
     <section class="section" id="clients">
-      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">All Registered Clients</div><div class="sub">Search, filter, approve, or reject client registrations.</div></div><button class="btn ghost" onclick="exportCsv('clients')">Export CSV</button></div><div id="clientsAdminFeedback" class="admin-feedback info" style="display:none;"></div><div class="filters"><input id="clientSearch" placeholder="Search clients, phone, town, agent" oninput="renderClients()"><input id="clientRegionFilter" placeholder="Region" oninput="loadClients()"><input id="clientTownFilter" placeholder="Town" oninput="loadClients()"><select id="clientStatusFilter" onchange="loadClients()"><option value="">All statuses</option><option>PENDING</option><option>APPROVED</option><option>ACTIVE</option><option>REJECTED</option></select><button class="btn" onclick="clearClientFilters()">Clear</button></div><div class="row" style="margin-top:8px"><input id="clientAgentFilter" placeholder="Filter by agent" oninput="loadClients()"><input id="clientFrom" type="date" onchange="loadClients()"><input id="clientTo" type="date" onchange="loadClients()"></div><div class="row" style="margin-top:12px"><label class="pill"><input type="checkbox" id="clientSelectAll" onchange="setAllVisible('client',this.checked)"> Select visible</label><button class="btn ok" onclick="bulkApprove('client')">Bulk approve selected</button><button class="btn bad" onclick="bulkReject('client')">Bulk reject selected</button><button class="btn ghost" onclick="bulkApprove('client',true)">Approve all filtered</button><button class="btn ghost" onclick="bulkReject('client',true)">Reject all filtered</button><span class="pill" id="clientBulkCount">0 selected</span></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Status</th><th>Name</th><th>Phone</th><th>Town/Region</th><th>Recruiter</th><th>Created</th><th>Actions</th></tr></thead><tbody id="clientRows"><tr><td colspan="8">Checking records...</td></tr></tbody></table></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">All Registered Clients</div><div class="sub">Search, filter, approve, or reject client registrations.</div></div><button class="btn ghost" onclick="exportCsv('clients')">Export CSV</button></div><div id="clientsAdminFeedback" class="admin-feedback info" style="display:none;"></div><div class="filters"><input id="clientSearch" aria-label="Search clients, phone, town, agent" oninput="renderClients()"><input id="clientRegionFilter" aria-label="Region" oninput="loadClients()"><input id="clientTownFilter" aria-label="Town" oninput="loadClients()"><select id="clientStatusFilter" onchange="loadClients()"><option value="">All statuses</option><option>PENDING</option><option>APPROVED</option><option>ACTIVE</option><option>REJECTED</option></select><button class="btn" onclick="clearClientFilters()">Clear</button></div><div class="row" style="margin-top:8px"><input id="clientAgentFilter" aria-label="Filter by agent" oninput="loadClients()"><input id="clientFrom" type="date" onchange="loadClients()"><input id="clientTo" type="date" onchange="loadClients()"></div><div class="row" style="margin-top:12px"><label class="pill"><input type="checkbox" id="clientSelectAll" onchange="setAllVisible('client',this.checked)"> Select visible</label><button class="btn ok" onclick="bulkApprove('client')">Bulk approve selected</button><button class="btn bad" onclick="bulkReject('client')">Bulk reject selected</button><button class="btn ghost" onclick="bulkApprove('client',true)">Approve all filtered</button><button class="btn ghost" onclick="bulkReject('client',true)">Reject all filtered</button><span class="pill" id="clientBulkCount">0 selected</span></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th></th><th>Status</th><th>Name</th><th>Phone</th><th>Town/Region</th><th>Recruiter</th><th>Created</th><th>Actions</th></tr></thead><tbody id="clientRows"><tr><td colspan="8">Checking records...</td></tr></tbody></table></div></div>
     </section>
 
     <section class="section" id="reports">
@@ -170,13 +170,13 @@
           <div class="title">Finance Settings</div>
           <div class="sub">Driver and client rewards can be set by region and town.</div>
           <div class="grid3" style="margin-top:12px">
-            <input id="ruleRegion" placeholder="Region">
-            <input id="ruleTown" placeholder="Town or All">
+            <input id="ruleRegion" aria-label="Region">
+            <input id="ruleTown" aria-label="Town or All">
             <select id="ruleStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select>
-            <input id="ruleDriverReward" type="number" step="0.01" placeholder="Driver reward">
-            <input id="ruleClientReward" type="number" step="0.01" placeholder="Client reward">
-            <input id="ruleActivationBonus" type="number" step="0.01" placeholder="Activation bonus">
-            <input id="ruleFirstTripBonus" type="number" step="0.01" placeholder="First trip bonus">
+            <input id="ruleDriverReward" type="number" step="0.01" aria-label="Driver reward">
+            <input id="ruleClientReward" type="number" step="0.01" aria-label="Client reward">
+            <input id="ruleActivationBonus" type="number" step="0.01" aria-label="Activation bonus">
+            <input id="ruleFirstTripBonus" type="number" step="0.01" aria-label="First trip bonus">
             <input id="ruleEffectiveFrom" type="date">
             <input id="ruleEffectiveTo" type="date">
           </div>
@@ -187,9 +187,9 @@
           <div class="title">Region Activation Settings</div>
           <div class="sub">Control whether registrations are open by region and town.</div>
           <div class="grid3" style="margin-top:12px">
-            <input id="accessRegion" placeholder="Region">
-            <input id="accessTown" placeholder="Town or All">
-            <input id="accessNote" placeholder="Note">
+            <input id="accessRegion" aria-label="Region">
+            <input id="accessTown" aria-label="Town or All">
+            <input id="accessNote" aria-label="Note">
             <label class="pill"><input type="checkbox" id="accessActive" checked> Active</label>
             <label class="pill"><input type="checkbox" id="accessOpen" checked> Registration open</label>
           </div>
@@ -197,17 +197,17 @@
           <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Region</th><th>Town</th><th>Active</th><th>Registration</th><th>Updated</th><th>Note</th></tr></thead><tbody id="regionSettingRows"><tr><td colspan="6">Checking records...</td></tr></tbody></table></div>
         </div>
       </div>
-      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">Finance Center</div><div class="sub">Wallet ledger and finance records.</div></div><input id="financeSearch" placeholder="Search finance" oninput="renderFinance()"></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Time</th><th>Agent/User</th><th>Type</th><th>Status</th><th>Amount</th><th>Details</th></tr></thead><tbody id="financeRows"><tr><td colspan="6">Checking records...</td></tr></tbody></table></div></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><div><div class="title">Finance Center</div><div class="sub">Wallet ledger and finance records.</div></div><input id="financeSearch" aria-label="Search finance" oninput="renderFinance()"></div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Time</th><th>Agent/User</th><th>Type</th><th>Status</th><th>Amount</th><th>Details</th></tr></thead><tbody id="financeRows"><tr><td colspan="6">Checking records...</td></tr></tbody></table></div></div>
       <div class="grid2">
         <div class="card">
           <div class="title">Statements</div>
           <div class="grid2" style="margin-top:12px">
             <select id="statementAgent"></select>
-            <input id="statementAmount" type="number" step="0.01" placeholder="Amount (leave blank to use wallet due)">
+            <input id="statementAmount" type="number" step="0.01" aria-label="Amount (leave blank to use wallet due)">
             <input id="statementPeriodStart" type="date">
             <input id="statementPeriodEnd" type="date">
           </div>
-          <textarea id="statementNote" placeholder="Statement note" style="margin-top:10px"></textarea>
+          <textarea id="statementNote" aria-label="Statement note" style="margin-top:10px"></textarea>
           <div class="row" style="margin-top:10px"><button class="btn ok" onclick="executeStatement()">Execute Statement</button></div>
           <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Statement</th><th>Agent</th><th>Amount</th><th>Status</th><th>Executed</th></tr></thead><tbody id="financeStatementRows"><tr><td colspan="5">Checking records...</td></tr></tbody></table></div>
         </div>
@@ -224,9 +224,9 @@
         <div class="title">Region Access</div>
         <div class="sub">When a town or region is closed, agents in that area cannot register drivers or clients.</div>
         <div class="grid3" style="margin-top:12px">
-          <input id="accessRegionTab" placeholder="Region">
-          <input id="accessTownTab" placeholder="Town or All">
-          <input id="accessNoteTab" placeholder="Note">
+          <input id="accessRegionTab" aria-label="Region">
+          <input id="accessTownTab" aria-label="Town or All">
+          <input id="accessNoteTab" aria-label="Note">
           <label class="pill"><input type="checkbox" id="accessActiveTab" checked> Active</label>
           <label class="pill"><input type="checkbox" id="accessOpenTab" checked> Registration open</label>
         </div>
@@ -236,11 +236,11 @@
     </section>
 
     <section class="section" id="jobs">
-      <div class="grid2"><div class="card"><div class="title">Post Remote Job / Task</div><div class="grid2" style="margin-top:12px"><input id="jobTitle" placeholder="Need 10 agents in Windhoek"><input id="jobTown" placeholder="Town / region"><input id="jobTarget" type="number" min="0" placeholder="Target count"><select id="jobStatus"><option>ACTIVE</option><option>ON_HOLD</option><option>CLOSED</option></select></div><textarea id="jobDescription" placeholder="Task details" style="margin-top:10px"></textarea><div class="row" style="margin-top:10px"><button class="btn ok" onclick="createJob()">Post Job</button><button class="btn ghost" onclick="loadJobs()">Reload</button></div></div><div class="card"><div class="title">Active Job Alerts</div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Created</th><th>Title</th><th>Town</th><th>Status</th><th>Target</th></tr></thead><tbody id="jobRows"><tr><td colspan="5">Checking records...</td></tr></tbody></table></div></div></div>
+      <div class="grid2"><div class="card"><div class="title">Post Remote Job / Task</div><div class="grid2" style="margin-top:12px"><input id="jobTitle" aria-label="Need 10 agents in Windhoek"><input id="jobTown" aria-label="Town / region"><input id="jobTarget" type="number" min="0" aria-label="Target count"><select id="jobStatus"><option>ACTIVE</option><option>ON_HOLD</option><option>CLOSED</option></select></div><textarea id="jobDescription" aria-label="Task details" style="margin-top:10px"></textarea><div class="row" style="margin-top:10px"><button class="btn ok" onclick="createJob()">Post Job</button><button class="btn ghost" onclick="loadJobs()">Reload</button></div></div><div class="card"><div class="title">Active Job Alerts</div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Created</th><th>Title</th><th>Town</th><th>Status</th><th>Target</th></tr></thead><tbody id="jobRows"><tr><td colspan="5">Checking records...</td></tr></tbody></table></div></div></div>
     </section>
 
     <section class="section" id="broadcasts">
-      <div class="grid2"><div class="card"><div class="title">Broadcasts</div><input id="broadcastTitle" placeholder="Title" style="margin-top:10px"><textarea id="broadcastMessage" placeholder="Message" style="margin-top:10px"></textarea><div class="row" style="margin-top:10px"><button class="btn ok" onclick="createBroadcast()">Send Broadcast</button><button class="btn ghost" onclick="loadBroadcasts()">Reload</button></div></div><div class="card"><div class="title">Recent Broadcasts</div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Time</th><th>Title</th><th>Message</th></tr></thead><tbody id="broadcastRows"><tr><td colspan="3">Checking records...</td></tr></tbody></table></div></div></div>
+      <div class="grid2"><div class="card"><div class="title">Broadcasts</div><input id="broadcastTitle" aria-label="Title" style="margin-top:10px"><textarea id="broadcastMessage" aria-label="Message" style="margin-top:10px"></textarea><div class="row" style="margin-top:10px"><button class="btn ok" onclick="createBroadcast()">Send Broadcast</button><button class="btn ghost" onclick="loadBroadcasts()">Reload</button></div></div><div class="card"><div class="title">Recent Broadcasts</div><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Time</th><th>Title</th><th>Message</th></tr></thead><tbody id="broadcastRows"><tr><td colspan="3">Checking records...</td></tr></tbody></table></div></div></div>
     </section>
   </main>
   <div class="toast" id="toast"></div>

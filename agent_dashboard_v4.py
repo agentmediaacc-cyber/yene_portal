@@ -666,9 +666,9 @@ def register_agent_dashboard_v4_routes(app, sb_admin, require_login, log_system_
         debug("agent_activity_v4", {"agent_id": agent.get("id"), "period": period}, rows=len(rows))
         return jsonify({"ok": True, "period": period, "rows": rows, "activity": rows})
 
-    @app.route("/api/agent/debug_links_v4", methods=["GET"], endpoint="agent_debug_links_v4")
+    @app.route("/api/agent/link_metrics_v4", methods=["GET"], endpoint="agent_link_metrics_v4")
     @require_login("AGENT")
-    def agent_debug_links_v4():
+    def agent_link_metrics_v4():
         agent, err = get_agent()
         if err:
             app.logger.warning(
